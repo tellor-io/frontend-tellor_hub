@@ -2,37 +2,165 @@ body {
     background:white;
 }
 h1 {
-
-    color: #07643A;
-
-    font: 1.3rem 'Inconsolata', monospace;  
-    font-size:15px;
+    color: black;
+    font: 1.3rem 'Cascadia', monospace;  
+    font-size:35px;
     text-align: center;
+    flex: 1; /* Allows the title to grow and take necessary space */
+    margin-left: 5%; /* Adds space between the title and the image */
+    margin-top: 50px; /* Adds some space between the title and the image */
+
 }
 h2 {
-    font: 1.3rem 'Inconsolata', monospace;  
-    font-size:20px;
-    color: #07643A; 
+    font: 1.3rem 'Cascadia', monospace;  
+    font-size:115px;
+    color: black; 
 
 }
 p {
-    font: 1.3rem 'Inconsolata', monospace;  
+    font: 1.3rem 'Cascadia', monospace;  
     font-size:15px;
-    color: #262626; 
+    color: black; 
 }
 .box {
-    border: 2px solid black;
-    margin-left: 25px;
-    margin-top: 25px;
-    margin-right: 25px;
+    border: 2px solid white;
+    margin-left: auto;
+    margin-top: 50px;
+    margin-right: auto;
     margin-bottom: 25px;
     padding: 1ex;
     color: #262626;  
-    font: 1.3rem 'Inconsolata', monospace;  
+    font: 1.3rem 'Cascadia', monospace;  
     font-size: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 a {
-    font: 1.3rem 'Inconsolata', monospace;  
+    font: 1.3rem 'Cascadia', monospace;  
     font-size:15px;
-    color: #2714ff;
+    color: #07643A;
+}
+.button-style-1 {
+    background-color: black;
+    color: white;
+    padding: 10px 40px;
+    border: none;
+    font-size: 20px;
+    border-radius: 0px;
+    cursor: pointer;
+    margin-top: 20px; /* Adds some space between the title and the image */
+  }
+
+    .button-container {
+    display: flex;
+    align-items: center;
+    gap: 20px; /* Adds space between children */
+    margin-top: 20px; /* Adds some space between the title and the image */
+    }
+
+.button-style-2 {
+    background-color: green;
+    color: white;
+    width: 300px;
+    height: 100px;
+    border: solid 2px black;
+    border-radius: 0px;
+    cursor: cell;
+    margin-top: 20px; /* Adds margin to the right of the button */
+
+}
+.contest-address-style {
+    color: green; /* Set the color you prefer */
+    font-size: 16px; /* Example: set font size */
+    /* Add other styling as needed */
+}
+.title-container {
+    display: flex;
+    align-items: center; /* Vertically center the items in the container */
+    justify-content: flex-end; /* Align items to the start */
+    flex-wrap: nowrap; /* Prevent wrapping of items */
+}
+.right-side-image {
+    width: 50px; /* Adjust width as necessary */
+    height: auto; /* Keeps the aspect ratio */
+    margin-left: 0%; /* Adds space between the title and the image */
+    text-align: center;
+    flex: 1; /* Allows the title to grow and take necessary space */
+    margin-right: 20px; /* Adds some space between the title and the image */
+    margin-top: 5px; /* Adds some space between the title and the image */
+    vertical-align: -7px; /* Adjusts vertical alignment */
+
+}
+.top-right {
+    position: absolute;
+    right: 0;
+    top: 0;
+    margin: 50px;
+}
+img {
+    text-align: center;
+    flex: 1; /* Allows the title to grow and take necessary space */
+    margin-right: 20px; /* Adds some space between the title and the image */
+}
+
+@media (max-width: 600px) {
+    .box {
+        border: 2px solid white;
+        margin-left: 25px;
+        margin-top: 100px;
+        margin-right: 25px;
+        margin-bottom: 25px;
+        padding: 1ex;
+        color: #262626;  
+        font: 1.3rem 'Cascadia', monospace;  
+        font-size: 16px;
+    }
+    h1 {
+        font-size: 20px; /* Smaller font size for mobile */
+        margin-left: 2%; /* Less margin for smaller screens */
+        margin-top: 50px; /* Less space on top */
+    }
+    .button-style-1, .button-style-2 {
+        display: flex;
+        flex-direction: column; /* Stack buttons vertically */
+        gap: 10px; /* Smaller gap between buttons */
+        align-items: center; /* Center align items horizontally */
+        justify-content: center; /* Center align items vertically */
+        margin-right: 50px; /* Adds some space between the title and the image */
+        margin-bottom: 100px; /* Adds some space between the title and the image */
+
+    }
+    .button-style-2 {
+        background-color: green;
+        color: white;
+        width: 300px;
+        height: 100px;
+        border: solid 2px black;
+        border-radius: 100px;
+        cursor: cell;
+        margin-top: 20px; /* Adds margin to the right of the button */
+        margin-left: 40px; /* Adds margin to the right of the button */
+
+    
+    }
+    .button-container {
+        display: flex;
+        flex-direction: column; /* Stack buttons vertically */
+        gap: 10px; /* Smaller gap between buttons */
+        align-items: center; /* Center align items horizontally */
+        justify-content: center; /* Center align items vertically */
+        margin-top: 20px; /* Less space on top */
+
+    }
+    .title-container, .button-container {
+        justify-content: center; /* Center aligning for smaller screens */
+        margin-top: 20px; /* Less space on top */
+
+    }
+    .right-side-image {
+        width: 30px; /* Smaller image on mobile */
+        margin-right: 10px; /* Less margin */
+    }
+
 }

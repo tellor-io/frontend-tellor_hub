@@ -7,65 +7,73 @@ var App = {
   tokenAddress: {},
   web3,
   tokenDecimals: 0,
+  currentDepositLimit: null,
+  depositId: 0, // Initialize depositId here
+  deposits: {}, // Assuming you also need a structure to store deposit details
+  //currentDepositLimit: 0, // Initialize currentDepositLimit in the App object
+  //depositLimitUpdateTime: 0, // Initialize depositLimitUpdateTime in the App object
+
+  _depositLimit: function() {
+    return App.currentDepositLimit;
+  },
 
   init: function () {
-    return App.initWeb3();a
+    return App.initWeb3();
   },
 
   initWeb3: function () {
-    if (typeof web3 !== "undefined") {
-      console.log("Using web3 detected from external source like Metamask");
-      App.web3Provider = window.ethereum;
-      web3 = new Web3(window.ethereum);
-    } else {
-      console.log("Using localhost");
-      web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
-    }
-    return App.initEth();
+    return new Promise((resolve, reject) => {
+      if (typeof web3 !== 'undefined') {
+        console.log("Using web3 detected from external source like Metamask");
+        App.web3Provider = window.ethereum;
+        web3 = new Web3(window.ethereum);
+        resolve(App.initEth()); // Ensure this resolves with initEth
+      } else {
+        console.log("Using localhost");
+        web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
+        resolve(App.initEth()); // Ensure this resolves with initEth
+      }
+    });
   },
 
   initEth: function () {
-    ethereum
-      .request({ method: "eth_requestAccounts" })
+    return ethereum.request({ method: "eth_requestAccounts" })
       .then(function (accounts) {
-        console.log("Ethereum enabled");
         App.account = accounts[0];
-        console.log("In initEth: " + App.account);
-        web3.eth.getChainId().then(function (result) {
+        return web3.eth.getChainId().then(function (result) {
           App.chainId = result;
-          console.log("Chain ID: " + App.chainId);
-          return App.initContestContract();
-        })
+          return App.initContestContract()
+            .then(App.initTokenContract)
+            .then(App.fetchCurrentDepositLimit);
+        });
+      }).catch(function(error) {
+        console.error("Error during Ethereum account request:", error);
       });
   },
 
   initContestContract: function () {
     var pathToAbi = "./abis/TheContest.json";
-    $.getJSON(pathToAbi, function (abi) {
-      App.contracts.Contest = new web3.eth.Contract(abi);
-      console.log(App.chainId)
-      if (App.chainId === 421613) {
-        App.contracts.Contest.options.address = "0xb2CB696fE5244fB9004877e58dcB680cB86Ba444" 
-      }
-     else  {
-        App.contracts.Contest.options.address = "0xD9157453E2668B2fc45b7A803D3FEF3642430cC0" 
-      }
-      console.log(App.chainId)
-      console.log("Contract initialized");
-      console.log("Contract address: " +  App.contracts.Contest.options.address);
-      console.log("this is ryan", App.contracts.contestAddress);
-      console.log("this is ryan", App.tokenBalance);
-      console.log("this is staker", App.contracts.Contest.getStakerInfo);
-      return App.initTokenContract();
+    return new Promise(function(resolve, reject) {
+      $.getJSON(pathToAbi, function (abi) {
+        App.contracts.Contest = new web3.eth.Contract(abi);
+        if (App.chainId === 421613) {
+          App.contracts.Contest.options.address = "0xb2CB696fE5244fB9004877e58dcB680cB86Ba444";
+        } else {
+          App.contracts.Contest.options.address = "0x17d9282cf0EB5705F6c0F4426a5E780bB9a1Ffe8";
+        }
+        console.log("Contract initialized");
+        console.log("Contract address: " + App.contracts.Contest.options.address);
+        resolve(); // Resolve after all setup is done
+      }).fail(reject); // Handle JSON fetch failure
     });
   },
-
-  initTokenContract: function () {
-    var pathToAbi = "./abis/ERC20.json";
+initTokenContract: function () {
+  var pathToAbi = "./abis/ERC20.json";
+  return new Promise(function(resolve, reject) {
     $.getJSON(pathToAbi, function (abi) {
       App.contracts.Token = new web3.eth.Contract(abi);
-      if (App.chainId === 5) {
-        App.contracts.Token.options.address = "0x51c59c6cAd28ce3693977F2feB4CfAebec30d8a2" //eth goerli 
+      if (App.chainId === 11155111) {
+        App.contracts.Token.options.address = "0x99CAAb1d5a46098FAD0dF0505a0C42965e020F7E" //eth sepolia 
       } 
       if (App.chainId === 1)  {
         App.contracts.Token.options.address = "0x88dF592F8eb5D7Bd38bFeF7dEb0fBc02cf3778a0" // eth main
@@ -101,69 +109,40 @@ var App = {
       console.log(
         "Token contract address: ", App.contracts.Token.options.address
       );
-      return App.getTokenDecimals();
-    });
-  },
+      resolve(); // Resolve the promise after all setup is done
+    }).fail(reject); // Reject the promise on failure
+  });
+},
 
-  
-  getTokenDecimals: function () {
-    App.contracts.Token.methods
-      .decimals()
-      .call()
-      .then(function (result) {
-        App.tokenDecimals = result;
-        return App.setPageParams();
-      });
-  },
+fetchCurrentDepositLimit: function() {
+  App.contracts.Contest.methods.currentDepositLimit().call()
+    .then(function(result) {
+      App.currentDepositLimit = result;
+      console.log("Updated currentDepositLimit:", App.currentDepositLimit);
+      // Convert from wei to ether (or any other unit your token uses)
+    const readableLimit = web3.utils.fromWei(App.currentDepositLimit, 'ether');
 
-  
+    // Update the DOM
+    document.getElementById("depositLimit").className = "contest-address-style";
+
+    document.getElementById("depositLimit").innerText = readableLimit + ' Tokens';
+  })
+  .catch(function(err) {
+    console.error("Failed to fetch currentDepositLimit:", err);
+  });
+},
 
   setPageParams: function () {
-    document.getElementById("contestAddress").innerHTML = App.contracts.Contest.options.address;
-    document.getElementById("connectedAddress").innerHTML = App.account;
-    App.getTokenBalance();
-  },
-
-
-
-  getTokenBalance: function () {
-    App.contracts.Token.methods
-      .balanceOf(App.account)
-      .call()
-      .then(function (result) {
-        let tokenBalance = BigInt(result) / BigInt(10 ** App.tokenDecimals);
-        let tokenBalanceString = tokenBalance.toString() + " TRB";
-        document.getElementById("tokenBalance").innerHTML = tokenBalanceString;
-      });
-  },
-
-  getStakedTokenBalance: function () {
-    App.contracts.Contest.methods
-      .getStakerInfo(App.account)
-      .call()
-      .then(function (result) {
-        let stakedTokenBalance = BigInt(result) / BigInt(10 ** App.tokenDecimals);
-        let stakedTokenBalanceString = stakedTokenBalance.toString() + " TRB";
-        document.getElementById("stakedTokenBalance").innerHTML = stakedTokenBalanceString;
-      });
-  },
-
-
-
-  /*to18: function(n) {
-    return ethers.BigNumber.from(n).mul(ethers.BigNumber.from(10).pow(18));
-},*/
-
-
-   /*uintTob32: function (n) {
-    let vars = web3.utils.toHex(n);
-    vars = vars.slice(2);
-    while (vars.length < 64) {
-      vars = "0" + vars;
+    document.getElementById("connectedAddress").className = "contest-address-style";
+    if (document.getElementById("connectedAddress")) {
+        document.getElementById("connectedAddress").innerHTML = App.account;
     }
-    vars = "0x" + vars;
-    return vars;
-  },*/
+    console.log("Account:", App.account);
+    console.log("Contest Address:", App.contracts.Contest.options.address); // Keep this line to log the address to the console
+    console.log("Current Deposit Limit:", App.currentDepositLimit);
+  },
+
+
 
   uintTob32: function (n) {
     let vars = web3.utils.toBN(n).toString('hex');
@@ -181,6 +160,7 @@ var App = {
     console.log("_value: "  + value.padStart(64, '0'));
     console.log("_nonce: " + nonce);
     console.log("_queryData: " + queryData);
+    console.log("Attempting to interact with contract at address:", App.contracts.Contest.options.address);
     App.contracts.Contest.methods
       .submitValue(queryId, value, nonce, queryData)
       .send({ from: App.account })
@@ -189,26 +169,44 @@ var App = {
       });
   },
 
-  //     value = "0x" + App.uintTob32(web3.utils.toWei(document.getElementById("_value").value, 'ether')).padStart(64, '0');
+  depositToLayer: function() {
+    const recipient = document.getElementById('_queryId').value;
+    const amount = document.getElementById('stakeAmount').value;
+    const amountToSend = web3.utils.toWei(amount, 'ether');
+  
+    // Convert the current deposit limit and the amount to send into BN for comparison
+    const amountToSendBN = web3.utils.toBN(amountToSend);
+    const currentDepositLimitBN = web3.utils.toBN(App.currentDepositLimit);
+  
+    if (amountToSendBN.gt(currentDepositLimitBN)) {
+      return alert("Deposit amount exceeds the current deposit limit.");
+    }
+  
+    // Proceed with the deposit if the amount is within the limit
+    App.contracts.Token.methods.approve(App.contracts.Contest.options.address, amountToSend)
+      .send({ from: App.account })
+      .then(function(approvalResult) {
+        console.log("Approval successful", approvalResult);
+        return App.contracts.Contest.methods.depositToLayer(amountToSend, recipient)
+          .send({ from: App.account });
+      })
+      .then(function(depositResult) {
+        console.log("Deposit to layer successful", depositResult);
+      })
+      .catch(function(error) {
+        console.error("Error in depositing to layer", error);
+      });
+  }
 
-
-
-
-  stakeToken: function () {
-  stakeAmount = (document.getElementById("stakeAmount").value)*100000000000000000n;
-  console.log("stakeAmount: " + stakeAmount);
-  App.contracts.Contest.methods
-    .depositStake(stakeAmount)
-    .send({ from: App.account })
-    .then(function (result) {
-      console.log(result);
-    });
-},
 };
 
 $(function () {
   $(window).load(function () {
     document.getElementById("connectButton").disabled = false;
-    // App.init();
+    App.init().then(function() {
+      App.setPageParams(); // Ensure this is called after initialization
+    }).catch(function(error) {
+      console.error("Initialization failed:", error);
+    });
   });
 });
