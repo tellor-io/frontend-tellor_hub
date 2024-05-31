@@ -10,13 +10,13 @@
   <body>
     <header>
       <div class="top-right">
-        <button id="connectButton" class="button-style-1" onclick="App.init()" disabled>connect wallet</button>
-    </div>
+        <button id="walletButton" class="button-style-1" disabled>Connect Wallet</button>
+      </div>
     </header>
 
     <div class="box">
       <section>
-        <h1><img src="../bridge-image.png" alt="Descriptive Image Text" class="right-side-image">Bridge to Layer</h1> 
+        <h1><img src="../bridge-image.png" alt="Descriptive Image Text" class="right-side-image">tellor layer trb bridge</h1> 
         <div>
    <!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script> -->
         <p>connected address: <span id="connectedAddress"></span></p>
@@ -31,7 +31,7 @@
         <!--<p> 
           <a target="_blank" href="https://queryidbuilder.herokuapp.com/spotprice">obtain query id & query data here</a>
         </p>-->
-        <p><input style="width: 565px; height: 35px; font-size: 26px;" type="text" id="_queryId" placeholder="recipient address"/></p>
+        <p><input type="text" id="_queryId" placeholder="                     recipient address"/></p>
         <!--<p><input style="width: 350px;"type="text" id="_value" placeholder="_value (bytes)"/></p>
         <p><input type="text" id="_nonce" placeholder="_nonce (uint256)"/></p>
         <p><textarea style="height:190px; width: 485px;"type="text" id="_queryData" placeholder="_queryData (bytes)"></textarea></p>
@@ -42,13 +42,13 @@
 
         <h2>stake the trb token:</h2>-->
         <div>
-          <input style="width: 395px; height: 35px; font-size: 26px;" type="text" id="stakeAmount" placeholder="ex. 20 TRB"/>
+          <input type="text" id="stakeAmount" placeholder="             ex. '20' "/> TRB
       </div>
       <section>
         <p style= "font-size: 12px"> (deposit limit:         <span id="depositLimit"; style= "font-size: 12px" ></span> )</p>
       </section>
         <div class="button-container">
-          <button id="stakeToken" class="button-style-2" onclick="App.depositToLayer()">Bridge to Layer</button>      </div>
+          <button id="stakeToken" class="button-style-2" onclick="App.depositToLayer()">bridge to layer</button>      </div>
       <br></br>
       <br></br>
 
