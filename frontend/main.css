@@ -68,7 +68,7 @@ a {
     border-radius: 0px;
     cursor: cell;
     margin-top: 20px; /* Adds margin to the right of the button */
-
+    font-size: 35px;
 }
 .contest-address-style {
     color: green; /* Set the color you prefer */
@@ -103,6 +103,18 @@ img {
     flex: 1; /* Allows the title to grow and take necessary space */
     margin-right: 20px; /* Adds some space between the title and the image */
 }
+#_queryId {
+    font-size: 20px; /* Smaller font size for mobile */
+    padding: 10px; /* Larger padding for better touch interaction */
+    margin: 5px 0; /* Adjust margin for better spacing */
+    width: 400px; /* Full width to utilize screen space */
+}
+#stakeAmount {
+    font-size: 20px; /* Smaller font size for mobile */
+    padding: 10px; /* Larger padding for better touch interaction */
+    margin: 5px 0; /* Adjust margin for better spacing */
+    width: 200px; /* Full width to utilize screen space */
+}
 
 @media (max-width: 600px) {
     .box {
@@ -129,6 +141,17 @@ img {
         justify-content: center; /* Center align items vertically */
         margin-right: 50px; /* Adds some space between the title and the image */
         margin-bottom: 100px; /* Adds some space between the title and the image */
+
+    }
+    .button-style-1 {
+        background-color: black;
+        color: white;
+        padding: 10px 40px;
+        border: none;
+        font-size: 20px;
+        border-radius: 0px;
+        cursor: pointer;
+        margin-top: 20px; /* Adds some space between the title and the image */
 
     }
     .button-style-2 {
@@ -161,6 +184,18 @@ img {
     .right-side-image {
         width: 30px; /* Smaller image on mobile */
         margin-right: 10px; /* Less margin */
+    }
+    #_queryId {
+        font-size: 12px; /* Smaller font size for mobile */
+        padding: 10px; /* Larger padding for better touch interaction */
+        margin: 5px 0; /* Adjust margin for better spacing */
+        width: 300px; /* Full width to utilize screen space */
+    }
+    #stakeAmount {
+        font-size: 20px; /* Smaller font size for mobile */
+        padding: 10px; /* Larger padding for better touch interaction */
+        margin: 5px 0; /* Adjust margin for better spacing */
+        width: 200px; /* Full width to utilize screen space */
     }
 
 }

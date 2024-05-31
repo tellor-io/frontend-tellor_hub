@@ -10,8 +10,6 @@ var App = {
   currentDepositLimit: null,
   depositId: 0, // Initialize depositId here
   deposits: {}, // Assuming you also need a structure to store deposit details
-  //currentDepositLimit: 0, // Initialize currentDepositLimit in the App object
-  //depositLimitUpdateTime: 0, // Initialize depositLimitUpdateTime in the App object
 
   _depositLimit: function() {
     return App.currentDepositLimit;
@@ -112,6 +110,7 @@ initTokenContract: function () {
       resolve(); // Resolve the promise after all setup is done
     }).fail(reject); // Reject the promise on failure
   });
+
 },
 
 fetchCurrentDepositLimit: function() {
@@ -125,7 +124,7 @@ fetchCurrentDepositLimit: function() {
     // Update the DOM
     document.getElementById("depositLimit").className = "contest-address-style";
 
-    document.getElementById("depositLimit").innerText = readableLimit + ' Tokens';
+    document.getElementById("depositLimit").innerText = readableLimit + ' TRB';
   })
   .catch(function(err) {
     console.error("Failed to fetch currentDepositLimit:", err);
@@ -202,7 +201,8 @@ fetchCurrentDepositLimit: function() {
 
 $(function () {
   $(window).load(function () {
-    document.getElementById("connectButton").disabled = false;
+    console.log(document.getElementById('walletButton')); // Replace 'elementId' with the actual ID used at line 204
+    document.getElementById("walletButton").disabled = false;
     App.init().then(function() {
       App.setPageParams(); // Ensure this is called after initialization
     }).catch(function(error) {
@@ -210,3 +210,32 @@ $(function () {
     });
   });
 });
+
+$(document).ready(function() {
+    const walletButton = document.getElementById('walletButton');
+    console.log(walletButton); // This should not be null if everything is correct
+    let isConnected = false;
+
+    walletButton.addEventListener('click', function() {
+        if (!isConnected) {
+            connectWallet();
+        } else {
+            disconnectWallet();
+        }
+    });
+
+    function connectWallet() {
+        console.log('Connecting wallet...');
+        isConnected = true;
+        walletButton.textContent = 'Disconnect Wallet';
+        walletButton.disabled = false;
+    }
+
+    function disconnectWallet() {
+        console.log('Disconnecting wallet...');
+        isConnected = false;
+        walletButton.textContent = 'Connect Wallet';
+        walletButton.disabled = false;
+    }
+});
+
