@@ -39,15 +39,15 @@ p {
 a {
     font: 1.3rem 'Cascadia', monospace;  
     font-size:15px;
-    color: #07643A;
+    color: #165863;
 }
 .button-style-1 {
-    background-color: black;
+    background-color: #6C5780;
     color: white;
     padding: 10px 40px;
     border: none;
     font-size: 20px;
-    border-radius: 0px;
+    border-radius: 10px;
     cursor: pointer;
     margin-top: 20px; /* Adds some space between the title and the image */
   }
@@ -60,18 +60,40 @@ a {
     }
 
 .button-style-2 {
-    background-color: green;
+    background-color: #156B75;
     color: white;
-    width: 300px;
-    height: 100px;
+    width: 150px;
+    height: 50px;
     border: solid 2px black;
-    border-radius: 0px;
+    border-radius: 10px;
     cursor: cell;
     margin-top: 20px; /* Adds margin to the right of the button */
-    font-size: 35px;
+    font-size: 20px;
+}
+.button-style-3 {
+    background-color: #1F486D;
+    color: white;
+    width: 150px;
+    height: 50px;
+    border: solid 2px black;
+    border-radius: 10px;
+    cursor: cell;
+    margin-top: 20px; /* Adds margin to the right of the button */
+    font-size: 20px;
+}
+.button-style-4 {
+    background-color: #14283D;
+    color: white;
+    width: 150px;
+    height: 50px;
+    border: solid 2px black;
+    border-radius: 10px;
+    cursor: cell;
+    margin-top: 20px; /* Adds margin to the right of the button */
+    font-size: 20px;
 }
 .contest-address-style {
-    color: green; /* Set the color you prefer */
+    color: #165863; /* Set the color you prefer */
     font-size: 16px; /* Example: set font size */
     /* Add other styling as needed */
 }
@@ -140,31 +162,30 @@ img {
         align-items: center; /* Center align items horizontally */
         justify-content: center; /* Center align items vertically */
         margin-right: 50px; /* Adds some space between the title and the image */
-        margin-bottom: 100px; /* Adds some space between the title and the image */
+        margin-bottom: 10px; /* Adds some space between the title and the image */
 
     }
     .button-style-1 {
-        background-color: black;
+        background-color: #5A486A;
         color: white;
         padding: 10px 40px;
         border: none;
         font-size: 20px;
-        border-radius: 0px;
+        border-radius: 10px;
         cursor: pointer;
         margin-top: 20px; /* Adds some space between the title and the image */
 
     }
     .button-style-2 {
-        background-color: green;
+        background-color: #165863;
         color: white;
-        width: 300px;
-        height: 100px;
+        width: 150px;
+        height: 50px;
         border: solid 2px black;
-        border-radius: 100px;
+        border-radius: 10px;
         cursor: cell;
         margin-top: 20px; /* Adds margin to the right of the button */
         margin-left: 40px; /* Adds margin to the right of the button */
-
     
     }
     .button-container {

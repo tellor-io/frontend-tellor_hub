@@ -1,1168 +1,599 @@
 [
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "_token",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "_blobstream",
-          "type": "address"
-        },
-        {
-          "internalType": "address",
-          "name": "_tellorFlex",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "nonpayable",
-      "type": "constructor"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "depositId",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "address",
-          "name": "sender",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "string",
-          "name": "recipient",
-          "type": "string"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        }
-      ],
-      "name": "Deposit",
-      "type": "event"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "depositId",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "internalType": "string",
-          "name": "sender",
-          "type": "string"
-        },
-        {
-          "indexed": false,
-          "internalType": "address",
-          "name": "recipient",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        }
-      ],
-      "name": "Withdrawal",
-      "type": "event"
-    },
-    {
-      "inputs": [],
-      "name": "DEPOSIT_LIMIT_DENOMINATOR",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "DEPOSIT_LIMIT_UPDATE_INTERVAL",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "INITIAL_LAYER_TOKEN_SUPPLY",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "MAX_ATTESTATION_AGE",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "_amount",
-          "type": "uint256"
-        }
-      ],
-      "name": "addStakingRewards",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "bridge",
-      "outputs": [
-        {
-          "internalType": "contract BlobstreamO",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "currentDepositLimit",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "depositId",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "depositLimit",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "depositLimitUpdateTime",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "_amount",
-          "type": "uint256"
-        },
-        {
-          "internalType": "string",
-          "name": "_layerRecipient",
-          "type": "string"
-        }
-      ],
-      "name": "depositToLayer",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "name": "deposits",
-      "outputs": [
-        {
-          "internalType": "address",
-          "name": "sender",
-          "type": "address"
-        },
-        {
-          "internalType": "string",
-          "name": "recipient",
-          "type": "string"
-        },
-        {
-          "internalType": "uint256",
-          "name": "amount",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "blockHeight",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "_queryId",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_timestamp",
-          "type": "uint256"
-        }
-      ],
-      "name": "getDataBefore",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "_ifRetrieve",
-          "type": "bool"
-        },
-        {
-          "internalType": "bytes",
-          "name": "_value",
-          "type": "bytes"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_timestampRetrieved",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "components": [
-            {
-              "internalType": "bytes32",
-              "name": "queryId",
-              "type": "bytes32"
-            },
-            {
-              "components": [
-                {
-                  "internalType": "bytes",
-                  "name": "value",
-                  "type": "bytes"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "timestamp",
-                  "type": "uint256"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "aggregatePower",
-                  "type": "uint256"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "previousTimestamp",
-                  "type": "uint256"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "nextTimestamp",
-                  "type": "uint256"
-                }
-              ],
-              "internalType": "struct ReportData",
-              "name": "report",
-              "type": "tuple"
-            },
-            {
-              "internalType": "uint256",
-              "name": "attestationTimestamp",
-              "type": "uint256"
-            }
-          ],
-          "internalType": "struct OracleAttestationData",
-          "name": "_attest",
-          "type": "tuple"
-        },
-        {
-          "components": [
-            {
-              "internalType": "address",
-              "name": "addr",
-              "type": "address"
-            },
-            {
-              "internalType": "uint256",
-              "name": "power",
-              "type": "uint256"
-            }
-          ],
-          "internalType": "struct Validator[]",
-          "name": "_currentValidatorSet",
-          "type": "tuple[]"
-        },
-        {
-          "components": [
-            {
-              "internalType": "uint8",
-              "name": "v",
-              "type": "uint8"
-            },
-            {
-              "internalType": "bytes32",
-              "name": "r",
-              "type": "bytes32"
-            },
-            {
-              "internalType": "bytes32",
-              "name": "s",
-              "type": "bytes32"
-            }
-          ],
-          "internalType": "struct Signature[]",
-          "name": "_sigs",
-          "type": "tuple[]"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_fallbackTimestamp",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_fallbackMinimumPower",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_maxAttestationAge",
-          "type": "uint256"
-        }
-      ],
-      "name": "getDataWithFallback",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "_queryId",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_timestamp",
-          "type": "uint256"
-        }
-      ],
-      "name": "getIndexForDataBefore",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "_found",
-          "type": "bool"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_index",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "_queryId",
-          "type": "bytes32"
-        }
-      ],
-      "name": "getNewValueCountbyQueryId",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "_queryId",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_timestamp",
-          "type": "uint256"
-        }
-      ],
-      "name": "getReporterByTimestamp",
-      "outputs": [
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "getTimeOfLastNewValue",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "_queryId",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_index",
-          "type": "uint256"
-        }
-      ],
-      "name": "getTimestampbyQueryIdandIndex",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "components": [
-            {
-              "internalType": "bytes32",
-              "name": "queryId",
-              "type": "bytes32"
-            },
-            {
-              "components": [
-                {
-                  "internalType": "bytes",
-                  "name": "value",
-                  "type": "bytes"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "timestamp",
-                  "type": "uint256"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "aggregatePower",
-                  "type": "uint256"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "previousTimestamp",
-                  "type": "uint256"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "nextTimestamp",
-                  "type": "uint256"
-                }
-              ],
-              "internalType": "struct ReportData",
-              "name": "report",
-              "type": "tuple"
-            },
-            {
-              "internalType": "uint256",
-              "name": "attestationTimestamp",
-              "type": "uint256"
-            }
-          ],
-          "internalType": "struct OracleAttestationData",
-          "name": "_attest",
-          "type": "tuple"
-        },
-        {
-          "components": [
-            {
-              "internalType": "address",
-              "name": "addr",
-              "type": "address"
-            },
-            {
-              "internalType": "uint256",
-              "name": "power",
-              "type": "uint256"
-            }
-          ],
-          "internalType": "struct Validator[]",
-          "name": "_currentValidatorSet",
-          "type": "tuple[]"
-        },
-        {
-          "components": [
-            {
-              "internalType": "uint8",
-              "name": "v",
-              "type": "uint8"
-            },
-            {
-              "internalType": "bytes32",
-              "name": "r",
-              "type": "bytes32"
-            },
-            {
-              "internalType": "bytes32",
-              "name": "s",
-              "type": "bytes32"
-            }
-          ],
-          "internalType": "struct Signature[]",
-          "name": "_sigs",
-          "type": "tuple[]"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_maxAttestationAge",
-          "type": "uint256"
-        }
-      ],
-      "name": "isAnyConsensusValue",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "components": [
-            {
-              "internalType": "bytes32",
-              "name": "queryId",
-              "type": "bytes32"
-            },
-            {
-              "components": [
-                {
-                  "internalType": "bytes",
-                  "name": "value",
-                  "type": "bytes"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "timestamp",
-                  "type": "uint256"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "aggregatePower",
-                  "type": "uint256"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "previousTimestamp",
-                  "type": "uint256"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "nextTimestamp",
-                  "type": "uint256"
-                }
-              ],
-              "internalType": "struct ReportData",
-              "name": "report",
-              "type": "tuple"
-            },
-            {
-              "internalType": "uint256",
-              "name": "attestationTimestamp",
-              "type": "uint256"
-            }
-          ],
-          "internalType": "struct OracleAttestationData",
-          "name": "_attest",
-          "type": "tuple"
-        },
-        {
-          "components": [
-            {
-              "internalType": "address",
-              "name": "addr",
-              "type": "address"
-            },
-            {
-              "internalType": "uint256",
-              "name": "power",
-              "type": "uint256"
-            }
-          ],
-          "internalType": "struct Validator[]",
-          "name": "_currentValidatorSet",
-          "type": "tuple[]"
-        },
-        {
-          "components": [
-            {
-              "internalType": "uint8",
-              "name": "v",
-              "type": "uint8"
-            },
-            {
-              "internalType": "bytes32",
-              "name": "r",
-              "type": "bytes32"
-            },
-            {
-              "internalType": "bytes32",
-              "name": "s",
-              "type": "bytes32"
-            }
-          ],
-          "internalType": "struct Signature[]",
-          "name": "_sigs",
-          "type": "tuple[]"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_maxAttestationAge",
-          "type": "uint256"
-        }
-      ],
-      "name": "isCurrentConsensusValue",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "bytes32",
-          "name": "_queryId",
-          "type": "bytes32"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_timestamp",
-          "type": "uint256"
-        }
-      ],
-      "name": "isInDispute",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "components": [
-            {
-              "internalType": "bytes32",
-              "name": "queryId",
-              "type": "bytes32"
-            },
-            {
-              "components": [
-                {
-                  "internalType": "bytes",
-                  "name": "value",
-                  "type": "bytes"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "timestamp",
-                  "type": "uint256"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "aggregatePower",
-                  "type": "uint256"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "previousTimestamp",
-                  "type": "uint256"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "nextTimestamp",
-                  "type": "uint256"
-                }
-              ],
-              "internalType": "struct ReportData",
-              "name": "report",
-              "type": "tuple"
-            },
-            {
-              "internalType": "uint256",
-              "name": "attestationTimestamp",
-              "type": "uint256"
-            }
-          ],
-          "internalType": "struct OracleAttestationData",
-          "name": "_attest",
-          "type": "tuple"
-        },
-        {
-          "components": [
-            {
-              "internalType": "address",
-              "name": "addr",
-              "type": "address"
-            },
-            {
-              "internalType": "uint256",
-              "name": "power",
-              "type": "uint256"
-            }
-          ],
-          "internalType": "struct Validator[]",
-          "name": "_currentValidatorSet",
-          "type": "tuple[]"
-        },
-        {
-          "components": [
-            {
-              "internalType": "uint8",
-              "name": "v",
-              "type": "uint8"
-            },
-            {
-              "internalType": "bytes32",
-              "name": "r",
-              "type": "bytes32"
-            },
-            {
-              "internalType": "bytes32",
-              "name": "s",
-              "type": "bytes32"
-            }
-          ],
-          "internalType": "struct Signature[]",
-          "name": "_sigs",
-          "type": "tuple[]"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_timestampAfter",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_maxAge",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_minimumPower",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_maxAttestationAge",
-          "type": "uint256"
-        }
-      ],
-      "name": "isValidDataAfter",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "components": [
-            {
-              "internalType": "bytes32",
-              "name": "queryId",
-              "type": "bytes32"
-            },
-            {
-              "components": [
-                {
-                  "internalType": "bytes",
-                  "name": "value",
-                  "type": "bytes"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "timestamp",
-                  "type": "uint256"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "aggregatePower",
-                  "type": "uint256"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "previousTimestamp",
-                  "type": "uint256"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "nextTimestamp",
-                  "type": "uint256"
-                }
-              ],
-              "internalType": "struct ReportData",
-              "name": "report",
-              "type": "tuple"
-            },
-            {
-              "internalType": "uint256",
-              "name": "attestationTimestamp",
-              "type": "uint256"
-            }
-          ],
-          "internalType": "struct OracleAttestationData",
-          "name": "_attest",
-          "type": "tuple"
-        },
-        {
-          "components": [
-            {
-              "internalType": "address",
-              "name": "addr",
-              "type": "address"
-            },
-            {
-              "internalType": "uint256",
-              "name": "power",
-              "type": "uint256"
-            }
-          ],
-          "internalType": "struct Validator[]",
-          "name": "_currentValidatorSet",
-          "type": "tuple[]"
-        },
-        {
-          "components": [
-            {
-              "internalType": "uint8",
-              "name": "v",
-              "type": "uint8"
-            },
-            {
-              "internalType": "bytes32",
-              "name": "r",
-              "type": "bytes32"
-            },
-            {
-              "internalType": "bytes32",
-              "name": "s",
-              "type": "bytes32"
-            }
-          ],
-          "internalType": "struct Signature[]",
-          "name": "_sigs",
-          "type": "tuple[]"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_timestampBefore",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_maxReportAge",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_minimumPower",
-          "type": "uint256"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_maxAttestationAge",
-          "type": "uint256"
-        }
-      ],
-      "name": "isValidDataBefore",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "tellorFlex",
-      "outputs": [
-        {
-          "internalType": "contract ITellorFlex",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "token",
-      "outputs": [
-        {
-          "internalType": "contract IERC20",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "verify",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "pure",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "components": [
-            {
-              "internalType": "bytes32",
-              "name": "queryId",
-              "type": "bytes32"
-            },
-            {
-              "components": [
-                {
-                  "internalType": "bytes",
-                  "name": "value",
-                  "type": "bytes"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "timestamp",
-                  "type": "uint256"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "aggregatePower",
-                  "type": "uint256"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "previousTimestamp",
-                  "type": "uint256"
-                },
-                {
-                  "internalType": "uint256",
-                  "name": "nextTimestamp",
-                  "type": "uint256"
-                }
-              ],
-              "internalType": "struct ReportData",
-              "name": "report",
-              "type": "tuple"
-            },
-            {
-              "internalType": "uint256",
-              "name": "attestationTimestamp",
-              "type": "uint256"
-            }
-          ],
-          "internalType": "struct OracleAttestationData",
-          "name": "_attest",
-          "type": "tuple"
-        },
-        {
-          "components": [
-            {
-              "internalType": "address",
-              "name": "addr",
-              "type": "address"
-            },
-            {
-              "internalType": "uint256",
-              "name": "power",
-              "type": "uint256"
-            }
-          ],
-          "internalType": "struct Validator[]",
-          "name": "_valset",
-          "type": "tuple[]"
-        },
-        {
-          "components": [
-            {
-              "internalType": "uint8",
-              "name": "v",
-              "type": "uint8"
-            },
-            {
-              "internalType": "bytes32",
-              "name": "r",
-              "type": "bytes32"
-            },
-            {
-              "internalType": "bytes32",
-              "name": "s",
-              "type": "bytes32"
-            }
-          ],
-          "internalType": "struct Signature[]",
-          "name": "_sigs",
-          "type": "tuple[]"
-        },
-        {
-          "internalType": "uint256",
-          "name": "_depositId",
-          "type": "uint256"
-        }
-      ],
-      "name": "withdrawFromLayer",
-      "outputs": [],
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "name": "withdrawalClaimed",
-      "outputs": [
-        {
-          "internalType": "bool",
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    }
-  ]
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_token",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_blobstream",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_tellorFlex",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "_depositId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "_sender",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "_recipient",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "Deposit",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "_depositId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "_sender",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "Withdrawal",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "DEPOSIT_LIMIT_DENOMINATOR",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "DEPOSIT_LIMIT_UPDATE_INTERVAL",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "addStakingRewards",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "bridge",
+    "outputs": [
+      {
+        "internalType": "contract BlobstreamO",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_recipient",
+        "type": "address"
+      }
+    ],
+    "name": "claimExtraWithdraw",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "depositId",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "depositLimit",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "depositLimitRecord",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "depositLimitUpdateTime",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "string",
+        "name": "_layerRecipient",
+        "type": "string"
+      }
+    ],
+    "name": "depositToLayer",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "deposits",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "sender",
+        "type": "address"
+      },
+      {
+        "internalType": "string",
+        "name": "recipient",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "blockHeight",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "_queryId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "getDataBefore",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "_ifRetrieve",
+        "type": "bool"
+      },
+      {
+        "internalType": "bytes",
+        "name": "_value",
+        "type": "bytes"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_timestampRetrieved",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "_queryId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "getIndexForDataBefore",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "_found",
+        "type": "bool"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_index",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "_queryId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "getNewValueCountbyQueryId",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "_queryId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "getReporterByTimestamp",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getTimeOfLastNewValue",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "_queryId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_index",
+        "type": "uint256"
+      }
+    ],
+    "name": "getTimestampbyQueryIdandIndex",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "_queryId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "isInDispute",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "tellorFlex",
+    "outputs": [
+      {
+        "internalType": "contract ITellorFlex",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "token",
+    "outputs": [
+      {
+        "internalType": "contract ITellorMaster",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "tokensToClaim",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "verify",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "queryId",
+            "type": "bytes32"
+          },
+          {
+            "components": [
+              {
+                "internalType": "bytes",
+                "name": "value",
+                "type": "bytes"
+              },
+              {
+                "internalType": "uint256",
+                "name": "timestamp",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "aggregatePower",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "previousTimestamp",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "nextTimestamp",
+                "type": "uint256"
+              }
+            ],
+            "internalType": "struct ReportData",
+            "name": "report",
+            "type": "tuple"
+          },
+          {
+            "internalType": "uint256",
+            "name": "attestationTimestamp",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct OracleAttestationData",
+        "name": "_attestData",
+        "type": "tuple"
+      },
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "addr",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "power",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct Validator[]",
+        "name": "_valset",
+        "type": "tuple[]"
+      },
+      {
+        "components": [
+          {
+            "internalType": "uint8",
+            "name": "v",
+            "type": "uint8"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "r",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "s",
+            "type": "bytes32"
+          }
+        ],
+        "internalType": "struct Signature[]",
+        "name": "_sigs",
+        "type": "tuple[]"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_depositId",
+        "type": "uint256"
+      }
+    ],
+    "name": "withdrawFromLayer",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "withdrawalClaimed",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]

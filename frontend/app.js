@@ -7,12 +7,12 @@ var App = {
   tokenAddress: {},
   web3,
   tokenDecimals: 0,
-  currentDepositLimit: null,
+  depositLimit: null,
   depositId: 0, // Initialize depositId here
   deposits: {}, // Assuming you also need a structure to store deposit details
 
   _depositLimit: function() {
-    return App.currentDepositLimit;
+    return App.depositLimit;
   },
 
   init: function () {
@@ -25,12 +25,11 @@ var App = {
         console.log("Using web3 detected from external source like Metamask");
         App.web3Provider = window.ethereum;
         web3 = new Web3(window.ethereum);
-        resolve(App.initEth()); // Ensure this resolves with initEth
       } else {
         console.log("Using localhost");
         web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:8545"));
-        resolve(App.initEth()); // Ensure this resolves with initEth
       }
+      resolve();
     });
   },
 
@@ -42,7 +41,15 @@ var App = {
           App.chainId = result;
           return App.initContestContract()
             .then(App.initTokenContract)
-            .then(App.fetchCurrentDepositLimit);
+            .then(function() {
+              console.log("Contracts initialized, fetching deposit limit...");
+              return App.fetchDepositLimit();
+            })
+            .then(function(readableLimit) {
+              console.log("Deposit limit fetched:", readableLimit);
+              // You can update the UI here if needed
+              App.setPageParams(); // Ensure this is called after initialization
+            });
         });
       }).catch(function(error) {
         console.error("Error during Ethereum account request:", error);
@@ -57,7 +64,7 @@ var App = {
         if (App.chainId === 421613) {
           App.contracts.Contest.options.address = "0xb2CB696fE5244fB9004877e58dcB680cB86Ba444";
         } else {
-          App.contracts.Contest.options.address = "0x17d9282cf0EB5705F6c0F4426a5E780bB9a1Ffe8";
+          App.contracts.Contest.options.address = "0x1AaF421491171930e71fb032B765DF252CE3F97e";
         }
         console.log("Contract initialized");
         console.log("Contract address: " + App.contracts.Contest.options.address);
@@ -71,7 +78,7 @@ initTokenContract: function () {
     $.getJSON(pathToAbi, function (abi) {
       App.contracts.Token = new web3.eth.Contract(abi);
       if (App.chainId === 11155111) {
-        App.contracts.Token.options.address = "0x99CAAb1d5a46098FAD0dF0505a0C42965e020F7E" //eth sepolia 
+        App.contracts.Token.options.address = "0xceBa0609797251395CFB420a1540E58b6be0828d" //eth sepolia 
       } 
       if (App.chainId === 1)  {
         App.contracts.Token.options.address = "0x88dF592F8eb5D7Bd38bFeF7dEb0fBc02cf3778a0" // eth main
@@ -107,38 +114,68 @@ initTokenContract: function () {
       console.log(
         "Token contract address: ", App.contracts.Token.options.address
       );
+      // Check if the faucet method exists
+      if (!App.contracts.Token.methods.faucet) {
+        console.error("Faucet method not found on Token contract");
+      }
       resolve(); // Resolve the promise after all setup is done
     }).fail(reject); // Reject the promise on failure
   });
 
 },
 
-fetchCurrentDepositLimit: function() {
-  App.contracts.Contest.methods.currentDepositLimit().call()
+fetchDepositLimit: function() {
+  console.log("Fetching deposit limit...");
+  console.log("Contest contract address:", App.contracts.Contest.options.address);
+  
+  if (!App.contracts.Contest.methods.depositLimit) {
+    console.error("depositLimit method not found on contract");
+    return Promise.reject("depositLimit method not found");
+  }
+
+  return App.contracts.Contest.methods.depositLimit().call()
     .then(function(result) {
-      App.currentDepositLimit = result;
-      console.log("Updated currentDepositLimit:", App.currentDepositLimit);
+      console.log("Raw deposit limit result:", result);
+      App.depositLimit = result;
+      console.log("Updated DepositLimit:", App.depositLimit);
+      
       // Convert from wei to ether (or any other unit your token uses)
-    const readableLimit = web3.utils.fromWei(App.currentDepositLimit, 'ether');
+      const readableLimit = web3.utils.fromWei(App.depositLimit, 'ether');
+      console.log("Readable deposit limit:", readableLimit);
 
-    // Update the DOM
-    document.getElementById("depositLimit").className = "contest-address-style";
+      // Update the DOM
+      const depositLimitElement = document.getElementById("depositLimit");
+      if (depositLimitElement) {
+        depositLimitElement.textContent = readableLimit + ' TRB';
+        console.log("DOM updated with deposit limit");
+      } else {
+        console.error("depositLimit element not found in DOM");
+      }
 
-    document.getElementById("depositLimit").innerText = readableLimit + ' TRB';
-  })
-  .catch(function(err) {
-    console.error("Failed to fetch currentDepositLimit:", err);
-  });
+      return readableLimit; // Return the readable limit for further use
+    })
+    .catch(function(err) {
+      console.error("Failed to fetch DepositLimit:", err);
+      throw err; // Re-throw the error to propagate it
+    });
 },
 
   setPageParams: function () {
-    document.getElementById("connectedAddress").className = "contest-address-style";
-    if (document.getElementById("connectedAddress")) {
-        document.getElementById("connectedAddress").innerHTML = App.account;
+    console.log('Setting page parameters');
+    console.log('App.account in setPageParams:', App.account);
+    const connectedAddressElement = document.getElementById("connectedAddress");
+    if (connectedAddressElement) {
+      connectedAddressElement.textContent = App.account;
+      console.log("Updated connected address in setPageParams to:", App.account);
+    } else {
+      console.error('connectedAddress element not found in setPageParams');
     }
-    console.log("Account:", App.account);
-    console.log("Contest Address:", App.contracts.Contest.options.address); // Keep this line to log the address to the console
-    console.log("Current Deposit Limit:", App.currentDepositLimit);
+    if (App.contracts.Contest && App.contracts.Contest.options) {
+      console.log("Contest Address:", App.contracts.Contest.options.address);
+    } else {
+      console.error('Contest contract not properly initialized in setPageParams');
+    }
+    console.log("Current Deposit Limit:", App.depositLimit);
   },
 
 
@@ -168,32 +205,67 @@ fetchCurrentDepositLimit: function() {
       });
   },
 
-  depositToLayer: function() {
-    const recipient = document.getElementById('_queryId').value;
+  faucet: function() {
+    console.log("Faucet button clicked");
+    if (!App.contracts.Token) {
+      console.error("Token contract not initialized");
+      alert("Please connect your wallet first");
+      return;
+    }
+    
+    App.contracts.Token.methods.faucet(App.account)
+      .send({ from: App.account })
+      .then(function(result) {
+        console.log("Faucet successful", result);
+        alert("Test TRB tokens have been sent to your account!");
+      })
+      .catch(function(error) {
+        console.error("Error in faucet", error);
+        alert("Error getting test TRB tokens. Please try again.");
+      });
+  },
+
+  approveDeposit: function() {
     const amount = document.getElementById('stakeAmount').value;
     const amountToSend = web3.utils.toWei(amount, 'ether');
-  
-    // Convert the current deposit limit and the amount to send into BN for comparison
-    const amountToSendBN = web3.utils.toBN(amountToSend);
-    const currentDepositLimitBN = web3.utils.toBN(App.currentDepositLimit);
-  
-    if (amountToSendBN.gt(currentDepositLimitBN)) {
-      return alert("Deposit amount exceeds the current deposit limit.");
-    }
-  
-    // Proceed with the deposit if the amount is within the limit
+
     App.contracts.Token.methods.approve(App.contracts.Contest.options.address, amountToSend)
       .send({ from: App.account })
       .then(function(approvalResult) {
         console.log("Approval successful", approvalResult);
-        return App.contracts.Contest.methods.depositToLayer(amountToSend, recipient)
-          .send({ from: App.account });
+        alert("Approval successful. You can now proceed with the deposit.");
+        // Enable the deposit button here
+        document.getElementById('depositButton').disabled = false;
       })
+      .catch(function(error) {
+        console.error("Error in approval", error);
+        alert("Error in approval. Please try again.");
+      });
+  },
+
+  depositToLayer: function() {
+    const recipient = document.getElementById('_queryId').value;
+    const amount = document.getElementById('stakeAmount').value;
+    const amountToSend = web3.utils.toWei(amount, 'ether');
+
+    // Convert the current deposit limit and the amount to send into BN for comparison
+    const amountToSendBN = web3.utils.toBN(amountToSend);
+    const depositLimitBN = web3.utils.toBN(App.depositLimit);
+
+    if (amountToSendBN.gt(depositLimitBN)) {
+      return alert("Deposit amount exceeds the current deposit limit.");
+    }
+
+    // Proceed with the deposit
+    App.contracts.Contest.methods.depositToLayer(amountToSend, recipient)
+      .send({ from: App.account })
       .then(function(depositResult) {
         console.log("Deposit to layer successful", depositResult);
+        alert("Deposit to layer successful!");
       })
       .catch(function(error) {
         console.error("Error in depositing to layer", error);
+        alert("Error in depositing to layer. Please try again.");
       });
   }
 
@@ -204,7 +276,15 @@ $(function () {
     console.log(document.getElementById('walletButton')); // Replace 'elementId' with the actual ID used at line 204
     document.getElementById("walletButton").disabled = false;
     App.init().then(function() {
-      App.setPageParams(); // Ensure this is called after initialization
+      return App.initEth();
+    }).then(function() {
+      return App.initContestContract();
+    }).then(function() {
+      return App.initTokenContract();
+    }).then(function() {
+      return App.fetchDepositLimit();
+    }).then(function() {
+      App.setPageParams(); // Call setPageParams after all initializations
     }).catch(function(error) {
       console.error("Initialization failed:", error);
     });
@@ -226,16 +306,66 @@ $(document).ready(function() {
 
     function connectWallet() {
         console.log('Connecting wallet...');
-        isConnected = true;
-        walletButton.textContent = 'Disconnect Wallet';
-        walletButton.disabled = false;
+        
+        if (typeof window.ethereum !== 'undefined') {
+            console.log('MetaMask is installed!');
+            
+            window.ethereum.request({ method: 'eth_requestAccounts' })
+                .then(function (accounts) {
+                    console.log('Accounts:', accounts);
+                    App.account = accounts[0];
+                    console.log('App.account set to:', App.account);
+                    updateConnectedAddress();
+                    return web3.eth.getChainId();
+                })
+                .then(function (result) {
+                    console.log('Chain ID:', result);
+                    App.chainId = result;
+                    return App.initContestContract();
+                })
+                .then(function() {
+                    console.log('Contest contract initialized');
+                    return App.initTokenContract();
+                })
+                .then(function() {
+                    console.log('Token contract initialized');
+                    return App.fetchDepositLimit();
+                })
+                .then(function() {
+                    console.log('Deposit limit fetched');
+                    isConnected = true;
+                    walletButton.textContent = 'Disconnect Wallet';
+                })
+                .catch(function(error) {
+                    console.error("Error during wallet connection:", error);
+                    walletButton.disabled = false;
+                });
+        } else {
+            console.log('MetaMask is not installed!');
+            alert('Please install MetaMask to use this feature!');
+        }
+    }
+
+    function updateConnectedAddress() {
+        const connectedAddressElement = document.getElementById("connectedAddress");
+        if (connectedAddressElement) {
+            connectedAddressElement.textContent = App.account;
+            console.log("Updated connected address to:", App.account);
+        } else {
+            console.error('connectedAddress element not found');
+        }
     }
 
     function disconnectWallet() {
         console.log('Disconnecting wallet...');
+        App.account = '0x0';
         isConnected = false;
         walletButton.textContent = 'Connect Wallet';
-        walletButton.disabled = false;
+        updateConnectedAddress();
+        console.log('Wallet disconnected');
     }
 });
 
+$(document).ready(function() {
+    document.getElementById('depositButton').disabled = true;
+});

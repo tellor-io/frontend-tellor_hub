@@ -6,32 +6,53 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Layer Bridge</title>
     <link rel="stylesheet" href="main.css" />
+    <style>
+      .connected-address-style {
+        color: #165863;
+      }
+      .button-container {
+        display: flex;
+        justify-content: center;
+      }
+    </style>
   </head>
   <body>
     <header>
       <div class="top-right">
-        <button id="walletButton" class="button-style-1" disabled>Connect Wallet</button>
+        <button id="walletButton" class="button-style-4" disabled>connect wallet</button>
       </div>
     </header>
-
     <div class="box">
       <section>
-        <h1><img src="../bridge-image.png" alt="Descriptive Image Text" class="right-side-image">tellor layer trb bridge</h1> 
+        <h1><img src="../new bridge-image.png" alt="Descriptive Image Text" class="right-side-image">tellor layer trb bridge</h1> 
         <div>
    <!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script> -->
-        <p>connected address: <span id="connectedAddress"></span></p>
+        <p>connected address: <span id="connectedAddress" class="connected-address-style"></span></p>
       <!--<p id="tokenBalance"></p>-->
       <!--<p id="stakedTokenBalance"></p>-->
       </section>
-      <section>
+        <div>        
+          1. <button id="faucetButton" class="button-style-3" onclick="App.faucet()">get test TRB</button>
+        </div>
+        <br>
+        <div>
+         2. send <input type="text" id="stakeAmount" placeholder=" #  to send (i.e. '20') " /> TRB to...
+        </div>
+        <p>3. <input type="text" id="_queryId" placeholder="layer recipient address(i.e. tellor1py3fsm......)"/></p>
+        <p> (deposit limit:<span id="depositLimit"; style= "font-size: 12px" class="connected-address-style"></span> )</p>
+        <section>
+        4. <button id="approveButton" class="button-style-1" onclick="App.approveDeposit()">approve deposit</button>
       </section>
-     
       <section>
-      </section>
-        <!--<p> 
+      5. <button id="depositButton" class="button-style-2" onclick="App.depositToLayer()" disabled>bridge to layer</button>
+    </section>
+        <div class="button-container">
+      <br></br>
+      <br></br>
+      <br></br>
+              <!--<p> 
           <a target="_blank" href="https://queryidbuilder.herokuapp.com/spotprice">obtain query id & query data here</a>
         </p>-->
-        <p><input type="text" id="_queryId" placeholder="                     recipient address"/></p>
         <!--<p><input style="width: 350px;"type="text" id="_value" placeholder="_value (bytes)"/></p>
         <p><input type="text" id="_nonce" placeholder="_nonce (uint256)"/></p>
         <p><textarea style="height:190px; width: 485px;"type="text" id="_queryData" placeholder="_queryData (bytes)"></textarea></p>
@@ -41,19 +62,6 @@
       <p>(*staked trb is required to report. if you do not have TRB already staked, stake below) </p>
 
         <h2>stake the trb token:</h2>-->
-        <div>
-          <input type="text" id="stakeAmount" placeholder="             ex. '20' "/> TRB
-      </div>
-      <section>
-        <p style= "font-size: 12px"> (deposit limit:         <span id="depositLimit"; style= "font-size: 12px" ></span> )</p>
-      </section>
-        <div class="button-container">
-          <button id="stakeToken" class="button-style-2" onclick="App.depositToLayer()">bridge to layer</button>      </div>
-      <br></br>
-      <br></br>
-
-      <br></br>
-
       <footer>
         <p>
           <a target="_blank" href="https://github.com/tellor-io/frontend-layerbridgebutton">Front-End code</a>
