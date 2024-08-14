@@ -64,7 +64,7 @@ a {
     color: white;
     width: 150px;
     height: 50px;
-    border: solid 2px black;
+    border: none;
     border-radius: 10px;
     cursor: cell;
     margin-top: 20px; /* Adds margin to the right of the button */
@@ -75,7 +75,7 @@ a {
     color: white;
     width: 150px;
     height: 50px;
-    border: solid 2px black;
+    border: none;
     border-radius: 10px;
     cursor: cell;
     margin-top: 20px; /* Adds margin to the right of the button */
@@ -86,7 +86,7 @@ a {
     color: white;
     width: 150px;
     height: 50px;
-    border: solid 2px black;
+    border: none;
     border-radius: 10px;
     cursor: cell;
     margin-top: 20px; /* Adds margin to the right of the button */
@@ -181,7 +181,7 @@ img {
         color: white;
         width: 150px;
         height: 50px;
-        border: solid 2px black;
+        border: none;
         border-radius: 10px;
         cursor: cell;
         margin-top: 20px; /* Adds margin to the right of the button */

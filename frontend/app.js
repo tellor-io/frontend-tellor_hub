@@ -273,27 +273,15 @@ fetchDepositLimit: function() {
 
 $(function () {
   $(window).load(function () {
-    console.log(document.getElementById('walletButton')); // Replace 'elementId' with the actual ID used at line 204
+    console.log(document.getElementById('walletButton'));
     document.getElementById("walletButton").disabled = false;
-    App.init().then(function() {
-      return App.initEth();
-    }).then(function() {
-      return App.initContestContract();
-    }).then(function() {
-      return App.initTokenContract();
-    }).then(function() {
-      return App.fetchDepositLimit();
-    }).then(function() {
-      App.setPageParams(); // Call setPageParams after all initializations
-    }).catch(function(error) {
-      console.error("Initialization failed:", error);
-    });
+    App.init();
   });
 });
 
 $(document).ready(function() {
     const walletButton = document.getElementById('walletButton');
-    console.log(walletButton); // This should not be null if everything is correct
+    console.log(walletButton);
     let isConnected = false;
 
     walletButton.addEventListener('click', function() {
@@ -335,6 +323,7 @@ $(document).ready(function() {
                     console.log('Deposit limit fetched');
                     isConnected = true;
                     walletButton.textContent = 'Disconnect Wallet';
+                    App.setPageParams();
                 })
                 .catch(function(error) {
                     console.error("Error during wallet connection:", error);
