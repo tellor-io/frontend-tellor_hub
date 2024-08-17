@@ -14,44 +14,66 @@
         display: flex;
         justify-content: center;
       }
+
+      .input-button-container {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
     </style>
+
+    <script>
+      if (typeof crypto.randomUUID !== 'function') {
+        crypto.randomUUID = function() {
+          return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+            (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+          );
+        };
+      }
+    </script>
+
+      <h1 ><img src="../new bridge-image.png" alt="Descriptive Image Text" class="right-side-image">Tellor Layer TRB Bridge</h1> 
+      
   </head>
+
   <body>
     <header>
       <div class="top-right">
-        <button id="walletButton" class="button-style-4" disabled>connect wallet</button>
       </div>
     </header>
-    <div class="box">
-      <section>
-        <h1><img src="../new bridge-image.png" alt="Descriptive Image Text" class="right-side-image">tellor layer trb bridge</h1> 
-        <div>
-   <!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script> -->
-        <p>connected address: <span id="connectedAddress" class="connected-address-style"></span></p>
-      <!--<p id="tokenBalance"></p>-->
-      <!--<p id="stakedTokenBalance"></p>-->
-      </section>
-        <div>        
-          1. <button id="faucetButton" class="button-style-3" onclick="App.faucet()">get test TRB</button>
+    <div class="box-wrapper">
+      <button id="faucetButton" class="button-style-1" onclick="App.faucet()">Get Test TRB</button>           
+        <div class="input-button-container">
+        
+          <div class="step-label input-with-label">
+              <span class="input-label">TRB</span><input class="centered-input" type="text" id="stakeAmount" placeholder="0" style="width: 220px;" />
         </div>
-        <br>
-        <div>
-         2. send <input type="text" id="stakeAmount" placeholder=" #  to send (i.e. '20') " /> TRB to...
+      </div>
+        <p>(Deposit limit: <span id="depositLimit" style="font-size: 12px" class="connected-address-style"></span>)</p>
+
+        <div class="step-label">
+          <input class="input" type="text" id="_queryId" style="width: 270px; font-size: 20px" placeholder="To address (e.g. tellor1py3fs...)"/>
         </div>
-        <p>3. <input type="text" id="_queryId" placeholder="layer recipient address(i.e. tellor1py3fsm......)"/></p>
-        <p> (deposit limit:<span id="depositLimit"; style= "font-size: 12px" class="connected-address-style"></span> )</p>
-        <section>
-        4. <button id="approveButton" class="button-style-1" onclick="App.approveDeposit()">approve deposit</button>
-      </section>
-      <section>
-      5. <button id="depositButton" class="button-style-2" onclick="App.depositToLayer()" disabled>bridge to layer</button>
-    </section>
-        <div class="button-container">
-      <br></br>
-      <br></br>
-      <br></br>
-              <!--<p> 
-          <a target="_blank" href="https://queryidbuilder.herokuapp.com/spotprice">obtain query id & query data here</a>
+        <a  target="_blank" href="https://docs.tellor.io/layer-docs/public-testnet/run-a-layer-node">need a tellor prefix address? click to learn more</a>
+
+        <div class="step-label">
+          <button id="approveButton" class="button-style-1" onclick="App.approveDeposit()">Approve Deposit</button>
+        </div>
+        <div class="step-label">
+          <button id="depositButton" class="button-style-1" onclick="App.depositToLayer()" disabled >Bridge to Layer</button>
+        </div>
+        <div class="step-label">  
+          <button id="walletButton" class="button-style-2" disabled>Connect Wallet</button>
+       </div>
+    </div>
+    <p style= "text-align: center">
+      <a  target="_blank" href="https://github.com/tellor-io/frontend-layerbridgebutton">Front-End code</a>
+    </p>
+   
+        <!--<p> 
+       <p>Connected address: <span id="connectedAddress" class="connected-address-style"></span></p>
+        <a target="_blank" href="https://queryidbuilder.herokuapp.com/spotprice">obtain query id & query data here</a>
         </p>-->
         <!--<p><input style="width: 350px;"type="text" id="_value" placeholder="_value (bytes)"/></p>
         <p><input type="text" id="_nonce" placeholder="_nonce (uint256)"/></p>
@@ -60,12 +82,14 @@
       </section>
 
       <p>(*staked trb is required to report. if you do not have TRB already staked, stake below) </p>
+      <h2>stake the trb token:</h2>-->
 
-        <h2>stake the trb token:</h2>-->
+   <!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script> -->
+
+      <!--<p id="tokenBalance"></p>-->
+      <!--<p id="stakedTokenBalance"></p>-->
       <footer>
-        <p>
-          <a target="_blank" href="https://github.com/tellor-io/frontend-layerbridgebutton">Front-End code</a>
-        </p>
+
       </footer>
     </div>
     <script src="./extensions/jquery.min.js"></script>

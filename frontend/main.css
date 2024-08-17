@@ -1,97 +1,124 @@
 body {
-    background:white;
+    background: url('../Rectangle 38.png') no-repeat center center fixed;
+    margin: 0;
+    padding: 0 20px; /* Add some padding to the body */
+    background-size: cover;
 }
-h1 {
-    color: black;
-    font: 1.3rem 'Cascadia', monospace;  
-    font-size:35px;
-    text-align: center;
-    flex: 1; /* Allows the title to grow and take necessary space */
-    margin-left: 5%; /* Adds space between the title and the image */
-    margin-top: 50px; /* Adds some space between the title and the image */
+@font-face {
+    font-family: 'PPNeueMontreal-Medium';
+    src: url('../fonts/PPNeueMontreal-Medium.woff2') format('woff2'),
+         url('../fonts/PPNeueMontreal-Medium.woff') format('woff'),
+         url('../fonts/PPNeueMontreal-Medium.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+  }
 
+  input::placeholder {
+    font-family: 'PPNeueMontreal-Medium', monospace;  
+  }
+
+
+  .step-label {
+    font-family: 'PPNeueMontreal-Medium', monospace;
+    /* Add any additional styles you want for this text */
+    font-size: 16px;
+    color: #333;
+    margin-bottom: 5px;
+    border-radius: 5px 0px 0px 5px;
+  }
+h1 {
+    color: #156b75;
+    font-family: 'PPNeueMontreal-Medium', monospace;  
+    font-size:35px;
+    text-align: center; /* Align text to the left */
+    flex: 1; /* Allows the title to grow and take necessary space */
+    margin-top: 50px; /* Adds some space between the title and the image */
 }
 h2 {
-    font: 1.3rem 'Cascadia', monospace;  
+    font-family: 'PPNeueMontreal-Medium', monospace;  
     font-size:115px;
+    margin-left: 100px; /* Remove left margin */
+
     color: black; 
 
 }
 p {
-    font: 1.3rem 'Cascadia', monospace;  
+    font-family: 'PPNeueMontreal-Medium', monospace;  
     font-size:15px;
     color: black; 
 }
+.box-wrapper {
+    border: 2px solid #156b75; /* Black border */
+    border-radius: 10px; /* Rounded corners */
+    padding: 20px;
+    max-width: 400px; /* Set a maximum width */
+    width: 80%; /* Set a percentage width */
+    margin: 20px auto; /* Center the box and provide vertical margin */
+    background-color: #f5f5f5; /* Light gray background */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+    display: flex;
+    flex-direction: column;
+    align-items: center;    
+}
 .box {
-    border: 2px solid white;
-    margin-left: auto;
-    margin-top: 50px;
-    margin-right: auto;
-    margin-bottom: 25px;
-    padding: 1ex;
+    border: none; /* Remove the existing border */
+    margin-left: 0; /* Remove left margin as it's now handled by the wrapper */
+    margin-top: 0px;
+    margin-right: 0; /* Remove auto margin */
+    margin-bottom: 0px;
+    padding: 0ex;
     color: #262626;  
-    font: 1.3rem 'Cascadia', monospace;  
+    font: 1.3rem 'PPNeueMontreal-Medium', monospace;  
     font-size: 16px;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    align-items: flex-start; /* Align items to the start (left) of the flex container */
 }
 a {
-    font: 1.3rem 'Cascadia', monospace;  
+    font-family: 'PPNeueMontreal-Medium', monospace;  
     font-size:15px;
-    color: #165863;
+    color: #156b75;
 }
 .button-style-1 {
-    background-color: #6C5780;
-    color: white;
-    padding: 10px 40px;
+    background-color: #40f0f0;
+    font-family: 'PPNeueMontreal-Medium', monospace;  
+    color: #14283D;
+    padding: 10px 50px;
     border: none;
     font-size: 20px;
     border-radius: 10px;
     cursor: pointer;
-    margin-top: 20px; /* Adds some space between the title and the image */
+    text-align: center;
+    width: 300px; /* Make the button span the full width of its container */
+    margin-top: 10px; /* Added some top margin */
+    display: block; /* Changed from inline to block */
+    margin-left: auto; /* Center horizontally */
+    margin-right: auto; /* Center horizontally */
   }
 
-    .button-container {
+.button-container {
     display: flex;
-    align-items: center;
+    font-family: 'PPNeueMontreal-Medium', monospace;  
+    align-items: flex-start; /* Align items to the start (left) */
     gap: 20px; /* Adds space between children */
     margin-top: 20px; /* Adds some space between the title and the image */
     }
 
 .button-style-2 {
-    background-color: #156B75;
-    color: white;
-    width: 150px;
-    height: 50px;
-    border: none;
-    border-radius: 10px;
-    cursor: cell;
-    margin-top: 20px; /* Adds margin to the right of the button */
-    font-size: 20px;
-}
-.button-style-3 {
-    background-color: #1F486D;
-    color: white;
-    width: 150px;
-    height: 50px;
-    border: none;
-    border-radius: 10px;
-    cursor: cell;
-    margin-top: 20px; /* Adds margin to the right of the button */
-    font-size: 20px;
-}
-.button-style-4 {
     background-color: #14283D;
-    color: white;
-    width: 150px;
-    height: 50px;
+    font-family: 'PPNeueMontreal-Medium', monospace;  
+    color: #40f0f0;
+    padding: 10px 100px;
     border: none;
-    border-radius: 10px;
-    cursor: cell;
-    margin-top: 20px; /* Adds margin to the right of the button */
-    font-size: 20px;
+    font-size: 30px;
+    border-radius: 250px;
+    cursor: pointer;
+    text-align: center;
+    width: 100%; /* Make the button span the full width of its container */
+    margin-top: 30px; /* Adds some space between the title and the image */
 }
+
 .contest-address-style {
     color: #165863; /* Set the color you prefer */
     font-size: 16px; /* Example: set font size */
@@ -100,16 +127,15 @@ a {
 .title-container {
     display: flex;
     align-items: center; /* Vertically center the items in the container */
-    justify-content: flex-end; /* Align items to the start */
+    justify-content: flex-start; /* Align items to the start (left) */
     flex-wrap: nowrap; /* Prevent wrapping of items */
 }
 .right-side-image {
     width: 50px; /* Adjust width as necessary */
     height: auto; /* Keeps the aspect ratio */
-    margin-left: 0%; /* Adds space between the title and the image */
-    text-align: center;
+    text-align: left;
     flex: 1; /* Allows the title to grow and take necessary space */
-    margin-right: 20px; /* Adds some space between the title and the image */
+    margin-right: 10px; /* Adds some space between the title and the image */
     margin-top: 5px; /* Adds some space between the title and the image */
     vertical-align: -7px; /* Adjusts vertical alignment */
 
@@ -138,22 +164,88 @@ img {
     width: 200px; /* Full width to utilize screen space */
 }
 
-@media (max-width: 600px) {
+/* Add this new style for general content alignment */
+.content-wrapper {
+    max-width: 1200px; /* Or any suitable max-width */
+    margin: 0 auto; /* Center the wrapper */
+    padding: 0 20px; /* Add some padding */
+}
+
+.centered-input {
+    width: 74%;
+    text-align: left;
+    font-size: 18px;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    border-radius: 5px 5px 5px 5px;
+    border: 1px solid #156b75; /* Light gray border */
+}
+
+.input-with-label {
+    display: flex;
+    align-items: center;
+    border-radius: 0px 5px 5px 0px;
+    
+}
+input {
+    background-color: #f0f0f0; /* Light gray background */
+    color: #14283D;; /* Dark gray text color */
+    border: 1px solid #156b75; /* Light gray border */
+    height: 23px;
+    border-radius: 5px 5px 5px 5px;
+  }
+
+.centered-input {
+    width: 14%; /* number*/
+    text-align: left;
+    border-radius: 0px 5px 5px 0px;
+}
+
+.input-label {
+    white-space: nowrap;
+    background: #f0f0f0;
+    height: 43px;
+    color: black;
+    border: 1px solid #156b75; /* Light gray border */
+    text-align: center;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    margin-right: -2px;
+    margin-top: 0px;
+    border-radius: 5px 0px 0px 5px;
+}
+
+.deposit-limit {
+    font-size: 12px;
+    margin-left: auto; /* Pushes the deposit limit to the right */
+}
+
+@media (max-width: 400px) {
+    .box-wrapper {
+        width: 95%; /* Increase width percentage for smaller screens */
+        margin: 20px auto; /* Keep it centered */
+        padding: 10px;
+    }
     .box {
-        border: 2px solid white;
-        margin-left: 25px;
-        margin-top: 100px;
-        margin-right: 25px;
-        margin-bottom: 25px;
+        border: none; /* Remove the existing border */
+        margin-left: 0; /* Remove left margin as it's now handled by the wrapper */
+        margin-top: 0;
+        margin-right: 0;
+        margin-bottom: 15px;
         padding: 1ex;
         color: #262626;  
         font: 1.3rem 'Cascadia', monospace;  
         font-size: 16px;
     }
     h1 {
-        font-size: 20px; /* Smaller font size for mobile */
-        margin-left: 2%; /* Less margin for smaller screens */
-        margin-top: 50px; /* Less space on top */
+        color: #14283D;
+        font-family: 'PPNeueMontreal-Medium', monospace;  
+        font-size:35px;
+        text-align: center; /* Align text to the left */
+        flex: 1; /* Allows the title to grow and take necessary space */
+        margin-top: 50px; /* Adds some space between the title and the image */
     }
     .button-style-1, .button-style-2 {
         display: flex;
@@ -166,8 +258,8 @@ img {
 
     }
     .button-style-1 {
-        background-color: #5A486A;
-        color: white;
+        background-color: #40f0f0;
+        color: #0b346b;
         padding: 10px 40px;
         border: none;
         font-size: 20px;
@@ -183,7 +275,7 @@ img {
         height: 50px;
         border: none;
         border-radius: 10px;
-        cursor: cell;
+        cursor: pointer;
         margin-top: 20px; /* Adds margin to the right of the button */
         margin-left: 40px; /* Adds margin to the right of the button */
     
@@ -192,13 +284,13 @@ img {
         display: flex;
         flex-direction: column; /* Stack buttons vertically */
         gap: 10px; /* Smaller gap between buttons */
-        align-items: center; /* Center align items horizontally */
-        justify-content: center; /* Center align items vertically */
+        align-items: flex-start; /* Align items to the start (left) */
+        justify-content: flex-start; /* Align to the start (left) */
         margin-top: 20px; /* Less space on top */
 
     }
     .title-container, .button-container {
-        justify-content: center; /* Center aligning for smaller screens */
+        justify-content: flex-start; /* Center aligning for smaller screens */
         margin-top: 20px; /* Less space on top */
 
     }
@@ -219,4 +311,10 @@ img {
         width: 200px; /* Full width to utilize screen space */
     }
 
+}
+@media (max-width: 480px) {
+    .box-wrapper {
+        width: 100%; /* Full width for very small screens */
+        margin: 20px 0; /* Remove horizontal margin */
+    }
 }
