@@ -284,6 +284,10 @@ $(document).ready(function() {
     console.log(walletButton);
     let isConnected = false;
 
+    function showNetworkAlert() {
+      alert("Please connect to the Sepolia network. Mainnet coming soon.");
+    }
+
     walletButton.addEventListener('click', function() {
         if (!isConnected) {
             connectWallet();
@@ -309,6 +313,11 @@ $(document).ready(function() {
                 .then(function (result) {
                     console.log('Chain ID:', result);
                     App.chainId = result;
+                    if (App.chainId !== 11155111) {
+                        showNetworkAlert();
+                        disconnectWallet();
+                        return Promise.reject("Wrong network");
+                    }
                     return App.initContestContract();
                 })
                 .then(function() {
