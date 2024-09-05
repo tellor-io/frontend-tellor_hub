@@ -167,6 +167,12 @@ a {
     margin-right: auto; /* Center horizontally */
   }
 
+.button-style-3:disabled {
+  background-color: #cccccc;
+  color: #666666;
+  cursor: not-allowed;
+}
+
 .contest-address-style {
     color: #165863; /* Set the color you prefer */
     font-size: 16px; /* Example: set font size */

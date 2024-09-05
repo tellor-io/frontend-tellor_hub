@@ -222,42 +222,51 @@ var App = {
   },
 
   approveDeposit: function() {
+    if (!checkWalletConnection()) return;
     const amount = document.getElementById('stakeAmount').value;
     const amountToSend = App.web3.utils.toWei(amount, 'ether');
 
+    App.showPendingPopup("Approval transaction pending...");
     App.contracts.Token.methods.approve(App.contracts.Contest.options.address, amountToSend)
       .send({ from: App.account })
       .then(function(approvalResult) {
+        App.hidePendingPopup();
         console.log("Approval successful", approvalResult);
         alert("Approval successful. You can now proceed with the deposit.");
         document.getElementById('depositButton').disabled = false;
       })
       .catch(function(error) {
+        App.hidePendingPopup();
         console.error("Error in approval", error);
         alert("Error in approval. Please try again.");
       });
   },
 
   depositToLayer: function() {
+    if (!checkWalletConnection()) return;
     const recipient = document.getElementById('_queryId').value;
     const amount = document.getElementById('stakeAmount').value;
     const tip = document.getElementById('tipAmount').value;
     const amountToSend = App.web3.utils.toWei(amount, 'ether');
     const tipToSend = App.web3.utils.toWei(tip, 'ether');
 
+    App.showPendingPopup("Deposit transaction pending...");
     App.contracts.Contest.methods.depositToLayer(amountToSend, tipToSend, recipient)
-        .send({ from: App.account })
-        .then(function(depositResult) {
-            console.log("Deposit to layer successful", depositResult);
-            alert("Deposit to layer successful!");
-        })
-        .catch(function(error) {
-            console.error("Error in depositing to layer", error);
-            alert("Error in depositing to layer. Please try again.");
-        });
+      .send({ from: App.account })
+      .then(function(depositResult) {
+        App.hidePendingPopup();
+        console.log("Deposit to layer successful", depositResult);
+        alert("Deposit to layer successful!");
+      })
+      .catch(function(error) {
+        App.hidePendingPopup();
+        console.error("Error in depositing to layer", error);
+        alert("Error in depositing to layer. Please try again.");
+      });
   },
 
   initInputValidation: function() {
+    document.getElementById('depositButton').disabled = true;
     const stakeAmountInput = document.getElementById('stakeAmount');
     const tipAmountInput = document.getElementById('tipAmount');
     
