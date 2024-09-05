@@ -43,33 +43,39 @@
       </div>
     </header>
     <div class="box-wrapper">
+      <div class="input-button-container">
+      <div class="step-label">  
+        <button id="walletButton" class="button-style-2" disabled>Connect Wallet</button>
+     </div>
+    </div>
       <button id="faucetButton" class="button-style-1" onclick="App.faucet()">Get Test TRB</button>           
         <div class="input-button-container">
-        
           <div class="step-label input-with-label">
-              <span class="input-label">TRB</span><input class="centered-input" type="text" id="stakeAmount" placeholder="0" style="width: 220px;" />
+              <span class="input-label">TRB</span><input class="input" type="text" id="stakeAmount" placeholder="0" style="width: 220px;" />
+        </div>
+      </div>
+      <div class="input-button-container">
+
+          <div class="step-label input-with-label">
+            <span class="input-label">TIP</span><input class="input" type="text" id="tipAmount" placeholder="0" style="width: 220px;" />
         </div>
       </div>
         <p>(Deposit limit: <span id="depositLimit" style="font-size: 12px" class="connected-address-style"></span>)</p>
 
         <div class="step-label">
           <input class="input" type="text" id="_queryId" style="width: 270px; font-size: 20px" placeholder="To address (e.g. tellor1py3fs...)"/>
+          <span class="info-icon" title="Don't have a tellor prefix address? Click to learn how to create one">ⓘ</span>
         </div>
-        <a  target="_blank" href="https://docs.tellor.io/layer-docs/public-testnet/run-a-layer-node">need a tellor prefix address? click to learn more</a>
 
         <div class="step-label">
-          <button id="approveButton" class="button-style-1" onclick="App.approveDeposit()">Approve Deposit</button>
+          <button id="approveButton" class="button-style-3" onclick="App.approveDeposit()">Approve Deposit</button>
         </div>
         <div class="step-label">
-          <button id="depositButton" class="button-style-1" onclick="App.depositToLayer()" disabled >Bridge to Layer</button>
+          <button id="depositButton" class="button-style-3" onclick="App.depositToLayer()" disabled >Bridge to Layer</button>
         </div>
-        <div class="step-label">  
-          <button id="walletButton" class="button-style-2" disabled>Connect Wallet</button>
-       </div>
+        <a  target="_blank" href="https://github.com/tellor-io/frontend-layerbridgebutton">Front-End code</a>
     </div>
-    <p style= "text-align: center">
-      <a  target="_blank" href="https://github.com/tellor-io/frontend-layerbridgebutton">Front-End code</a>
-    </p>
+    <p style= "text-align: center"></p>
    
         <!--<p> 
        <p>Connected address: <span id="connectedAddress" class="connected-address-style"></span></p>
@@ -95,6 +101,30 @@
     <script src="./extensions/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.7.3/web3.min.js"></script>
     <script src="./extensions/web3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
     <script src="app.js"></script>
+    <style>
+      /* Add this to your existing styles */
+      .step-label {
+        position: relative;
+      }
+      .info-icon {
+        position: absolute;
+        right: -25px;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+        color: #165863;
+        font-size: 18px;
+      }
+    </style>
+    <script>
+      // Add this to your existing scripts
+      document.querySelector('.info-icon').addEventListener('click', function() {
+        window.open('https://docs.tellor.io/layer-docs/public-testnet/run-a-layer-node', '_blank');
+      });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider@2.9.1/dist/umd/index.min.js"></script>
   </body>
 </html>

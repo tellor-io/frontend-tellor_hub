@@ -3,7 +3,10 @@ body {
     margin: 0;
     padding: 0 20px; /* Add some padding to the body */
     background-size: cover;
+    min-height: auto;
+    display: block;
 }
+
 @font-face {
     font-family: 'PPNeueMontreal-Medium';
     src: url('../fonts/PPNeueMontreal-Medium.woff2') format('woff2'),
@@ -16,6 +19,8 @@ body {
 
   input::placeholder {
     font-family: 'PPNeueMontreal-Medium', monospace;  
+    color: #38A8A3;; /* Dark gray text color */
+
   }
 
 
@@ -28,13 +33,32 @@ body {
     border-radius: 5px 0px 0px 5px;
   }
 h1 {
+    text-align: center;
     color: #14283D;
     font-family: 'PPNeueMontreal-Medium', monospace;  
-    font-size:35px;
-    text-align: center; /* Align text to the left */
-    flex: 1; /* Allows the title to grow and take necessary space */
-    margin-top: 50px; /* Adds some space between the title and the image */
+    font-size: clamp(13px, 5vw, 35px); /* Fluid typography */
+    margin: 0;
+    padding: 20px 20px 0px; /* Top, left/right, bottom padding */
+    background-color: transparent; /* Explicitly set to transparent */
+    z-index: 1000; /* Ensure it stays on top of other content */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
+
+h1 .right-side-image {
+    width: clamp(35px, 10vw, 50px); /* Fluid image size */
+    height: auto;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+/* Add this rule to ensure no other styles are overriding */
+img.right-side-image {
+    max-width: clamp(35px, 10vw, 50px);
+    width: clamp(35px, 10vw, 50px);
+}
+
 h2 {
     font-family: 'PPNeueMontreal-Medium', monospace;  
     font-size:115px;
@@ -49,18 +73,22 @@ p {
     color: black; 
 }
 .box-wrapper {
+    margin-top: 10px; /* Add space between h1 and the container */
     border: 2px solid #156b75; /* Black border */
     border-radius: 10px; /* Rounded corners */
     padding: 20px;
     max-width: 400px; /* Set a maximum width */
-    width: 80%; /* Set a percentage width */
+    width: 100%; /* Set a percentage width */
     margin: 20px auto; /* Center the box and provide vertical margin */
-    background-color: #f5f5f5; /* Light gray background */
+    background-color: #F0FAFA; /* Light gray background */
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow */
     display: flex;
     flex-direction: column;
     align-items: center;    
+    padding-top: 0px; /* Add some space between title and content */
+    position: top; /* Add this line */
 }
+
 .box {
     border: none; /* Remove the existing border */
     margin-left: 0; /* Remove left margin as it's now handled by the wrapper */
@@ -78,20 +106,21 @@ p {
 a {
     font-family: 'PPNeueMontreal-Medium', monospace;  
     font-size:15px;
-    color: #156b75;
+    color: #38A8A3;
+    margin-top: 10px;
 }
 .button-style-1 {
-    background-color: #40f0f0;
+    background-color: #40F0E3;
     font-family: 'PPNeueMontreal-Medium', monospace;  
-    color: #14283D;
+    color: #121717;
     padding: 10px 50px;
     border: none;
     font-size: 20px;
-    border-radius: 10px;
+    border-radius: 24px;
     cursor: pointer;
     text-align: center;
     width: 300px; /* Make the button span the full width of its container */
-    margin-top: 10px; /* Added some top margin */
+    margin-top: 20px; /* Added some top margin */
     display: block; /* Changed from inline to block */
     margin-left: auto; /* Center horizontally */
     margin-right: auto; /* Center horizontally */
@@ -102,22 +131,41 @@ a {
     font-family: 'PPNeueMontreal-Medium', monospace;  
     align-items: flex-start; /* Align items to the start (left) */
     gap: 20px; /* Adds space between children */
-    margin-top: 20px; /* Adds some space between the title and the image */
+    margin-top: 10px; /* Adds some space between the title and the image */
     }
 
 .button-style-2 {
-    background-color: #14283D;
+    background-color: #156b75;
     font-family: 'PPNeueMontreal-Medium', monospace;  
-    color: #40f0f0;
-    padding: 10px 100px;
+    color: white;
     border: none;
-    font-size: 30px;
-    border-radius: 250px;
+    font-size: 45px;
+    border-radius: 6px 6px 0px 0px;
     cursor: pointer;
     text-align: center;
-    width: 100%; /* Make the button span the full width of its container */
-    margin-top: 30px; /* Adds some space between the title and the image */
+    width: 440px; /* Make the button span the full width of its container */
+    position: top;
+    top: 0px; /* Increased from 10px to 50px */
+    right: 20px;
+    padding: 10px 10px ;
 }
+
+.button-style-3 {
+    background-color: #40F0E3;
+    font-family: 'PPNeueMontreal-Medium', monospace;  
+    color: #121717;
+    padding: 10px 50px;
+    border: none;
+    font-size: 20px;
+    border-radius: 24px;
+    cursor: pointer;
+    text-align: center;
+    width: 300px; /* Make the button span the full width of its container */
+    margin-top: 10px; /* Added some top margin */
+    display: block; /* Changed from inline to block */
+    margin-left: auto; /* Center horizontally */
+    margin-right: auto; /* Center horizontally */
+  }
 
 .contest-address-style {
     color: #165863; /* Set the color you prefer */
@@ -125,43 +173,53 @@ a {
     /* Add other styling as needed */
 }
 .title-container {
-    display: flex;
-    align-items: center; /* Vertically center the items in the container */
-    justify-content: flex-start; /* Align items to the start (left) */
-    flex-wrap: nowrap; /* Prevent wrapping of items */
-}
-.right-side-image {
-    width: 50px; /* Adjust width as necessary */
-    height: auto; /* Keeps the aspect ratio */
-    text-align: left;
-    flex: 1; /* Allows the title to grow and take necessary space */
-    margin-right: 10px; /* Adds some space between the title and the image */
-    margin-top: 5px; /* Adds some space between the title and the image */
-    vertical-align: -7px; /* Adjusts vertical alignment */
-
-}
-.top-right {
-    position: absolute;
-    right: 0;
+    position: fixed;
     top: 0;
-    margin: 50px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding-top: 20px; /* Adjust this value to control the distance from the top */
+    background-color: transparent; /* Add this if you want to ensure visibility over other content */
 }
+
 img {
     text-align: center;
     flex: 1; /* Allows the title to grow and take necessary space */
     margin-right: 20px; /* Adds some space between the title and the image */
+    width: 20px;
 }
 #_queryId {
     font-size: 20px; /* Smaller font size for mobile */
     padding: 10px; /* Larger padding for better touch interaction */
     margin: 5px 0; /* Adjust margin for better spacing */
     width: 400px; /* Full width to utilize screen space */
+    color: #38A8A3;; /* Dark gray text color */
+    border: 1px solid #C4EDEB; /* Light gray border */
+}
+#_queryId:not(:placeholder-shown) {
+
+    color: black;; /* Dark gray text color */
+
 }
 #stakeAmount {
     font-size: 20px; /* Smaller font size for mobile */
     padding: 10px; /* Larger padding for better touch interaction */
-    margin: 5px 0; /* Adjust margin for better spacing */
-    width: 200px; /* Full width to utilize screen space */
+    margin: 20px 0; /* Adjust margin for better spacing */
+    width: 400px; /* Full width to utilize screen space */
+    color: #38A8A3;; /* Dark gray text color */
+    border: 1px solid #156b75; /* Dark gray text color */
+    border-radius: 0px 10px 10px 0px /* Dark gray text color */
+}
+
+#tipAmount {
+    font-size: 20px; /* Smaller font size for mobile */
+    padding: 10px; /* Larger padding for better touch interaction */
+    width: 400px; /* Full width to utilize screen space */
+    color: #38A8A3;; /* Dark gray text color */
+    border: 1px solid #156b75; /* Dark gray text color */
+    border-radius: 0px 10px 10px 0px /* Dark gray text color */
 }
 
 /* Add this new style for general content alignment */
@@ -171,35 +229,25 @@ img {
     padding: 0 20px; /* Add some padding */
 }
 
-.centered-input {
-    width: 74%;
-    text-align: left;
-    font-size: 18px;
-    display: block;
-    margin-left: auto;
-    margin-right: auto;
-    border-radius: 5px 5px 5px 5px;
-    border: 1px solid #156b75; /* Light gray border */
-}
-
 .input-with-label {
     display: flex;
     align-items: center;
     border-radius: 0px 5px 5px 0px;
-    
 }
 input {
     background-color: #f0f0f0; /* Light gray background */
-    color: #14283D;; /* Dark gray text color */
+    color: #C4EDEB;; /* Dark gray text color */
     border: 1px solid #156b75; /* Light gray border */
     height: 23px;
     border-radius: 5px 5px 5px 5px;
-  }
+}
 
-.centered-input {
-    width: 14%; /* number*/
-    text-align: left;
-    border-radius: 0px 5px 5px 0px;
+input:not(:placeholder-shown) {
+    color: black; /* This is the color when the input has text */
+}
+
+.centered-input:not(:placeholder-shown) {
+    color: black; /* Color when has text */
 }
 
 .input-label {
@@ -207,7 +255,7 @@ input {
     background: #f0f0f0;
     height: 43px;
     color: black;
-    border: 1px solid #156b75; /* Light gray border */
+    border: 1px solid #156b75;; /* Dark gray text color */
     text-align: center;
     padding: 0 10px;
     display: flex;
@@ -224,97 +272,30 @@ input {
 
 @media (max-width: 400px) {
     .box-wrapper {
-        width: 95%; /* Increase width percentage for smaller screens */
-        margin: 20px auto; /* Keep it centered */
-        padding: 10px;
+        padding: 0;
+        width: 100%;
+        max-width: 400px;
+        box-sizing: border-box;
+        overflow: hidden; /* Prevent button from overflowing */
     }
-    .box {
-        border: none; /* Remove the existing border */
-        margin-left: 0; /* Remove left margin as it's now handled by the wrapper */
-        margin-top: 0;
-        margin-right: 0;
-        margin-bottom: 15px;
-        padding: 1ex;
-        color: #262626;  
-        font: 1.3rem 'Cascadia', monospace;  
-        font-size: 16px;
-    }
-    h1 {
-        color: #14283D;
-        font-family: 'PPNeueMontreal-Medium', monospace;  
-        font-size:35px;
-        text-align: center; /* Align text to the left */
-        flex: 1; /* Allows the title to grow and take necessary space */
-        margin-top: 50px; /* Adds some space between the title and the image */
-    }
-    .button-style-1, .button-style-2 {
-        display: flex;
-        flex-direction: column; /* Stack buttons vertically */
-        gap: 10px; /* Smaller gap between buttons */
-        align-items: center; /* Center align items horizontally */
-        justify-content: center; /* Center align items vertically */
-        margin-right: 50px; /* Adds some space between the title and the image */
-        margin-bottom: 10px; /* Adds some space between the title and the image */
 
-    }
-    .button-style-1 {
-        background-color: #40f0f0;
-        color: #0b346b;
-        padding: 10px 40px;
-        border: none;
-        font-size: 20px;
-        border-radius: 10px;
-        cursor: pointer;
-        margin-top: 20px; /* Adds some space between the title and the image */
-
-    }
     .button-style-2 {
-        background-color: #165863;
-        color: white;
-        width: 150px;
-        height: 50px;
-        border: none;
+        width: 100%; /* Extend beyond the box-wrapper */
+        font-size: 19px;
+        padding: 10px 100px;
+        box-sizing: border-box;
+        border-radius: 5px 5px 0 0;
+        position: center; /* Ensure it's on top */
+        z-index: 1;
+    }
+
+    .box {
+        padding: 15px;
+        width: 100%;
+        box-sizing: border-box;
+        margin-top: -10px; /* Slightly overlap with the button */
+        position: relative;
+        background-color: #F0FAFA; /* Match the original background color */
         border-radius: 10px;
-        cursor: pointer;
-        margin-top: 20px; /* Adds margin to the right of the button */
-        margin-left: 40px; /* Adds margin to the right of the button */
-    
-    }
-    .button-container {
-        display: flex;
-        flex-direction: column; /* Stack buttons vertically */
-        gap: 10px; /* Smaller gap between buttons */
-        align-items: flex-start; /* Align items to the start (left) */
-        justify-content: flex-start; /* Align to the start (left) */
-        margin-top: 20px; /* Less space on top */
-
-    }
-    .title-container, .button-container {
-        justify-content: flex-start; /* Center aligning for smaller screens */
-        margin-top: 20px; /* Less space on top */
-
-    }
-    .right-side-image {
-        width: 30px; /* Smaller image on mobile */
-        margin-right: 10px; /* Less margin */
-    }
-    #_queryId {
-        font-size: 12px; /* Smaller font size for mobile */
-        padding: 10px; /* Larger padding for better touch interaction */
-        margin: 5px 0; /* Adjust margin for better spacing */
-        width: 300px; /* Full width to utilize screen space */
-    }
-    #stakeAmount {
-        font-size: 20px; /* Smaller font size for mobile */
-        padding: 10px; /* Larger padding for better touch interaction */
-        margin: 5px 0; /* Adjust margin for better spacing */
-        width: 200px; /* Full width to utilize screen space */
-    }
-
-}
-@media (max-width: 480px) {
-    .box-wrapper {
-        width: 100%; /* Full width for very small screens */
-        margin: 20px 0; /* Remove horizontal margin */
     }
 }

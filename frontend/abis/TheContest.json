@@ -25,6 +25,19 @@
     "inputs": [
       {
         "indexed": false,
+        "internalType": "enum TokenBridge.BridgeState",
+        "name": "_newState",
+        "type": "uint8"
+      }
+    ],
+    "name": "BridgeStateUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
         "internalType": "uint256",
         "name": "_depositId",
         "type": "uint256"
@@ -46,9 +59,34 @@
         "internalType": "uint256",
         "name": "_amount",
         "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "_tip",
+        "type": "uint256"
       }
     ],
     "name": "Deposit",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "_recipient",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "ExtraWithdrawClaimed",
     "type": "event"
   },
   {
@@ -79,7 +117,7 @@
         "type": "uint256"
       }
     ],
-    "name": "Withdrawal",
+    "name": "Withdraw",
     "type": "event"
   },
   {
@@ -97,7 +135,46 @@
   },
   {
     "inputs": [],
-    "name": "DEPOSIT_LIMIT_UPDATE_INTERVAL",
+    "name": "PAUSE_PERIOD",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "PAUSE_TRIBUTE_AMOUNT",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "TWELVE_HOUR_UPDATE_INTERVAL",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "WITHDRAW_LIMIT_DENOMINATOR",
     "outputs": [
       {
         "internalType": "uint256",
@@ -126,9 +203,35 @@
     "name": "bridge",
     "outputs": [
       {
-        "internalType": "contract BlobstreamO",
+        "internalType": "contract IBlobstreamO",
         "name": "",
         "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "bridgeState",
+    "outputs": [
+      {
+        "internalType": "enum TokenBridge.BridgeState",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "bridgeStateUpdateTime",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -207,6 +310,11 @@
         "type": "uint256"
       },
       {
+        "internalType": "uint256",
+        "name": "_tip",
+        "type": "uint256"
+      },
+      {
         "internalType": "string",
         "name": "_layerRecipient",
         "type": "string"
@@ -240,6 +348,11 @@
       {
         "internalType": "uint256",
         "name": "amount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "tip",
         "type": "uint256"
       },
       {
@@ -420,6 +533,13 @@
   },
   {
     "inputs": [],
+    "name": "pauseBridge",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "tellorFlex",
     "outputs": [
       {
@@ -465,6 +585,13 @@
   },
   {
     "inputs": [],
+    "name": "unpauseBridge",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "verify",
     "outputs": [
       {
@@ -474,6 +601,25 @@
       }
     ],
     "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "withdrawClaimed",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -578,19 +724,39 @@
     "type": "function"
   },
   {
-    "inputs": [
+    "inputs": [],
+    "name": "withdrawLimit",
+    "outputs": [
       {
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
       }
     ],
-    "name": "withdrawalClaimed",
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "withdrawLimitRecord",
     "outputs": [
       {
-        "internalType": "bool",
+        "internalType": "uint256",
         "name": "",
-        "type": "bool"
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "withdrawLimitUpdateTime",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
