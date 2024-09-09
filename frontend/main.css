@@ -1,5 +1,5 @@
 body {
-    background: url('../Rectangle 38.png') no-repeat center center fixed;
+    background: white;
     margin: 0;
     padding: 0 20px; /* Add some padding to the body */
     background-size: cover;
@@ -17,25 +17,54 @@ body {
     font-display: swap;
   }
 
+  @font-face {
+    font-family: 'PPNeueMontreal-Book';
+    src: url('../fonts/PPNeueMontreal-Book.woff2') format('woff2'),
+         url('../fonts/PPNeueMontreal-Book.woff') format('woff'),
+         url('../fonts/PPNeueMontreal-Book.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'PPNeueMontreal-Bold';
+    src: url('../fonts/PPNeueMontreal-Bold.woff2') format('woff2'),
+         url('../fonts/PPNeueMontreal-Bold.woff') format('woff'),
+         url('../fonts/PPNeueMontreal-Bold.otf') format('opentype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'PPNeueMontreal-Thin';
+    src: url('../fonts/PPNeueMontreal-Thin.woff2') format('woff2'),
+         url('../fonts/PPNeueMontreal-Thin.woff') format('woff'),
+         url('../fonts/PPNeueMontreal-Thin.otf') format('opentype');
+    font-style: normal;
+    font-display: swap;
+}
+
   input::placeholder {
-    font-family: 'PPNeueMontreal-Medium', monospace;  
+    font-family: 'PPNeueMontreal-Thin', monospace;  
     color: #38A8A3;; /* Dark gray text color */
 
   }
 
 
   .step-label {
-    font-family: 'PPNeueMontreal-Medium', monospace;
+    font-family: 'PPNeueMontreal-Book', monospace;
     /* Add any additional styles you want for this text */
     font-size: 16px;
     color: #333;
-    margin-bottom: 5px;
+    margin-bottom: 0px;
     border-radius: 5px 0px 0px 5px;
   }
 h1 {
     text-align: center;
-    color: #14283D;
-    font-family: 'PPNeueMontreal-Medium', monospace;  
+    color: #191B24;
+    font-family: 'PPNeueMontreal-Bold', monospace;  
     font-size: clamp(13px, 5vw, 35px); /* Fluid typography */
     margin: 0;
     padding: 20px 20px 0px; /* Top, left/right, bottom padding */
@@ -49,7 +78,7 @@ h1 {
 h1 .right-side-image {
     width: clamp(35px, 10vw, 50px); /* Fluid image size */
     height: auto;
-    margin-left: 10px;
+    margin-left: 5px;
     vertical-align: middle;
 }
 
@@ -64,29 +93,30 @@ h2 {
     font-size:115px;
     margin-left: 100px; /* Remove left margin */
 
-    color: black; 
+    color: 131e20; 
 
 }
 p {
     font-family: 'PPNeueMontreal-Medium', monospace;  
     font-size:15px;
-    color: black; 
+    color: #131e20; 
 }
 .box-wrapper {
-    margin-top: 10px; /* Add space between h1 and the container */
-    border: 2px solid #156b75; /* Black border */
-    border-radius: 10px; /* Rounded corners */
+    margin-top: 10px;
+    border: 2px solid #7FAFB1;
+    border-radius: 24px;
     padding: 20px;
-    max-width: 400px; /* Set a maximum width */
-    width: 100%; /* Set a percentage width */
-    margin: 20px auto; /* Center the box and provide vertical margin */
-    background-color: #F0FAFA; /* Light gray background */
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+    max-width: 400px;
+    width: 100%;
+    margin: 5px auto;
+    background-color: #EFFEFC;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     display: flex;
     flex-direction: column;
-    align-items: center;    
-    padding-top: 0px; /* Add some space between title and content */
-    position: top; /* Add this line */
+    align-items: center; /* Center children horizontally */
+    padding: 20px;
+    position: relative;
+    gap: 5px; /* Uniform 5px gap */
 }
 
 .box {
@@ -97,22 +127,26 @@ p {
     margin-bottom: 0px;
     padding: 0ex;
     color: #262626;  
-    font: 1.3rem 'PPNeueMontreal-Medium', monospace;  
+    font: 1.3rem 'PPNeueMontreal-Thin', monospace;  
     font-size: 16px;
     display: flex;
     flex-direction: column;
-    align-items: flex-start; /* Align items to the start (left) of the flex container */
+    align-items: center; /* Center children horizontally */
+    gap: 5px; /* Uniform 5px gap */
 }
+
 a {
-    font-family: 'PPNeueMontreal-Medium', monospace;  
+    font-family: 'PPNeueMontreal-Book', monospace;  
     font-size:15px;
-    color: #38A8A3;
-    margin-top: 10px;
+    color: #01A09C;
+    margin-top: 5px; /* Change from 20px to 12px */
+    align-self: center; /* Center the link */
 }
+
 .button-style-1 {
-    background-color: #40F0E3;
-    font-family: 'PPNeueMontreal-Medium', monospace;  
-    color: #121717;
+    background-color: #08D482;
+    font-family: 'PPNeueMontreal-Book', monospace;  
+    color: #191B24;
     padding: 10px 50px;
     border: none;
     font-size: 20px;
@@ -120,57 +154,72 @@ a {
     cursor: pointer;
     text-align: center;
     width: 300px; /* Make the button span the full width of its container */
-    margin-top: 20px; /* Added some top margin */
+    margin-top: 5px; /* Change from 20px to 12px */
     display: block; /* Changed from inline to block */
     margin-left: auto; /* Center horizontally */
     margin-right: auto; /* Center horizontally */
-  }
+    transition: background-color 0.3s ease; /* Add smooth transition */
+}
 
-.button-container {
-    display: flex;
-    font-family: 'PPNeueMontreal-Medium', monospace;  
-    align-items: flex-start; /* Align items to the start (left) */
-    gap: 20px; /* Adds space between children */
-    margin-top: 10px; /* Adds some space between the title and the image */
-    }
+.button-style-1:hover {
+    background-color: #025552; /* Darker shade for hover effect */
+    color: #88FFEC;
+}
 
 .button-style-2 {
-    background-color: #156b75;
-    font-family: 'PPNeueMontreal-Medium', monospace;  
-    color: white;
+    background-color: #191B24;
+    font-family: 'PPNeueMontreal-Book', monospace;  
+    color: #D4D8E3;
+    padding: 10px 50px;
     border: none;
-    font-size: 45px;
-    border-radius: 6px 6px 0px 0px;
+    font-size: 20px;
+    border-radius: 24px;
     cursor: pointer;
     text-align: center;
-    width: 440px; /* Make the button span the full width of its container */
-    position: top;
-    top: 0px; /* Increased from 10px to 50px */
-    right: 20px;
-    padding: 10px 10px ;
+    width: 300px; /* Make the button span the full width of its container */
+    margin-top: 5px; /* Change from 20px to 12px */
+    display: block; /* Changed from inline to block */
+    margin-left: auto; /* Center horizontally */
+    margin-right: auto; /* Center horizontally */
+    transition: background-color 0.3s ease; /* Add smooth transition */
+}
+
+.button-style-2:hover {
+    background-color: #008D8B; /* Darker shade for hover effect */
+    color: #DCEBEA
 }
 
 .button-style-3 {
-    background-color: #40F0E3;
-    font-family: 'PPNeueMontreal-Medium', monospace;  
-    color: #121717;
+    background-color: #08D482;
+    font-family: 'PPNeueMontreal-Book', monospace;  
+    color: #191B24;
     padding: 10px 50px;
     border: none;
     font-size: 20px;
     border-radius: 24px;
     cursor: pointer;
     text-align: center;
-    width: 300px; /* Make the button span the full width of its container */
-    margin-top: 10px; /* Added some top margin */
+    width: 300px; 
+    margin-top: 5px; /* Change from 10px to 12px */
     display: block; /* Changed from inline to block */
     margin-left: auto; /* Center horizontally */
     margin-right: auto; /* Center horizontally */
-  }
+    transition: background-color 0.3s ease; /* Add smooth transition */
+}
+
+.button-style-3:hover {
+    background-color: #025552; /* Darker shade for hover effect */
+    color: #88FFEC;
+}
 
 .button-style-3:disabled {
   background-color: #cccccc;
   color: #666666;
   cursor: not-allowed;
+}
+
+.button-style-3:disabled:hover {
+    background-color: #cccccc; /* Keep the disabled color on hover */
 }
 
 .contest-address-style {
@@ -199,10 +248,10 @@ img {
 #_queryId {
     font-size: 20px; /* Smaller font size for mobile */
     padding: 10px; /* Larger padding for better touch interaction */
-    margin: 5px 0; /* Adjust margin for better spacing */
     width: 400px; /* Full width to utilize screen space */
-    color: #38A8A3;; /* Dark gray text color */
-    border: 1px solid #C4EDEB; /* Light gray border */
+    color: #008D8B; /* Dark gray text color */
+    border: 1px solid #7FAFB1; /* Dark gray text color */
+    border-radius: 12px /* Dark gray text color */
 }
 #_queryId:not(:placeholder-shown) {
 
@@ -212,20 +261,20 @@ img {
 #stakeAmount {
     font-size: 20px; /* Smaller font size for mobile */
     padding: 10px; /* Larger padding for better touch interaction */
-    margin: 20px 0; /* Adjust margin for better spacing */
     width: 400px; /* Full width to utilize screen space */
-    color: #38A8A3;; /* Dark gray text color */
-    border: 1px solid #156b75; /* Dark gray text color */
-    border-radius: 0px 10px 10px 0px /* Dark gray text color */
+    color: #008D8B; /* Dark gray text color */
+    border: 1px solid #7FAFB1; /* Dark gray text color */
+    border-radius: 0px 12px 12px 0px; /* Dark gray text color */
+    margin-top: 12px;
 }
 
 #tipAmount {
     font-size: 20px; /* Smaller font size for mobile */
     padding: 10px; /* Larger padding for better touch interaction */
     width: 400px; /* Full width to utilize screen space */
-    color: #38A8A3;; /* Dark gray text color */
-    border: 1px solid #156b75; /* Dark gray text color */
-    border-radius: 0px 10px 10px 0px /* Dark gray text color */
+    color: #008D8B; /* Dark gray text color */
+    border: 1px solid #7FAFB1; /* Dark gray text color */
+    border-radius: 0px 12px 12px 0px /* Dark gray text color */
 }
 
 /* Add this new style for general content alignment */
@@ -236,14 +285,17 @@ img {
 }
 
 .input-with-label {
+    width: 100%; /* Make the input container take full width */
+    max-width: 400px; /* Limit maximum width */
     display: flex;
-    align-items: center;
+    justify-content: center; /* Center the input and label horizontally */
+    margin-bottom: 5px; /* Change from 10px to 12px */
     border-radius: 0px 5px 5px 0px;
 }
 input {
     background-color: #f0f0f0; /* Light gray background */
     color: #C4EDEB;; /* Dark gray text color */
-    border: 1px solid #156b75; /* Light gray border */
+    border: 1px solid #7FAFB1; /* Light gray border */
     height: 23px;
     border-radius: 5px 5px 5px 5px;
 }
@@ -260,21 +312,80 @@ input:not(:placeholder-shown) {
     white-space: nowrap;
     background: #f0f0f0;
     height: 43px;
-    color: black;
-    border: 1px solid #156b75;; /* Dark gray text color */
+    color: #191b24;
+    border: 1px solid #7FAFB1;; /* Dark gray text color */
+    text-align: center;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    margin-right: -2px;
+    margin-top: 12px; /* Change from 10px to 12px */
+    border-radius: 12px 0px 0px 12px;
+}
+
+.input-label-2 {
+    white-space: nowrap;
+    background: #f0f0f0;
+    height: 43px;
+    color: #131e20;
+    border: 1px solid #7FAFB1;; /* Dark gray text color */
     text-align: center;
     padding: 0 10px;
     display: flex;
     align-items: center;
     margin-right: -2px;
     margin-top: 0px;
-    border-radius: 5px 0px 0px 5px;
+    border-radius: 12px 0px 0px 12px;
+    width: 30px;
 }
 
 .deposit-limit {
     font-size: 12px;
     margin-left: auto; /* Pushes the deposit limit to the right */
+    color: #131e20;
 }
+
+.step-label {
+    position: relative;
+  }
+  .info-icon {
+    position: absolute;
+    right: -25px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: #165863;
+    font-size: 18px;
+  }
+  .tooltip {
+    display: none;
+    position: absolute;
+    background-color: #f9f9f9;
+    border: 1px solid #ccc;
+    padding: 10px;
+    border-radius: 5px;
+    z-index: 1000;
+    max-width: 200px;
+    right: -220px;
+    top: 50%;
+    transform: translateY(-50%);
+    
+    /* Add these properties to modify the font style */
+    font-family: 'PPNeueMontreal-Book', sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+    color: #333;
+  }
+
+  /* Style for links within tooltips */
+  .tooltip a {
+    color: #165863;
+    text-decoration: underline;
+  }
+
+  .tooltip a:hover {
+    text-decoration: none;
+  }
 
 @media (max-width: 400px) {
     .box-wrapper {
@@ -304,4 +415,12 @@ input:not(:placeholder-shown) {
         background-color: #F0FAFA; /* Match the original background color */
         border-radius: 10px;
     }
+}
+
+.main-content {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 40px; /* Add space for the Connect Wallet button */
 }
