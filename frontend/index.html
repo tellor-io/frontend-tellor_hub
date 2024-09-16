@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Layer Bridge</title>
     <link rel="stylesheet" href="main.css" />
+    <link rel="icon" type="image/x-icon" href="/cropped-SwooshCircle_Green.png">
+
     <style>
       .connected-address-style {
         color: #165863;
@@ -33,7 +35,7 @@
       }
     </script>
 
-      <h1 ><img src="../new bridge-image-green.png" alt="Descriptive Image Text" class="right-side-image">Tellor Layer TRB Bridge</h1> 
+      <h1 >Tellor Layer TRB Bridge</h1> 
       
   </head>
 
@@ -68,30 +70,12 @@
           <button id="approveButton" class="button-style-1" onclick="App.approveDeposit()">Approve Deposit</button>
         </div>
         <div class="step-label">
-          <button id="depositButton" class="button-style-3" onclick="App.depositToLayer()" disabled>Bridge to Layer</button>
+          <button id="depositButton" class="button-style-3" onclick="App.depositToLayer()">Bridge to Layer</button>
         </div>
 
         <a  target="_blank" href="https://github.com/tellor-io/frontend-layerbridgebutton">Front-End code</a>
     </div>
     <p style= "text-align: center"></p>
-   
-        <!--<p> 
-       <p>Connected address: <span id="connectedAddress" class="connected-address-style"></span></p>
-        <a target="_blank" href="https://queryidbuilder.herokuapp.com/spotprice">obtain query id & query data here</a>
-        </p>-->
-        <!--<p><input style="width: 350px;"type="text" id="_value" placeholder="_value (bytes)"/></p>
-        <p><input type="text" id="_nonce" placeholder="_nonce (uint256)"/></p>
-        <p><textarea style="height:190px; width: 485px;"type="text" id="_queryData" placeholder="_queryData (bytes)"></textarea></p>
-        <button id="reportValue" onclick="App.reportValue()">Submit Value</button>
-      </section>
-
-      <p>(*staked trb is required to report. if you do not have TRB already staked, stake below) </p>
-      <h2>stake the trb token:</h2>-->
-
-   <!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script> -->
-
-      <!--<p id="tokenBalance"></p>-->
-      <!--<p id="stakedTokenBalance"></p>-->
       <footer>
 
       </footer>
@@ -143,6 +127,48 @@
             tooltip.style.display = 'none';
           });
         });
+
+        // Add event listeners for input fields
+        const stakeAmountInput = document.getElementById('stakeAmount');
+        const tipAmountInput = document.getElementById('tipAmount');
+
+        stakeAmountInput.addEventListener('input', checkAllowance);
+        tipAmountInput.addEventListener('input', updateTipAmount);
+
+        function updateTipAmount() {
+          if (tipAmountInput.value === '') {
+            tipAmountInput.value = '';
+            tipAmountInput.placeholder = '0';
+          }
+        }
+
+        async function checkAllowance() {
+          const depositButton = document.getElementById('depositButton');
+          const stakeAmount = parseFloat(stakeAmountInput.value) || 0;
+
+          if (isNaN(stakeAmount) || stakeAmount <= 0) {
+            depositButton.disabled = true;
+            return;
+          }
+
+          try {
+            const allowance = await App.getAllowance(); // Implement this method in your App object
+            const stakeAmountWei = App.web3.utils.toWei(stakeAmount.toString(), 'ether');
+            
+            if (App.web3.utils.toBN(stakeAmountWei).gt(App.web3.utils.toBN(allowance))) {
+              depositButton.disabled = true;
+            } else {
+              depositButton.disabled = false;
+            }
+          } catch (error) {
+            console.error('Error checking allowance:', error);
+            depositButton.disabled = true;
+          }
+        }
+
+        // Initial checks
+        checkAllowance();
+        updateTipAmount();
       });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>

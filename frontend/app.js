@@ -266,80 +266,50 @@ var App = {
   },
 
   initInputValidation: function() {
-    document.getElementById('depositButton').disabled = true;
+    const depositButton = document.getElementById('depositButton');
     const stakeAmountInput = document.getElementById('stakeAmount');
-    const tipAmountInput = document.getElementById('tipAmount');
-    
-    const popupElement = document.createElement('div');
-    popupElement.style.display = 'none';
-    popupElement.style.position = 'absolute';
-    popupElement.style.backgroundColor = 'rgba(255, 0, 0, 0.8)';
-    popupElement.style.color = 'white';
-    popupElement.style.padding = '10px';
-    popupElement.style.borderRadius = '5px';
-    popupElement.style.zIndex = '1000';
-    popupElement.style.fontSize = '14px';
-    popupElement.style.whiteSpace = 'nowrap';
-    document.body.appendChild(popupElement);
+  
+    async function checkAllowanceAndValidate() {
+      const stakeAmount = stakeAmountInput.value.trim();
+      const stakeAmountWei = App.web3.utils.toWei(stakeAmount || '0', 'ether');
+      const stakeAmountBN = App.web3.utils.toBN(stakeAmountWei);
+      const depositLimitBN = App.web3.utils.toBN(App.depositLimit);
 
-    function showWarning(message, inputElement) {
-        popupElement.textContent = message;
-        popupElement.style.display = 'block';
+      console.log('Checking allowance. Stake amount (Ether):', stakeAmount);
+      console.log('Stake amount (Wei):', stakeAmountWei);
+
+      if (stakeAmount === '' || stakeAmountBN.isZero() || stakeAmountBN.gt(depositLimitBN)) {
+        console.log('Disabling button: Invalid stake amount or exceeds deposit limit');
+        depositButton.disabled = true;
+        return;
+      }
+
+      try {
+        const allowance = await App.getAllowance();
+        console.log('Current allowance (Wei):', allowance);
+        const allowanceBN = App.web3.utils.toBN(allowance);
         
-        const inputRect = inputElement.getBoundingClientRect();
-        const popupRect = popupElement.getBoundingClientRect();
+        console.log('Comparing:');
+        console.log('Stake amount (Wei):', stakeAmountWei);
+        console.log('Allowance (Wei):', allowance);
         
-        const left = inputRect.left + window.pageXOffset + (inputRect.width - popupRect.width) / 2;
-        const top = inputRect.top + window.pageYOffset - popupRect.height - 5;
-
-        popupElement.style.left = `${left}px`;
-        popupElement.style.top = `${top}px`;
-
-        setTimeout(() => {
-            popupElement.style.display = 'none';
-        }, 3000);
-    }
-
-    function validateInputs() {
-        const amount = stakeAmountInput.value;
-        const tip = tipAmountInput.value;
-        const amountBN = App.web3.utils.toBN(App.web3.utils.toWei(amount || '0', 'ether'));
-        const tipBN = App.web3.utils.toBN(App.web3.utils.toWei(tip || '0', 'ether'));
-        const minTipBN = App.web3.utils.toBN(App.web3.utils.toWei('0.0000000000001', 'ether'));
-        const depositLimitBN = App.web3.utils.toBN(App.depositLimit);
-
-        let warning = '';
-        let warningInput = null;
-
-        if (tipBN.gt(App.web3.utils.toBN(0))) {
-            if (tipBN.lt(minTipBN)) {
-                warning = "Tip must be at least 0.0000000000001 TRB";
-                warningInput = tipAmountInput;
-            } else if (amountBN.eq(App.web3.utils.toBN(0))) {
-                warning = "TRB amount must be greater than 0 when providing a tip";
-                warningInput = stakeAmountInput;
-            } else if (tipBN.gt(amountBN)) {
-                warning = "Tip amount cannot exceed the TRB amount";
-                warningInput = tipAmountInput;
-            }
-        }
-
-        if (amountBN.gt(depositLimitBN)) {
-            warning = "TRB amount exceeds the current deposit limit";
-            warningInput = stakeAmountInput;
-        }
-
-        if (warning) {
-            showWarning(warning, warningInput);
-            document.getElementById('depositButton').disabled = true;
+        if (stakeAmountBN.gt(allowanceBN)) {
+          console.log('Disabling button: Stake amount exceeds allowance');
+          depositButton.disabled = true;
         } else {
-            popupElement.style.display = 'none';
-            document.getElementById('depositButton').disabled = false;
+          console.log('Enabling button: Stake amount within allowance');
+          depositButton.disabled = false;
         }
+      } catch (error) {
+        console.error('Error checking allowance:', error);
+        depositButton.disabled = true;
+      }
     }
 
-    stakeAmountInput.addEventListener('input', validateInputs);
-    tipAmountInput.addEventListener('input', validateInputs);
+    stakeAmountInput.addEventListener('input', checkAllowanceAndValidate);
+
+    // Initial check
+    checkAllowanceAndValidate();
   },
 
   showPendingPopup: function(message) {
@@ -354,16 +324,41 @@ var App = {
     popup.style.color = '#083b44';
     popup.style.borderRadius = '10px';
     popup.style.zIndex = '1000';
-    popup.textContent = message;
-    document.body.appendChild(popup);
     popup.style.border = '3px solid black';
-    popup.style.fontFamily = "'PPNeueMontreal-Medium', Arial, sans-serif";
-    popup.style.fontSize = "30px";
+    popup.style.fontFamily = "'PPNeueMontreal-Book', Arial, sans-serif";
+    popup.style.fontSize = "15px";
+    popup.style.width = '250px'; // Set a fixed width
+    popup.style.textAlign = 'center'; // Center the text
+  
+    const messageSpan = document.createElement('span');
+    messageSpan.textContent = message;
+    popup.appendChild(messageSpan);
+  
+    const ellipsis = document.createElement('span');
+    ellipsis.id = 'ellipsis';
+    ellipsis.textContent = '';
+    ellipsis.style.display = 'inline-block';
+    ellipsis.style.width = '10px'; // Set a fixed width for the ellipsis
+    ellipsis.style.textAlign = 'left'; // Align dots to the left within their fixed width
+    popup.appendChild(ellipsis);
+  
+    document.body.appendChild(popup);
+  
+    let dots = 0;
+    const animateEllipsis = setInterval(() => {
+      dots = (dots + 1) % 4;
+      ellipsis.textContent = '.'.repeat(dots);
+    }, 500);
+  
+    // Store the interval ID on the popup element
+    popup.animationInterval = animateEllipsis;
   },
-
+  
   hidePendingPopup: function() {
     const popup = document.getElementById('pendingPopup');
     if (popup) {
+      // Clear the animation interval
+      clearInterval(popup.animationInterval);
       popup.remove();
     }
   },
@@ -397,7 +392,7 @@ var App = {
     const amount = document.getElementById('stakeAmount').value;
     const amountToSend = App.web3.utils.toWei(amount, 'ether');
 
-    App.showPendingPopup("Approval transaction pending...");
+    App.showPendingPopup("Approval transaction pending");
     App.contracts.Token.methods.approve(App.contracts.Contest.options.address, amountToSend)
       .send({ from: App.account })
       .then(function(approvalResult) {
@@ -462,6 +457,25 @@ var App = {
         console.error("Error in submitting value", error);
         alert("Error in submitting value. Please try again.");
       });
+  },
+
+  getAllowance: async function() {
+    if (!App.account || !App.contracts.Token || !App.contracts.Contest) {
+      console.error('Wallet not connected or contracts not initialized');
+      return '0';
+    }
+
+    try {
+      const allowance = await App.contracts.Token.methods.allowance(
+        App.account,
+        App.contracts.Contest.options.address
+      ).call();
+      console.log('Fetched allowance (Wei):', allowance);
+      return allowance;
+    } catch (error) {
+      console.error('Error fetching allowance:', error);
+      return '0';
+    }
   }
 };
 

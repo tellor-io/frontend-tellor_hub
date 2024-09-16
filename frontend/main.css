@@ -1,10 +1,11 @@
 body {
-    background: white;
+    background: url('../ND.svg') no-repeat center center fixed;
     margin: 0;
-    padding: 0 20px; /* Add some padding to the body */
+    padding: 0 20px;
     background-size: cover;
-    min-height: auto;
-    display: block;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
 @font-face {
@@ -46,10 +47,10 @@ body {
     font-display: swap;
 }
 
-  input::placeholder {
+  input::placeholder,
+  #tipAmount::placeholder {
     font-family: 'PPNeueMontreal-Thin', monospace;  
-    color: #38A8A3;; /* Dark gray text color */
-
+    color: #38A8A3;
   }
 
 
@@ -63,11 +64,11 @@ body {
   }
 h1 {
     text-align: center;
-    color: #191B24;
+    color: white;
     font-family: 'PPNeueMontreal-Bold', monospace;  
     font-size: clamp(13px, 5vw, 35px); /* Fluid typography */
     margin: 0;
-    padding: 20px 20px 0px; /* Top, left/right, bottom padding */
+    padding: 20px 20px 5px; /* Top, left/right, bottom padding */
     background-color: transparent; /* Explicitly set to transparent */
     z-index: 1000; /* Ensure it stays on top of other content */
     display: flex;
@@ -185,8 +186,8 @@ a {
 }
 
 .button-style-2:hover {
-    background-color: #008D8B; /* Darker shade for hover effect */
-    color: #DCEBEA
+    background-color: #025552; /* Darker shade for hover effect */
+    color: #88FFEC
 }
 
 .button-style-3 {
@@ -255,7 +256,7 @@ img {
 }
 #_queryId:not(:placeholder-shown) {
 
-    color: black;; /* Dark gray text color */
+    color: #008D8B;; /* Dark gray text color */
 
 }
 #stakeAmount {
@@ -423,4 +424,28 @@ input:not(:placeholder-shown) {
     flex-direction: column;
     align-items: center;
     padding-top: 40px; /* Add space for the Connect Wallet button */
+}
+
+#connectButton {
+    background-color: #08D482;
+    font-family: 'PPNeueMontreal-Book', monospace;  
+    color: #191B24;
+    padding: 10px 20px;
+    border: none;
+    font-size: 16px;
+    border-radius: 24px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+#connectButton:hover {
+    background-color: #025552;
+    color: #88FFEC;
+}
+
+#walletAddress {
+    font-family: 'PPNeueMontreal-Book', monospace;
+    font-size: 14px;
+    color: #131e20;
+    margin-top: 10px;
 }
