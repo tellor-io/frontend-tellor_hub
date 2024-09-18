@@ -45,6 +45,7 @@
       </div>
     </header>
     <div class="box-wrapper">
+      <w3m-button></w3m-button>
       <button id="walletButton" class="button-style-2" disabled>Connect Wallet</button>
       <button id="faucetButton" class="button-style-1" onclick="App.faucet()">Get Test TRB</button>           
         <div class="input-button-container">
@@ -74,6 +75,7 @@
         </div>
 
         <a  target="_blank" href="https://github.com/tellor-io/frontend-layerbridgebutton">Front-End code</a>
+        <w3m-button></w3m-button>
     </div>
     <p style= "text-align: center"></p>
       <footer>
@@ -81,9 +83,7 @@
       </footer>
     </div>
     <script src="./extensions/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.7.3/web3.min.js"></script>
-    <script src="./extensions/web3.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.7.4/web3.min.js"></script>
     <script src="app.js"></script>
 
     <script>
@@ -171,7 +171,5 @@
         updateTipAmount();
       });
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@walletconnect/ethereum-provider@2.9.1/dist/umd/index.min.js"></script>
   </body>
 </html>

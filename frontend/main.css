@@ -138,10 +138,11 @@ p {
 
 a {
     font-family: 'PPNeueMontreal-Book', monospace;  
-    font-size:15px;
+    font-size: 15px;
     color: #01A09C;
-    margin-top: 5px; /* Change from 20px to 12px */
-    align-self: center; /* Center the link */
+    margin-top: 5px;
+    margin-bottom: 10px;
+    align-self: center;
 }
 
 .button-style-1 {
@@ -351,12 +352,12 @@ input:not(:placeholder-shown) {
   }
   .info-icon {
     position: absolute;
-    right: -25px;
+    right: -20px;
     top: 50%;
     transform: translateY(-50%);
     cursor: pointer;
     color: #165863;
-    font-size: 18px;
+    font-size: 16px;
   }
   .tooltip {
     display: none;
@@ -389,32 +390,29 @@ input:not(:placeholder-shown) {
   }
 
 @media (max-width: 400px) {
+    h1 {
+
+        font-size: clamp(13px, 6vw, 35px); /* Fluid typography */
+       
+    }
+
     .box-wrapper {
-        padding: 0;
-        width: 100%;
-        max-width: 400px;
-        box-sizing: border-box;
-        overflow: hidden; /* Prevent button from overflowing */
+        padding: 20px;
+        width: 90%;
+        max-width: 350px;
+        margin-left: -5px;
     }
 
     .button-style-2 {
-        width: 100%; /* Extend beyond the box-wrapper */
-        font-size: 19px;
-        padding: 10px 100px;
-        box-sizing: border-box;
-        border-radius: 5px 5px 0 0;
-        position: center; /* Ensure it's on top */
-        z-index: 1;
+        width: 100%;
+        font-size: 20px;
+        padding: 10px;
     }
 
     .box {
-        padding: 15px;
+        padding: 10px;
         width: 100%;
-        box-sizing: border-box;
-        margin-top: -10px; /* Slightly overlap with the button */
-        position: relative;
-        background-color: #F0FAFA; /* Match the original background color */
-        border-radius: 10px;
+        margin-top: 0;
     }
 }
 
@@ -448,4 +446,11 @@ input:not(:placeholder-shown) {
     font-size: 14px;
     color: #131e20;
     margin-top: 10px;
+}
+
+input {
+    
+    width: 50%; /* Full width on mobile */
+    max-width: none; /* Remove max-width constraint on mobile */
+
 }

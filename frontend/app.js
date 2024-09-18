@@ -27,8 +27,15 @@ var App = {
         console.log("Using web3 detected from external source like Metamask");
         App.web3Provider = window.ethereum;
         App.web3 = new Web3(window.ethereum);
+
+        // Add listener for the 'disconnect' event
+        window.ethereum.on('disconnect', (error) => {
+          console.log('MetaMask disconnected');
+          App.disconnectWallet();
+        });
+
       } else {
-        console.log("Using localhost");
+        console.log("No web3 detected. Falling back to http://localhost:8545.");
         App.web3Provider = new Web3.providers.HttpProvider("http://localhost:8545");
         App.web3 = new Web3(App.web3Provider);
       }
@@ -36,26 +43,75 @@ var App = {
     });
   },
 
-  initEth: function () {
-    return ethereum.request({ method: "eth_requestAccounts" })
-      .then(function (accounts) {
-        App.account = accounts[0];
-        return App.web3.eth.getChainId().then(function (result) {
-          App.chainId = result;
-          return App.initContestContract()
-            .then(App.initTokenContract)
-            .then(function() {
-              console.log("Contracts initialized, fetching deposit limit...");
-              return App.fetchDepositLimit();
-            })
-            .then(function(readableLimit) {
-              console.log("Deposit limit fetched:", readableLimit);
-              App.setPageParams();
-            });
-        });
-      }).catch(function(error) {
-        console.error("Error during Ethereum account request:", error);
-      });
+  connectWallet: async function() {
+    console.log('Connecting wallet...');
+    if (typeof window.ethereum !== 'undefined') {
+      try {
+        // Request account access
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        App.handleAccountsChanged(accounts);
+      } catch (error) {
+        console.error("User denied account access")
+      }
+    } else {
+      console.log('No Ethereum browser detected');
+      alert('Please install MetaMask or use a Web3-enabled browser');
+    }
+  },
+
+  handleAccountsChanged: async function(accounts) {
+    console.log('Accounts:', accounts);
+    App.account = accounts[0];
+    console.log('App.account set to:', App.account);
+    App.updateConnectedAddress();
+    
+    try {
+      const chainId = await App.web3.eth.getChainId();
+      console.log('Chain ID:', chainId);
+      App.chainId = chainId;
+      if (App.chainId !== 11155111) {
+        App.showNetworkAlert();
+        App.disconnectWallet();
+        throw new Error("Wrong network");
+      }
+      await App.initContestContract();
+      console.log('Contest contract initialized');
+      await App.initTokenContract();
+      console.log('Token contract initialized');
+      await App.fetchDepositLimit();
+      console.log('Deposit limit fetched');
+      App.isConnected = true;
+      document.getElementById('walletButton').textContent = 'Disconnect Wallet';
+      App.setPageParams();
+    } catch (error) {
+      console.error('Error in handleAccountsChanged:', error);
+      App.handleError(error);
+    }
+  },
+
+  disconnectWallet: function() {
+    console.log('Disconnecting wallet...');
+    App.account = '0x0';
+    App.isConnected = false;
+    document.getElementById('walletButton').textContent = 'Connect Wallet';
+    App.updateConnectedAddress();
+    console.log('Wallet disconnected');
+  },
+
+  updateConnectedAddress: function() {
+    const connectedAddressElement = document.getElementById("connectedAddress");
+    if (connectedAddressElement) {
+      connectedAddressElement.textContent = App.account;
+    }
+  },
+
+  showNetworkAlert: function() {
+    alert("Please connect to the Sepolia network. Mainnet coming soon.");
+  },
+
+  handleError: function(error) {
+    console.error("An error occurred:", error);
+    alert("An error occurred. Please check the console for more details.");
   },
 
   initContestContract: function () {
@@ -270,40 +326,52 @@ var App = {
     const stakeAmountInput = document.getElementById('stakeAmount');
   
     async function checkAllowanceAndValidate() {
-      const stakeAmount = stakeAmountInput.value.trim();
-      const stakeAmountWei = App.web3.utils.toWei(stakeAmount || '0', 'ether');
-      const stakeAmountBN = App.web3.utils.toBN(stakeAmountWei);
-      const depositLimitBN = App.web3.utils.toBN(App.depositLimit);
-
-      console.log('Checking allowance. Stake amount (Ether):', stakeAmount);
-      console.log('Stake amount (Wei):', stakeAmountWei);
-
-      if (stakeAmount === '' || stakeAmountBN.isZero() || stakeAmountBN.gt(depositLimitBN)) {
-        console.log('Disabling button: Invalid stake amount or exceeds deposit limit');
-        depositButton.disabled = true;
-        return;
-      }
-
-      try {
-        const allowance = await App.getAllowance();
-        console.log('Current allowance (Wei):', allowance);
-        const allowanceBN = App.web3.utils.toBN(allowance);
-        
-        console.log('Comparing:');
-        console.log('Stake amount (Wei):', stakeAmountWei);
-        console.log('Allowance (Wei):', allowance);
-        
-        if (stakeAmountBN.gt(allowanceBN)) {
-          console.log('Disabling button: Stake amount exceeds allowance');
-          depositButton.disabled = true;
-        } else {
-          console.log('Enabling button: Stake amount within allowance');
-          depositButton.disabled = false;
+        if (!App.web3) {
+            console.log('Web3 not initialized yet');
+            depositButton.disabled = true;
+            return;
         }
-      } catch (error) {
-        console.error('Error checking allowance:', error);
-        depositButton.disabled = true;
-      }
+
+        const stakeAmount = stakeAmountInput.value.trim();
+        if (!stakeAmount) {
+            console.log('Stake amount is empty');
+            depositButton.disabled = true;
+            return;
+        }
+
+        try {
+            const stakeAmountWei = App.web3.utils.toWei(stakeAmount, 'ether');
+            const stakeAmountBN = App.web3.utils.toBN(stakeAmountWei);
+            const depositLimitBN = App.web3.utils.toBN(App.depositLimit);
+
+            console.log('Checking allowance. Stake amount (Ether):', stakeAmount);
+            console.log('Stake amount (Wei):', stakeAmountWei);
+
+            if (stakeAmountBN.isZero() || stakeAmountBN.gt(depositLimitBN)) {
+                console.log('Disabling button: Invalid stake amount or exceeds deposit limit');
+                depositButton.disabled = true;
+                return;
+            }
+
+            const allowance = await App.getAllowance();
+            console.log('Current allowance (Wei):', allowance);
+            const allowanceBN = App.web3.utils.toBN(allowance);
+            
+            console.log('Comparing:');
+            console.log('Stake amount (Wei):', stakeAmountWei);
+            console.log('Allowance (Wei):', allowance);
+            
+            if (stakeAmountBN.gt(allowanceBN)) {
+                console.log('Disabling button: Stake amount exceeds allowance');
+                depositButton.disabled = true;
+            } else {
+                console.log('Enabling button: Stake amount within allowance');
+                depositButton.disabled = false;
+            }
+        } catch (error) {
+            console.error('Error checking allowance:', error);
+            depositButton.disabled = true;
+        }
     }
 
     stakeAmountInput.addEventListener('input', checkAllowanceAndValidate);
@@ -392,7 +460,7 @@ var App = {
     const amount = document.getElementById('stakeAmount').value;
     const amountToSend = App.web3.utils.toWei(amount, 'ether');
 
-    App.showPendingPopup("Approval transaction pending");
+    App.showPendingPopup("Approval transaction pending...");
     App.contracts.Token.methods.approve(App.contracts.Contest.options.address, amountToSend)
       .send({ from: App.account })
       .then(function(approvalResult) {
@@ -481,228 +549,18 @@ var App = {
 
 $(function () {
   $(window).load(function () {
-    console.log(document.getElementById('walletButton'));
     document.getElementById("walletButton").disabled = false;
     App.init();
-  });
-});
 
-$(document).ready(function() {
-    const walletButton = document.getElementById('walletButton');
-    console.log(walletButton);
-    let isConnected = false;
-
-    function checkWalletConnection() {
-        if (!isConnected) {
-            alert("Please connect your wallet first.");
-            return false;
-        }
-        return true;
-    }
-
-    App.faucet = function() {
-        if (!checkWalletConnection()) return;
-        console.log("Faucet button clicked");
-        if (!App.contracts.Token) {
-            console.error("Token contract not initialized");
-            alert("Please connect your wallet first");
-            return;
-        }
-        
-        App.showPendingPopup("Faucet transaction pending...");
-        App.contracts.Token.methods.faucet(App.account)
-            .send({ from: App.account })
-            .then(function(result) {
-                App.hidePendingPopup();
-                console.log("Faucet successful", result);
-                alert("Test TRB tokens have been sent to your account!");
-            })
-            .catch(function(error) {
-                App.hidePendingPopup();
-                console.error("Error in faucet", error);
-                alert("Error getting test TRB tokens. Please try again.");
-            });
-    }
-
-    App.approveDeposit = function() {
-        if (!checkWalletConnection()) return;
-        const amount = document.getElementById('stakeAmount').value;
-        const amountToSend = App.web3.utils.toWei(amount, 'ether');
-
-        App.showPendingPopup("Approval transaction pending...");
-        App.contracts.Token.methods.approve(App.contracts.Contest.options.address, amountToSend)
-            .send({ from: App.account })
-            .then(function(approvalResult) {
-                App.hidePendingPopup();
-                console.log("Approval successful", approvalResult);
-                alert("Approval successful. You can now proceed with the deposit.");
-                document.getElementById('depositButton').disabled = false;
-            })
-            .catch(function(error) {
-                App.hidePendingPopup();
-                console.error("Error in approval", error);
-                alert("Error in approval. Please try again.");
-            });
-    }
-
-    App.depositToLayer = function() {
-        if (!checkWalletConnection()) return;
-        const recipient = document.getElementById('_queryId').value;
-        const amount = document.getElementById('stakeAmount').value;
-        const tip = document.getElementById('tipAmount').value;
-        const amountToSend = App.web3.utils.toWei(amount, 'ether');
-        const tipToSend = App.web3.utils.toWei(tip, 'ether');
-
-        App.showPendingPopup("Deposit transaction pending...");
-        App.contracts.Contest.methods.depositToLayer(amountToSend, tipToSend, recipient)
-            .send({ from: App.account })
-            .then(function(depositResult) {
-                App.hidePendingPopup();
-                console.log("Deposit to layer successful", depositResult);
-                alert("Deposit to layer successful!");
-            })
-            .catch(function(error) {
-                App.hidePendingPopup();
-                console.error("Error in depositing to layer", error);
-                alert("Error in depositing to layer. Please try again.");
-            });
-    }
-
-    App.reportValue = function () {
-        if (!checkWalletConnection()) return;
-        queryId = document.getElementById("_queryId").value;
-        value = document.getElementById("_value").value;
-        nonce = document.getElementById("_nonce").value;
-        queryData = document.getElementById("_queryData").value;
-        console.log("_queryId: " + queryId);
-        console.log("_value: "  + value.padStart(64, '0'));
-        console.log("_nonce: " + nonce);
-        console.log("_queryData: " + queryData);
-        console.log("Attempting to interact with contract at address:", App.contracts.Contest.options.address);
-        
-        App.showPendingPopup("Submitting value...");
-        App.contracts.Contest.methods
-            .submitValue(queryId, value, nonce, queryData)
-            .send({ from: App.account })
-            .then(function (result) {
-                App.hidePendingPopup();
-                console.log(result);
-                alert("Value submitted successfully!");
-            })
-            .catch(function(error) {
-                App.hidePendingPopup();
-                console.error("Error in submitting value", error);
-                alert("Error in submitting value. Please try again.");
-            });
-    }
-
-    function showNetworkAlert() {
-        alert("Please connect to the Sepolia network. Mainnet coming soon.");
-    }
-
-    walletButton.addEventListener('click', function() {
-        if (!isConnected) {
-            connectWallet();
-        } else {
-            disconnectWallet();
-        }
+    // Add event listener to wallet button
+    document.getElementById('walletButton').addEventListener('click', function() {
+      if (!App.isConnected) {
+        App.connectWallet();
+      } else {
+        App.disconnectWallet();
+      }
     });
-
-    function connectWallet() {
-        console.log('Connecting wallet...');
-        
-        if (typeof window.ethereum !== 'undefined') {
-            // MetaMask is installed
-            connectWithMetaMask();
-        } else {
-            // MetaMask is not installed, try WalletConnect
-            connectWithWalletConnect();
-        }
-    }
-
-    function connectWithMetaMask() {
-        console.log('Connecting with MetaMask...');
-        window.ethereum.request({ method: 'eth_requestAccounts' })
-            .then(handleAccountsChanged)
-            .catch(handleError);
-    }
-
-    function connectWithWalletConnect() {
-        console.log('Connecting with WalletConnect...');
-        // Initialize WalletConnect client
-        const provider = new WalletConnectProvider({
-            rpc: {
-                11155111: "https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161" // Sepolia testnet
-            }
-        });
-
-        // Enable session (triggers QR Code modal)
-        provider.enable()
-            .then(function(accounts) {
-                App.web3 = new Web3(provider);
-                handleAccountsChanged(accounts);
-            })
-            .catch(handleError);
-    }
-
-    function handleAccountsChanged(accounts) {
-        console.log('Accounts:', accounts);
-        App.account = accounts[0];
-        console.log('App.account set to:', App.account);
-        updateConnectedAddress();
-        return App.web3.eth.getChainId()
-            .then(function (result) {
-                console.log('Chain ID:', result);
-                App.chainId = result;
-                if (App.chainId !== 11155111) {
-                    showNetworkAlert();
-                    disconnectWallet();
-                    return Promise.reject("Wrong network");
-                }
-                return App.initContestContract();
-            })
-            .then(function() {
-                console.log('Contest contract initialized');
-                return App.initTokenContract();
-            })
-            .then(function() {
-                console.log('Token contract initialized');
-                return App.fetchDepositLimit();
-            })
-            .then(function() {
-                console.log('Deposit limit fetched');
-                isConnected = true;
-                walletButton.textContent = 'Disconnect Wallet';
-                App.setPageParams();
-            });
-    }
-
-    function handleError(error) {
-        console.error("Error during wallet connection:", error);
-        walletButton.disabled = false;
-    }
-
-    function updateConnectedAddress() {
-        const connectedAddressElement = document.getElementById("connectedAddress");
-        if (connectedAddressElement) {
-            connectedAddressElement.textContent = App.account;
-            console.log("Updated connected address to:", App.account);
-        } else {
-            console.error('connectedAddress element not found');
-        }
-    }
-
-    function disconnectWallet() {
-        console.log('Disconnecting wallet...');
-        if (App.web3 && App.web3.currentProvider && App.web3.currentProvider.disconnect) {
-            App.web3.currentProvider.disconnect();
-        }
-        App.account = '0x0';
-        isConnected = false;
-        walletButton.textContent = 'Connect Wallet';
-        updateConnectedAddress();
-        console.log('Wallet disconnected');
-    }
+  });
 });
 
 $(document).ready(function() {
