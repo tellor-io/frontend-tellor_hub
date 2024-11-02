@@ -80,6 +80,7 @@ var App = {
       console.log('Token contract initialized');
       await App.fetchDepositLimit();
       console.log('Deposit limit fetched');
+      await App.updateBalance();
       App.isConnected = true;
       document.getElementById('walletButton').textContent = 'Disconnect Wallet';
       App.setPageParams();
@@ -95,6 +96,13 @@ var App = {
     App.isConnected = false;
     document.getElementById('walletButton').textContent = 'Connect Wallet';
     App.updateConnectedAddress();
+    
+    // Clear the balance display
+    const balanceElement = document.getElementById("currentBalance");
+    if (balanceElement) {
+        balanceElement.innerHTML = `<span style="font-size: 12px; font-family: 'PPNeueMontreal-Book', Arial, sans-serif" class="connected-address-style">0 TRB</span>`;
+    }
+    
     console.log('Wallet disconnected');
   },
 
@@ -122,7 +130,7 @@ var App = {
         if (App.chainId === 421613) {
           App.contracts.Contest.options.address = "0xb2CB696fE5244fB9004877e58dcB680cB86Ba444";
         } else {
-          App.contracts.Contest.options.address = "0x717F9269032C25D91CcD92bADbdfcb32c30E9492";
+          App.contracts.Contest.options.address = "0x31F1f15541ea781e170F40A3eEdcfcaC837aFa12";
         }
         console.log("Contract initialized");
         console.log("Contract address: " + App.contracts.Contest.options.address);
@@ -137,7 +145,7 @@ var App = {
       $.getJSON(pathToAbi, function (abi) {
         App.contracts.Token = new App.web3.eth.Contract(abi);
         if (App.chainId === 11155111) {
-          App.contracts.Token.options.address = "0xceBa0609797251395CFB420a1540E58b6be0828d"
+          App.contracts.Token.options.address = "0x76402D74e79459157bb5581487F50f05439914C9"
         } 
         if (App.chainId === 1)  {
           App.contracts.Token.options.address = "0x88dF592F8eb5D7Bd38bFeF7dEb0fBc02cf3778a0"
@@ -218,19 +226,24 @@ var App = {
   setPageParams: function () {
     console.log('Setting page parameters');
     console.log('App.account in setPageParams:', App.account);
-    const connectedAddressElement = document.getElementById("connectedAddress");
-    if (connectedAddressElement) {
-      connectedAddressElement.textContent = App.account;
-      console.log("Updated connected address in setPageParams to:", App.account);
-    } else {
-      console.error('connectedAddress element not found in setPageParams');
+    try {
+        // Check if element exists before trying to access it
+        const connectedAddressElement = document.getElementById('connectedAddress');
+        if (connectedAddressElement) {
+            connectedAddressElement.innerHTML = App.account || 'Not Connected';
+        } else {
+            console.log('Note: connectedAddress element not found');
+        }
+
+        if (App.contracts.Contest && App.contracts.Contest.options) {
+            console.log("Contest Address:", App.contracts.Contest.options.address);
+        } else {
+            console.error('Contest contract not properly initialized in setPageParams');
+        }
+        console.log("Current Deposit Limit:", App.depositLimit);
+    } catch (error) {
+        console.error('Error in setPageParams:', error);
     }
-    if (App.contracts.Contest && App.contracts.Contest.options) {
-      console.log("Contest Address:", App.contracts.Contest.options.address);
-    } else {
-      console.error('Contest contract not properly initialized in setPageParams');
-    }
-    console.log("Current Deposit Limit:", App.depositLimit);
   },
 
   uintTob32: function (n) {
@@ -267,8 +280,10 @@ var App = {
     
     App.contracts.Token.methods.faucet(App.account)
       .send({ from: App.account })
-      .then(function(result) {
+      .then(async function(result) {
+        App.hidePendingPopup();
         console.log("Faucet successful", result);
+        await App.updateBalance();
         alert("Test TRB tokens have been sent to your account!");
       })
       .catch(function(error) {
@@ -298,27 +313,47 @@ var App = {
       });
   },
 
-  depositToLayer: function() {
-    if (!checkWalletConnection()) return;
-    const recipient = document.getElementById('_queryId').value;
-    const amount = document.getElementById('stakeAmount').value;
-    const tip = document.getElementById('tipAmount').value;
-    const amountToSend = App.web3.utils.toWei(amount, 'ether');
-    const tipToSend = App.web3.utils.toWei(tip, 'ether');
+  depositToLayer: async function() {
+    try {
+        const recipient = document.getElementById('_queryId').value;
+        const amount = document.getElementById('stakeAmount').value;
+        const tip = document.getElementById('tipAmount').value;
+        
+        const amountToSend = App.web3.utils.toWei(amount, 'ether');
+        
+        // Add debug logging for balance check
+        const balance = await App.contracts.Token.methods.balanceOf(App.account).call();
+        console.log('Current balance:', App.web3.utils.fromWei(balance, 'ether'), 'TRB');
+        console.log('Attempting to deposit:', amount, 'TRB');
+        
+        const balanceBN = new App.web3.utils.BN(balance);
+        const amountBN = new App.web3.utils.BN(amountToSend);
+        
+        console.log('Balance (wei):', balance);
+        console.log('Amount to send (wei):', amountToSend);
+        console.log('Is balance less than amount?', balanceBN.lt(amountBN));
 
-    App.showPendingPopup("Deposit transaction pending...");
-    App.contracts.Contest.methods.depositToLayer(amountToSend, tipToSend, recipient)
-      .send({ from: App.account })
-      .then(function(depositResult) {
+        if (balanceBN.lt(amountBN)) {
+            const errorMsg = `Insufficient token balance. You have ${App.web3.utils.fromWei(balance, 'ether')} TRB but trying to deposit ${amount} TRB`;
+            console.log('Showing error:', errorMsg);
+            alert(errorMsg);
+            return; // Make sure to return here to prevent the transaction
+        }
+
+        // Only reach here if balance is sufficient
+        App.showPendingPopup("Deposit transaction pending...");
+        const tipToSend = App.web3.utils.toWei(tip, 'ether');
+        await App.contracts.Contest.methods.depositToLayer(amountToSend, tipToSend, recipient)
+            .send({ from: App.account });
+        
         App.hidePendingPopup();
-        console.log("Deposit to layer successful", depositResult);
+        await App.updateBalance();
         alert("Deposit to layer successful!");
-      })
-      .catch(function(error) {
+    } catch (error) {
         App.hidePendingPopup();
-        console.error("Error in depositing to layer", error);
-        alert("Error in depositing to layer. Please try again.");
-      });
+        console.error("Error in depositing to layer:", error);
+        alert(error.message || "Error in depositing to layer. Please try again.");
+    }
   },
 
   initInputValidation: function() {
@@ -544,8 +579,33 @@ var App = {
       console.error('Error fetching allowance:', error);
       return '0';
     }
+  },
+
+  updateBalance: async function() {
+    if (!App.contracts.Token || !App.account) return;
+    
+    try {
+        const balance = await App.contracts.Token.methods.balanceOf(App.account).call();
+        const readableBalance = App.web3.utils.fromWei(balance, 'ether');
+        console.log("Current balance:", readableBalance);
+        
+        const balanceElement = document.getElementById("currentBalance");
+        if (balanceElement) {
+            balanceElement.textContent = `${readableBalance} TRB`;
+        }
+    } catch (error) {
+        console.error("Error fetching balance:", error);
+    }
   }
 };
+
+function checkWalletConnection() {
+    if (!App.isConnected) {
+        alert("Please connect your wallet first");
+        return false;
+    }
+    return true;
+}
 
 $(function () {
   $(window).load(function () {
@@ -566,3 +626,46 @@ $(function () {
 $(document).ready(function() {
     document.getElementById('depositButton').disabled = true;
 });
+
+function showBalanceErrorPopup(message) {
+  const popup = document.createElement('div');
+  popup.id = 'balanceErrorPopup';
+  popup.className = 'balance-error-popup';
+  popup.textContent = message;
+  
+  document.body.appendChild(popup);
+  
+  // Remove the popup after 3 seconds
+  setTimeout(() => {
+    const popup = document.getElementById('balanceErrorPopup');
+    if (popup) {
+      popup.remove();
+    }
+  }, 3000);
+}
+
+function hideBalanceErrorPopup() {
+  const popup = document.getElementById('balanceErrorPopup');
+  if (popup) {
+    popup.remove();
+  }
+}
+
+async function checkBalance(amount) {
+  if (!App.contracts.Token || !App.account) return true;
+  
+  try {
+    const balance = await App.contracts.Token.methods.balanceOf(App.account).call();
+    const amountWei = App.web3.utils.toWei(amount.toString(), 'ether');
+    
+    if (App.web3.utils.toBN(amountWei).gt(App.web3.utils.toBN(balance))) {
+      const readableBalance = App.web3.utils.fromWei(balance, 'ether');
+      showBalanceErrorPopup(`Insufficient balance. You have ${readableBalance} TRB but trying to deposit ${amount} TRB`);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error("Error checking balance:", error);
+    return false;
+  }
+}

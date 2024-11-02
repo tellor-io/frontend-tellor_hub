@@ -1,5 +1,5 @@
 body {
-    background: url('../ND.svg') no-repeat center center fixed;
+    background: url('../bg-com-lite.png') no-repeat center center fixed;
     margin: 0;
     padding: 0 20px;
     background-size: cover;
@@ -49,8 +49,9 @@ body {
 
   input::placeholder,
   #tipAmount::placeholder {
-    font-family: 'PPNeueMontreal-Thin', monospace;  
+    font-family: 'PPNeueMontreal-Book', monospace;  
     color: #38A8A3;
+    font-size: 16px;
   }
 
 
@@ -64,7 +65,7 @@ body {
   }
 h1 {
     text-align: center;
-    color: white;
+    color: #003734;
     font-family: 'PPNeueMontreal-Bold', monospace;  
     font-size: clamp(13px, 5vw, 35px); /* Fluid typography */
     margin: 0;
@@ -146,9 +147,9 @@ a {
 }
 
 .button-style-1 {
-    background-color: #08D482;
+    background-color: #003734;
     font-family: 'PPNeueMontreal-Book', monospace;  
-    color: #191B24;
+    color: #eefffb;
     padding: 10px 50px;
     border: none;
     font-size: 20px;
@@ -164,14 +165,14 @@ a {
 }
 
 .button-style-1:hover {
-    background-color: #025552; /* Darker shade for hover effect */
+    background-color: #049159; /* Darker shade for hover effect */
     color: #88FFEC;
 }
 
 .button-style-2 {
-    background-color: #191B24;
+    background-color: #003734;
     font-family: 'PPNeueMontreal-Book', monospace;  
-    color: #D4D8E3;
+    color: #eefffb;
     padding: 10px 50px;
     border: none;
     font-size: 20px;
@@ -187,14 +188,14 @@ a {
 }
 
 .button-style-2:hover {
-    background-color: #025552; /* Darker shade for hover effect */
+    background-color: #049159; /* Darker shade for hover effect */
     color: #88FFEC
 }
 
 .button-style-3 {
-    background-color: #08D482;
+    background-color: #003734;
     font-family: 'PPNeueMontreal-Book', monospace;  
-    color: #191B24;
+    color: #eefffb;
     padding: 10px 50px;
     border: none;
     font-size: 20px;
@@ -210,7 +211,7 @@ a {
 }
 
 .button-style-3:hover {
-    background-color: #025552; /* Darker shade for hover effect */
+    background-color: #049159; /* Darker shade for hover effect */
     color: #88FFEC;
 }
 
@@ -267,7 +268,6 @@ img {
     color: #008D8B; /* Dark gray text color */
     border: 1px solid #7FAFB1; /* Dark gray text color */
     border-radius: 0px 12px 12px 0px; /* Dark gray text color */
-    margin-top: 12px;
 }
 
 #tipAmount {
@@ -287,9 +287,11 @@ img {
 }
 
 .input-with-label {
-    width: 100%; /* Make the input container take full width */
-    max-width: 400px; /* Limit maximum width */
+    position: relative;
     display: flex;
+    align-items: center;
+    width: 100%;
+    max-width: 400px; /* Limit maximum width */
     justify-content: center; /* Center the input and label horizontally */
     margin-bottom: 5px; /* Change from 10px to 12px */
     border-radius: 0px 5px 5px 0px;
@@ -323,6 +325,9 @@ input:not(:placeholder-shown) {
     margin-right: -2px;
     margin-top: 12px; /* Change from 10px to 12px */
     border-radius: 12px 0px 0px 12px;
+    font-family: 'PPNeueMontreal-Book', monospace;
+    font-size: 5px;
+
 }
 
 .input-label-2 {
@@ -336,10 +341,15 @@ input:not(:placeholder-shown) {
     display: flex;
     align-items: center;
     margin-right: -2px;
-    margin-top: 0px;
+    margin-top: 8px;
     border-radius: 12px 0px 0px 12px;
     width: 30px;
+    font-family: 'PPNeueMontreal-Book', monospace;
 }
+
+.input-address {
+    font-size: 11.5px !important; /* Adjust this value as needed */
+  }
 
 .deposit-limit {
     font-size: 12px;
@@ -349,15 +359,18 @@ input:not(:placeholder-shown) {
 
 .step-label {
     position: relative;
+    font-family: 'PPNeueMontreal-Book', monospace;  
+
   }
   .info-icon {
     position: absolute;
-    right: -20px;
+    right: -25px;
     top: 50%;
     transform: translateY(-50%);
     cursor: pointer;
     color: #165863;
     font-size: 16px;
+    z-index: 1;
   }
   .tooltip {
     display: none;
@@ -453,4 +466,116 @@ input {
     width: 50%; /* Full width on mobile */
     max-width: none; /* Remove max-width constraint on mobile */
 
+}
+
+.popup {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 25px;
+    border-radius: 5px;
+    z-index: 1000;
+    display: none;
+}
+
+.popup.error {
+    background-color: #ff4444;
+    color: white;
+    border: 1px solid #cc0000;
+}
+
+.popup.pending {
+    background-color: #ffbb33;
+    color: white;
+    border: 1px solid #ff8800;
+}
+
+
+.info-text {
+    font-family: 'PPNeueMontreal-Bold', Arial, sans-serif;
+    font-size: 12px;
+    color: #131e20;
+    margin: 2px 0; /* Reduced vertical spacing between the two lines */
+}
+
+.info-text span {
+    font-family: 'PPNeueMontreal-Book', Arial, sans-serif;}
+
+.input-fields {
+    margin-bottom: 10px; /* Reduced spacing between input fields */
+}
+
+.step-label {
+    margin-bottom: 8px; /* Reduced spacing between inputs by half */
+}
+
+.connected-address-style {
+    color: black;
+}
+
+.button-container {
+    display: flex;
+    justify-content: center;
+}
+
+.input-button-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    max-width: 270px;
+    margin: 0 auto;
+}
+
+.input-with-label {
+    display: flex;
+    align-items: center;
+}
+
+.input-label, .input-label-2 {
+    font-family: 'PPNeueMontreal-Bold', Arial, sans-serif;
+
+    min-width: 40px;
+    margin-right: 0;
+    margin-top: 12px;
+    display: inline-block;
+    text-align: center;
+    font-size: 14px; /* Changed from inherit to explicit size */
+    line-height: 1;
+    height: 43px;
+    padding: 0 5px;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    background: #f0f0f0;
+    border: 1px solid #7FAFB1;
+}
+
+.input {
+    margin-top: 12px;
+    line-height: 1;
+    padding: 10px;
+    height: 43px;
+    box-sizing: border-box;
+    background-color: #f0f0f0;
+    border: 1px solid #7FAFB1;
+    width: 100%;
+}
+
+.balance-error-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 50px;
+    background-color: #ffeded;
+    color: #cc0000;
+    border-radius: 10px;
+    z-index: 1000;
+    border: 3px solid #cc0000;
+    font-family: 'PPNeueMontreal-Book', Arial, sans-serif;
+    font-size: 15px;
+    width: 250px;
+    text-align: center;
 }
