@@ -579,3 +579,14 @@ input {
     width: 250px;
     text-align: center;
 }
+
+.disclaimer {
+    text-align: center;
+    color: #003734;
+    font-family: 'PPNeueMontreal-Book', monospace;
+    font-size: clamp(10px, 3vw, 16px);
+    margin: 0;
+    padding: 0 20px 15px;
+    background-color: transparent;
+    z-index: 1000;
+}

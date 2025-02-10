@@ -130,7 +130,7 @@ var App = {
         if (App.chainId === 421613) {
           App.contracts.Contest.options.address = "0xb2CB696fE5244fB9004877e58dcB680cB86Ba444";
         } else {
-          App.contracts.Contest.options.address = "0x31F1f15541ea781e170F40A3eEdcfcaC837aFa12";
+          App.contracts.Contest.options.address = "0x6ac02F3887B358591b8B2D22CfB1F36Fa5843867";
         }
         console.log("Contract initialized");
         console.log("Contract address: " + App.contracts.Contest.options.address);
@@ -145,7 +145,7 @@ var App = {
       $.getJSON(pathToAbi, function (abi) {
         App.contracts.Token = new App.web3.eth.Contract(abi);
         if (App.chainId === 11155111) {
-          App.contracts.Token.options.address = "0x76402D74e79459157bb5581487F50f05439914C9"
+          App.contracts.Token.options.address = "0x5bd3b87EEF3348B2b115A2bC92d8c01Aa7a0CEb1"
         } 
         if (App.chainId === 1)  {
           App.contracts.Token.options.address = "0x88dF592F8eb5D7Bd38bFeF7dEb0fBc02cf3778a0"
