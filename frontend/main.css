@@ -244,10 +244,16 @@ a {
 
 img {
     text-align: center;
-    flex: 1; /* Allows the title to grow and take necessary space */
-    margin-right: 20px; /* Adds some space between the title and the image */
-    width: 20px;
+    width: auto;
 }
+
+h1 img {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+    margin: 0;
+}
+
 #_queryId {
     font-size: 20px; /* Smaller font size for mobile */
     padding: 10px; /* Larger padding for better touch interaction */

@@ -17,16 +17,17 @@
         };
       }
     </script>
-
-      <h1 > TRB Bridge To Tellor Layer</h1> 
-      <div class="disclaimer">*Sepolia Test Network Only*</div>
-      
   </head>
 
   <body>
     <header>
       <div class="top-right">
       </div>
+      <h1 style="display: grid; grid-template-columns: auto auto; gap: 5px; align-items: center; justify-content: center; margin: 0; padding: 20px 0 0 0;">
+        <img src="circle_logo.png" alt="Circle Logo" style="width: 40px; height: 40px; object-fit: contain; display: block;">
+        <span style="display: block;">TRB Bridge To Tellor Layer</span>
+      </h1>
+      <div class="disclaimer">*Sepolia Test Network Only*</div>
     </header>
     <div class="box-wrapper">
       <w3m-button></w3m-button>
@@ -60,7 +61,7 @@
 
         <div class="input-fields">
           <div class="step-label">
-            <button id="approveButton" class="button-style-1" onclick="App.approveDeposit()">Approve Deposit</button>
+            <button id="approveButton" class="button-style-1" onclick="console.log('Button clicked'); App.approveDeposit();">Approve Deposit</button>
           </div>
           <div class="step-label">
             <button id="depositButton" class="button-style-3" onclick="App.depositToLayer()">Bridge to Layer</button>
@@ -75,6 +76,7 @@
 
       </footer>
     </div>
+    <div id="connectedAddress"></div>
     <script src="./extensions/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.7.4/web3.min.js"></script>
     <script src="app.js"></script>
@@ -176,12 +178,17 @@
             const stakeAmountWei = App.web3.utils.toWei(stakeAmount.toString(), 'ether');
             
             if (App.web3.utils.toBN(stakeAmountWei).gt(App.web3.utils.toBN(allowance))) {
+              // Need approval - enable approve button, disable deposit button
+              approveButton.disabled = false;
               depositButton.disabled = true;
             } else {
+              // Already approved - disable approve button, enable deposit button
+              approveButton.disabled = true;
               depositButton.disabled = false;
             }
           } catch (error) {
             console.error('Error checking allowance:', error);
+            approveButton.disabled = true;
             depositButton.disabled = true;
           }
         }
