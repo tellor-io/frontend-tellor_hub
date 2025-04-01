@@ -596,3 +596,8 @@ input {
     background-color: transparent;
     z-index: 1000;
 }
+
+.truncated-address {
+    font-family: 'PPNeueMontreal-Thin', Arial, sans-serif;
+    font-size: 14px;
+}
