@@ -354,6 +354,17 @@ var App = {
         const amount = document.getElementById('stakeAmount').value;
         const tip = document.getElementById('tipAmount').value;
         
+        // Validate recipient address is not empty and starts with 'tellor1...'
+        if (!recipient || recipient.trim() === '') {
+            alert('Recipient address cannot be empty');
+            return;
+        }
+        
+        if (!recipient.startsWith('tellor1')) {
+            alert('Recipient address must start with "tellor1..."');
+            return;
+        }
+
         const amountToSend = App.web3.utils.toWei(amount, 'ether');
         
         // Add debug logging for balance check
