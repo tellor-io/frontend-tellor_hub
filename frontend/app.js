@@ -365,6 +365,11 @@ var App = {
             return;
         }
 
+        if (recipient.length !== 45) {
+            alert('Recipient address must be exactly 45 characters long');
+            return;
+        }
+
         const amountToSend = App.web3.utils.toWei(amount, 'ether');
         
         // Add debug logging for balance check
