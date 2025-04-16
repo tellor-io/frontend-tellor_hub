@@ -348,11 +348,44 @@ var App = {
       });
   },
 
+  showSuccessPopup: function(message) {
+    const popup = document.createElement('div');
+    popup.id = 'successPopup';
+    popup.style.position = 'fixed';
+    popup.style.top = '50%';
+    popup.style.left = '50%';
+    popup.style.transform = 'translate(-50%, -50%)';
+    popup.style.padding = '50px';
+    popup.style.backgroundColor = '#C4EDEB';
+    popup.style.color = '#083b44';
+    popup.style.borderRadius = '10px';
+    popup.style.zIndex = '1000';
+    popup.style.border = '3px solid black';
+    popup.style.fontFamily = "'PPNeueMontreal-Book', Arial, sans-serif";
+    popup.style.fontSize = "15px";
+    popup.style.width = '250px'; // Set a fixed width
+    popup.style.textAlign = 'center'; // Center the text
+  
+    const messageSpan = document.createElement('span');
+    messageSpan.textContent = message;
+    popup.appendChild(messageSpan);
+  
+    document.body.appendChild(popup);
+  
+    // Remove the popup after 5 seconds
+    setTimeout(() => {
+      const popup = document.getElementById('successPopup');
+      if (popup) {
+        popup.remove();
+      }
+    }, 5000);
+  },
+
   depositToLayer: async function() {
     try {
         const recipient = document.getElementById('_queryId').value;
         const amount = document.getElementById('stakeAmount').value;
-        const tip = document.getElementById('tipAmount').value;
+        const tip = "0"; // Set tip to 0 by default
         
         // Validate recipient address is not empty and starts with 'tellor1...'
         if (!recipient || recipient.trim() === '') {
@@ -394,7 +427,7 @@ var App = {
         
         App.hidePendingPopup();
         await App.updateBalance();
-        alert("Deposit to layer successful!");
+        App.showSuccessPopup("Deposit to layer successful! You will need to wait 12 hours before you can claim your tokens on Tellor Layer.");
     } catch (error) {
         App.hidePendingPopup();
         console.error("Error in depositing to layer:", error);
@@ -405,49 +438,81 @@ var App = {
   initInputValidation: function() {
     const depositButton = document.getElementById('depositButton');
     const stakeAmountInput = document.getElementById('stakeAmount');
-  
-    async function checkAllowanceAndValidate() {
-        if (!App.web3) {
-            console.log('Web3 not initialized yet');
-            depositButton.disabled = true;
-            return;
-        }
+    
+    // Preserve the original input width
+    const originalWidth = stakeAmountInput.offsetWidth;
+    stakeAmountInput.style.width = originalWidth + 'px'; // Lock the width to prevent stretching
+    
+    // Create tooltip element with relative positioning container
+    const tooltipContainer = document.createElement('div');
+    tooltipContainer.style.position = 'relative'; // Create a positioning context
+    tooltipContainer.style.display = 'inline-block'; // Keep it inline with input
+    tooltipContainer.style.verticalAlign = 'middle'; // Align with other elements
+    
+    // Move the input into our new container
+    stakeAmountInput.parentNode.insertBefore(tooltipContainer, stakeAmountInput);
+    tooltipContainer.appendChild(stakeAmountInput);
+    
+    const tooltip = document.createElement('div');
+    tooltip.style.display = 'none';
+    tooltip.style.position = 'absolute';
+    tooltip.style.backgroundColor = '#C4EDEB';
+    tooltip.style.padding = '5px 10px';
+    tooltip.style.borderRadius = '5px';
+    tooltip.style.border = '1px solid black';
+    tooltip.style.fontSize = '14px';
+    tooltip.style.color = '#083b44';
+    tooltip.style.fontFamily = "'PPNeueMontreal-Book', Arial, sans-serif";
+    tooltip.style.zIndex = '1000';
+    tooltip.style.whiteSpace = 'nowrap'; // Prevent wrapping
+    tooltipContainer.appendChild(tooltip);
 
-        const stakeAmount = stakeAmountInput.value.trim();
-        if (!stakeAmount) {
-            depositButton.disabled = true;
-            return;
-        }
-
-        try {
-            const stakeAmountWei = App.web3.utils.toWei(stakeAmount, 'ether');
-            const stakeAmountBN = App.web3.utils.toBN(stakeAmountWei);
-            const depositLimitBN = App.web3.utils.toBN(App.depositLimit);
-
-            if (stakeAmountBN.isZero() || stakeAmountBN.gt(depositLimitBN)) {
-                console.log('Disabling button: Invalid stake amount or exceeds deposit limit');
-                depositButton.disabled = true;
-                return;
-            }
-
-            const allowance = await App.getAllowance();
-            const allowanceBN = App.web3.utils.toBN(allowance);
-
-            if (stakeAmountBN.gt(allowanceBN)) {
-                depositButton.disabled = true;
-            } else {
-                depositButton.disabled = false;
-            }
-        } catch (error) {
-            console.error('Error checking allowance:', error);
-            depositButton.disabled = true;
-        }
+    // Position tooltip to the right of the input with more space
+    function positionTooltip() {
+      tooltip.style.right = ''; // Clear the right property
+      tooltip.style.left = '100%'; // Position to the right of the input
+      tooltip.style.top = '60%'; // Align with middle of input
+      tooltip.style.transform = 'translateY(-50%)'; // Center vertically
+      tooltip.style.marginLeft = '10px'; // Gap between tooltip and input
     }
 
-    stakeAmountInput.addEventListener('input', checkAllowanceAndValidate);
+    let trbPrice = 0;
+    // Fetch TRB price from CoinGecko API
+    async function updateTrbPrice() {
+      try {
+        const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=tellor&vs_currencies=usd');
+        const data = await response.json();
+        trbPrice = data.tellor.usd;
+      } catch (error) {
+        console.error('Error fetching TRB price:', error);
+      }
+    }
 
-    // Initial check
-    checkAllowanceAndValidate();
+    // Update tooltip with USD value
+    async function updateTooltip() {
+      const amount = parseFloat(stakeAmountInput.value) || 0;
+      if (amount > 0) {
+        if (trbPrice === 0) {
+          await updateTrbPrice();
+        }
+        const usdValue = (amount * trbPrice).toFixed(2);
+        tooltip.textContent = `≈ $${usdValue} USD`;
+        tooltip.style.display = 'block';
+        // Call positionTooltip after making the tooltip visible
+        requestAnimationFrame(positionTooltip);
+      } else {
+        tooltip.style.display = 'none';
+      }
+    }
+
+    // Update price every 60 seconds
+    setInterval(updateTrbPrice, 60000);
+    // Initial price fetch
+    updateTrbPrice();
+
+    stakeAmountInput.addEventListener('input', updateTooltip);
+    window.addEventListener('resize', positionTooltip);
+    stakeAmountInput.addEventListener('focus', updateTooltip);
   },
 
   showPendingPopup: function(message) {
