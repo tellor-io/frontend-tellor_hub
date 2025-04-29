@@ -45,14 +45,6 @@
 
         <div class="input-button-container">
           <div class="input-with-label">
-            <span class="input-label-2">TIP</span>
-            <input class="input" type="text" id="tipAmount" placeholder="0" />
-            <span class="info-icon" data-tooltip="Tip is optional, and will represent a portion of the TRB amount specified above">ⓘ</span>
-          </div>
-        </div>
-
-        <div class="input-button-container">
-          <div class="input-with-label">
             <input class= "input-address" type="text" id="_queryId" placeholder="To address (e.g. tellor1py3fs...)"/>
             <span class="info-icon" data-tooltip="Don't have a tellor prefix address? Click <a href='https://docs.tellor.io/layer-docs/public-testnet/run-a-layer-node' target='_blank'>here</a> to learn how to create one">ⓘ</span>
           </div>
@@ -123,7 +115,6 @@
 
         // Add event listeners for input fields
         const stakeAmountInput = document.getElementById('stakeAmount');
-        const tipAmountInput = document.getElementById('tipAmount');
 
         stakeAmountInput.addEventListener('input', async function() {
           const amount = parseFloat(this.value) || 0;
@@ -142,15 +133,6 @@
           
           checkAllowance();
         });
-
-        tipAmountInput.addEventListener('input', updateTipAmount);
-
-        function updateTipAmount() {
-          if (tipAmountInput.value === '') {
-            tipAmountInput.value = '';
-            tipAmountInput.placeholder = '0';
-          }
-        }
 
         async function checkAllowance() {
           const approveButton = document.getElementById('approveButton');
@@ -193,7 +175,6 @@
 
         // Initial checks
         checkAllowance();
-        updateTipAmount();
       });
     </script>
   </body>
