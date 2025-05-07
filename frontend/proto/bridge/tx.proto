@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package layer.bridge;
+
+import "cosmos/base/v1beta1/coin.proto";
+import "cosmos/msg/v1/msg.proto";
+import "gogoproto/gogo.proto";
+
+option go_package = "github.com/tellor-io/layer/x/bridge/types";
+
+// Msg defines the Msg service.
+service Msg {
+  option (cosmos.msg.v1.service) = true;
+  rpc RequestAttestations(MsgRequestAttestations) returns (MsgRequestAttestationsResponse);
+  rpc WithdrawTokens(MsgWithdrawTokens) returns (MsgWithdrawTokensResponse);
+  rpc ClaimDeposits(MsgClaimDepositsRequest) returns (MsgClaimDepositsResponse);
+  rpc UpdateSnapshotLimit(MsgUpdateSnapshotLimit) returns (MsgUpdateSnapshotLimitResponse);
+}
+
+message MsgRequestAttestations {
+  option (cosmos.msg.v1.signer) = "creator";
+
+  string creator = 1;
+  string query_id = 2;
+  string timestamp = 3;
+}
+
+message MsgRequestAttestationsResponse {}
+
+message MsgWithdrawTokens {
+  option (cosmos.msg.v1.signer) = "creator";
+
+  string creator = 1;
+  string recipient = 2;
+  cosmos.base.v1beta1.Coin amount = 3 [(gogoproto.nullable) = false];
+}
+
+message MsgWithdrawTokensResponse {}
+
+message MsgClaimDepositsRequest {
+  option (cosmos.msg.v1.signer) = "creator";
+
+  string creator = 1;
+  repeated uint64 deposit_ids = 2;
+  // list of timestamps in milliseconds
+  repeated uint64 timestamps = 3;
+}
+
+message MsgClaimDepositsResponse {}
+
+message MsgUpdateSnapshotLimit {
+  option (cosmos.msg.v1.signer) = "authority";
+
+  string authority = 1;
+  uint64 limit = 2;
+}
+
+message MsgUpdateSnapshotLimitResponse {}
+ 

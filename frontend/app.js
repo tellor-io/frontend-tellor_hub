@@ -11,69 +11,285 @@ var App = {
   depositId: 0,
   deposits: {},
   isProcessingAccountChange: false,
+  keplrProvider: null,
+  isKeplrConnected: false,
 
   _depositLimit: function() {
     return App.depositLimit;
   },
 
   init: function () {
-    return App.initWeb3().then(function() {
-        App.initInputValidation();
+    return new Promise((resolve, reject) => {
+      try {
+        // Wait for CosmJS to be loaded
+        if (!window.cosmjsLoaded) {
+          throw new Error('CosmJS not loaded yet');
+        }
+
+        // Verify CosmJS is available
+        if (typeof window.cosmjs === 'undefined' || typeof window.cosmjs.stargate === 'undefined') {
+          throw new Error('CosmJS not properly loaded');
+        }
+
+        App.initWeb3()
+          .then(() => {
+            App.initInputValidation();
+            console.log("App initialized successfully");
+            resolve();
+          })
+          .catch(error => {
+            console.error("Error initializing app:", error);
+            reject(error);
+          });
+      } catch (error) {
+        console.error("Initialization error:", error);
+        reject(error);
+      }
     });
   },
 
   initWeb3: function () {
     return new Promise((resolve, reject) => {
-        if (typeof window.ethereum !== 'undefined') {
-            // Define event handlers before adding listeners
-            const handleDisconnect = () => {
-                console.log('MetaMask disconnected');
-                App.disconnectWallet();
-            };
+      try {
+        // Check for both Keplr and MetaMask
+        if (window.keplr) {
+          App.keplrProvider = window.keplr;
+          resolve();
+        } else if (typeof window.ethereum !== 'undefined') {
+          // Existing Ethereum provider code
+          const handleDisconnect = () => {
+            console.log('MetaMask disconnected');
+            App.disconnectWallet();
+          };
 
-            const handleChainChanged = () => {
-                window.location.reload();
-            };
+          const handleChainChanged = () => {
+            window.location.reload();
+          };
 
-            const handleAccountsChanged = (accounts) => {
-                App.handleAccountsChanged(accounts);
-            };
+          const handleAccountsChanged = (accounts) => {
+            App.handleAccountsChanged(accounts);
+          };
 
-            // Remove existing listeners if any
-            if(App.web3Provider) {
-                window.ethereum.removeListener('disconnect', handleDisconnect);
-                window.ethereum.removeListener('chainChanged', handleChainChanged);
-                window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-            }
-            
-            App.web3Provider = window.ethereum;
-            App.web3 = new Web3(window.ethereum);
-            
-            // Add listeners with defined handlers
-            window.ethereum.on('disconnect', handleDisconnect);
-            window.ethereum.on('chainChanged', handleChainChanged);
-            window.ethereum.on('accountsChanged', handleAccountsChanged);
+          if(App.web3Provider) {
+            window.ethereum.removeListener('disconnect', handleDisconnect);
+            window.ethereum.removeListener('chainChanged', handleChainChanged);
+            window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+          }
+          
+          App.web3Provider = window.ethereum;
+          App.web3 = new Web3(window.ethereum);
+          
+          window.ethereum.on('disconnect', handleDisconnect);
+          window.ethereum.on('chainChanged', handleChainChanged);
+          window.ethereum.on('accountsChanged', handleAccountsChanged);
 
-            resolve();
+          resolve();
         } else {
-            reject(new Error("No Web3 provider detected"));
+          reject(new Error("No Web3 provider detected"));
         }
+      } catch (error) {
+        console.error("Error in initWeb3:", error);
+        reject(error);
+      }
     });
   },
 
   connectWallet: async function() {
-    if (typeof window.ethereum !== 'undefined') {
-      try {
-        // Request account access
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        App.handleAccountsChanged(accounts);
-      } catch (error) {
-        console.error("User denied account access")
-      }
-    } else {
-      console.log('No Ethereum browser detected');
-      alert('Please install MetaMask or use a Web3-enabled browser');
+    // Create wallet selection modal
+    const modal = document.createElement('div');
+    modal.style.position = 'fixed';
+    modal.style.top = '0';
+    modal.style.left = '0';
+    modal.style.width = '100%';
+    modal.style.height = '100%';
+    modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+    modal.style.display = 'flex';
+    modal.style.justifyContent = 'center';
+    modal.style.alignItems = 'center';
+    modal.style.zIndex = '1000';
+
+    const modalContent = document.createElement('div');
+    modalContent.style.backgroundColor = '#EFFEFC';
+    modalContent.style.padding = '20px';
+    modalContent.style.borderRadius = '10px';
+    modalContent.style.textAlign = 'center';
+    modalContent.style.fontFamily = "'PPNeueMontreal-Book', Arial, sans-serif";
+
+    const title = document.createElement('h2');
+    title.textContent = 'Select Wallet';
+    title.style.color = '#003734';
+    title.style.marginBottom = '20px';
+    modalContent.appendChild(title);
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.display = 'flex';
+    buttonContainer.style.flexDirection = 'column';
+    buttonContainer.style.gap = '10px';
+
+    if (window.keplr) {
+      const keplrButton = document.createElement('button');
+      keplrButton.textContent = 'Connect Keplr';
+      keplrButton.style.padding = '10px 20px';
+      keplrButton.style.backgroundColor = '#003734';
+      keplrButton.style.color = '#eefffb';
+      keplrButton.style.border = 'none';
+      keplrButton.style.borderRadius = '24px';
+      keplrButton.style.cursor = 'pointer';
+      keplrButton.style.fontFamily = "'PPNeueMontreal-Book', Arial, sans-serif";
+      keplrButton.style.fontSize = '16px';
+      keplrButton.onclick = async () => {
+        try {
+          // Configure Tellor chain
+          await window.keplr.experimentalSuggestChain({
+            "chainId": "layertest-4",
+            "chainName": "Layer",
+            "rpc": "https://node-palmito.tellorlayer.com/rpc",
+            "rest": "https://node-palmito.tellorlayer.com/rpc",
+            "bip44": {
+              "coinType": 118
+            },
+            bech32Config: {
+              bech32PrefixAccAddr: "tellor",
+              bech32PrefixAccPub: "tellorpub",
+              bech32PrefixValAddr: "tellorvaloper",
+              bech32PrefixValPub: "tellorvaloperpub",
+              bech32PrefixConsAddr: "tellorvalcons",
+              bech32PrefixConsPub: "tellorvalconspub",
+            },
+            currencies: [
+              {
+                coinDenom: "TRB",
+                coinMinimalDenom: "loya",
+                coinDecimals: 6,
+              },
+            ],
+            feeCurrencies: [
+              {
+                coinDenom: "TRB",
+                coinMinimalDenom: "loya",
+                coinDecimals: 6,
+                gasPriceStep: {
+                  low: 0.01,
+                  average: 0.025,
+                  high: 0.04,
+                }
+              },
+            ],
+            stakeCurrency: {
+              coinDenom: "TRB",
+              coinMinimalDenom: "loya",
+              coinDecimals: 6,
+            },
+          });
+
+          // Now enable the chain
+          await window.keplr.enable('layertest-4');
+          const offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+          const accounts = await offlineSigner.getAccounts();
+          App.account = accounts[0].address;
+          App.isKeplrConnected = true;
+          App.isConnected = true;
+          document.getElementById('walletButton').innerHTML = `Disconnect Wallet <span class="truncated-address">(${App.account.substring(0, 6)}...${App.account.substring(App.account.length - 4)})</span>`;
+          App.setPageParams();
+          modal.remove();
+        } catch (error) {
+          console.error("Error connecting Keplr:", error);
+          alert('Error connecting to Keplr wallet. Please make sure you have the latest version of Keplr installed.');
+        }
+      };
+      buttonContainer.appendChild(keplrButton);
     }
+
+    if (typeof window.ethereum !== 'undefined') {
+      const metamaskButton = document.createElement('button');
+      metamaskButton.textContent = 'Connect MetaMask';
+      metamaskButton.style.padding = '10px 20px';
+      metamaskButton.style.backgroundColor = '#003734';
+      metamaskButton.style.color = '#eefffb';
+      metamaskButton.style.border = 'none';
+      metamaskButton.style.borderRadius = '24px';
+      metamaskButton.style.cursor = 'pointer';
+      metamaskButton.style.fontFamily = "'PPNeueMontreal-Book', Arial, sans-serif";
+      metamaskButton.style.fontSize = '16px';
+      metamaskButton.onclick = async () => {
+        try {
+          // Request account access
+          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+          
+          // Initialize Web3
+          App.web3Provider = window.ethereum;
+          App.web3 = new Web3(window.ethereum);
+          
+          // Get chain ID and check if it's supported
+          const chainId = await App.web3.eth.getChainId();
+          App.chainId = chainId;
+          
+          if (!SUPPORTED_CHAIN_IDS[chainId]) {
+            App.showNetworkAlert();
+            throw new Error(`Unsupported network: ${chainId}`);
+          }
+          
+          // Initialize contracts
+          try {
+            await App.initBridgeContract();
+            await App.initTokenContract();
+          } catch (error) {
+            console.error("Contract initialization error:", error);
+            throw new Error("Failed to initialize contracts. Please try again.");
+          }
+          
+          // Update UI and state
+          App.account = accounts[0];
+          App.isConnected = true;
+          const truncatedAddress = `${accounts[0].substring(0, 6)}...${accounts[0].substring(accounts[0].length - 4)}`;
+          document.getElementById('walletButton').innerHTML = `Disconnect Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
+          
+          // Fetch initial data
+          try {
+            await Promise.all([
+              App.fetchDepositLimit(),
+              App.updateBalance()
+            ]);
+          } catch (error) {
+            console.error("Error fetching initial data:", error);
+            // Continue even if this fails, as the wallet is still connected
+          }
+          
+          App.setPageParams();
+          modal.remove();
+        } catch (error) {
+          console.error("Error connecting MetaMask:", error);
+          if (error.code === 4001) {
+            alert('Please connect to MetaMask to continue.');
+          } else if (error.message.includes("Unsupported network")) {
+            alert('Please connect to a supported network (Sepolia, Arbitrum Goerli, etc.).');
+          } else if (error.message.includes("Failed to initialize contracts")) {
+            alert('Error initializing contracts. Please try again or contact support.');
+          } else {
+            alert('Error connecting to MetaMask. Please make sure you are on the correct network.');
+          }
+        }
+      };
+      buttonContainer.appendChild(metamaskButton);
+    }
+
+    const closeButton = document.createElement('button');
+    closeButton.textContent = 'Close';
+    closeButton.style.padding = '10px 20px';
+    closeButton.style.backgroundColor = '#cccccc';
+    closeButton.style.color = '#333';
+    closeButton.style.border = 'none';
+    closeButton.style.borderRadius = '24px';
+    closeButton.style.cursor = 'pointer';
+    closeButton.style.fontFamily = "'PPNeueMontreal-Book', Arial, sans-serif";
+    closeButton.style.fontSize = '16px';
+    closeButton.style.marginTop = '10px';
+    closeButton.onclick = () => modal.remove();
+
+    modalContent.appendChild(buttonContainer);
+    modalContent.appendChild(closeButton);
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
   },
 
   handleAccountsChanged: async function(accounts) {
@@ -170,6 +386,11 @@ var App = {
 
   initBridgeContract: async function () {
     try {
+        // Skip contract initialization for Keplr
+        if (App.isKeplrConnected) {
+            return true;
+        }
+
         const response = await fetch("./abis/TokenBridge.json");
         if (!response.ok) {
             throw new Error(`Failed to load ABI: ${response.statusText}`);
@@ -185,8 +406,18 @@ var App = {
         App.contracts.Bridge = new App.web3.eth.Contract(abi);
         
         const contractAddresses = {
-            11155111: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",
-            421613: "0xb2CB696fE5244fB9004877e58dcB680cB86Ba444"
+            11155111: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2", // Sepolia
+            421613: "0xb2CB696fE5244fB9004877e58dcB680cB86Ba444",   // Arbitrum Goerli
+            1: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",        // Mainnet
+            137: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",      // Polygon
+            80001: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",    // Mumbai
+            100: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",      // Gnosis
+            10200: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",    // Chiado
+            10: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",       // Optimism
+            420: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",      // Optimism Goerli
+            42161: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",    // Arbitrum
+            421613: "0xb2CB696fE5244fB9004877e58dcB680cB86Ba444",   // Arbitrum Goerli
+            3141: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2"      // Filecoin
         };
 
         const address = contractAddresses[App.chainId];
@@ -210,39 +441,28 @@ var App = {
           // Make sure we're using the ABI array
           const abi = Array.isArray(data) ? data : data.abi;
           App.contracts.Token = new App.web3.eth.Contract(abi);
-          if (App.chainId === 11155111) {
-            App.contracts.Token.options.address = "0x80fc34a2f9FfE86F41580F47368289C402DEc660"
-          } 
-          if (App.chainId === 1)  {
-            App.contracts.Token.options.address = "0x88dF592F8eb5D7Bd38bFeF7dEb0fBc02cf3778a0"
-          } 
-          if (App.chainId === 137)  {
-            App.contracts.Token.options.address = "0xE3322702BEdaaEd36CdDAb233360B939775ae5f1"
+          
+          const tokenAddresses = {
+            11155111: "0x80fc34a2f9FfE86F41580F47368289C402DEc660", // Sepolia
+            421613: "0x8d1bB5eDdFce08B92dD47c9871d1805211C3Eb3C",   // Arbitrum Goerli
+            1: "0x88dF592F8eb5D7Bd38bFeF7dEb0fBc02cf3778a0",        // Mainnet
+            137: "0xE3322702BEdaaEd36CdDAb233360B939775ae5f1",      // Polygon
+            80001: "0xce4e32fe9d894f8185271aa990d2db425df3e6be",    // Mumbai
+            100: "0xAAd66432d27737ecf6ED183160Adc5eF36aB99f2",      // Gnosis
+            10200: "0xe7147C5Ed14F545B4B17251992D1DB2bdfa26B6d",    // Chiado
+            10: "0xaf8cA653Fa2772d58f4368B0a71980e9E3cEB888",       // Optimism
+            420: "0x3251838bd813fdf6a97D32781e011cce8D225d59",      // Optimism Goerli
+            42161: "0xd58D345Fd9c82262E087d2D0607624B410D88242",    // Arbitrum
+            421613: "0x8d1bB5eDdFce08B92dD47c9871d1805211C3Eb3C",   // Arbitrum Goerli
+            3141: "0xe7147C5Ed14F545B4B17251992D1DB2bdfa26B6d"      // Filecoin
+          };
+
+          const address = tokenAddresses[App.chainId];
+          if (!address) {
+            throw new Error(`No token address for chainId: ${App.chainId}`);
           }
-          if (App.chainId === 80001)  {
-            App.contracts.Token.options.address = "0xce4e32fe9d894f8185271aa990d2db425df3e6be"
-          } 
-          if (App.chainId === 100)  {
-            App.contracts.Token.options.address = "0xAAd66432d27737ecf6ED183160Adc5eF36aB99f2"
-          } 
-          if (App.chainId === 10200)  {
-            App.contracts.Token.options.address = "0xe7147C5Ed14F545B4B17251992D1DB2bdfa26B6d"
-          }
-          if (App.chainId === 10)  {
-            App.contracts.Token.options.address = "0xaf8cA653Fa2772d58f4368B0a71980e9E3cEB888"
-          }
-          if (App.chainId === 420)  {
-            App.contracts.Token.options.address = "0x3251838bd813fdf6a97D32781e011cce8D225d59"
-          }
-          if (App.chainId === 42161)  {
-            App.contracts.Token.options.address = "0xd58D345Fd9c82262E087d2D0607624B410D88242"
-          }
-          if (App.chainId === 421613)  {
-            App.contracts.Token.options.address = "0x8d1bB5eDdFce08B92dD47c9871d1805211C3Eb3C"
-          }
-          if (App.chainId === 3141)  {
-            App.contracts.Token.options.address = "0xe7147C5Ed14F545B4B17251992D1DB2bdfa26B6d"
-          }
+
+          App.contracts.Token.options.address = address;
           resolve();
         } catch (error) {
           console.error("Token contract initialization error:", error);
@@ -286,20 +506,61 @@ var App = {
 
   setPageParams: function () {
     try {
-        // Check if element exists before trying to access it
+        // Update connected address if element exists
         const connectedAddressElement = document.getElementById('connectedAddress');
         if (connectedAddressElement) {
             connectedAddressElement.innerHTML = App.account || 'Not Connected';
-        } else {
-            console.log('Note: connectedAddress element not found');
         }
 
-        if (App.contracts.Bridge && App.contracts.Bridge.options) {
-        } else {
-            console.error('Contest contract not properly initialized in setPageParams');
+        // Only check for Ethereum contracts if using MetaMask
+        if (!App.isKeplrConnected && App.contracts.Bridge && App.contracts.Bridge.options) {
+            // Ethereum-specific initialization
+            if (App.contracts.Bridge && App.contracts.Bridge.options) {
+                // Ethereum contract initialization logic
+            }
+        } else if (App.isKeplrConnected) {
+            // Keplr-specific initialization
+            // Update UI elements for Keplr
+            const balanceElement = document.getElementById("currentBalance");
+            if (balanceElement) {
+                // Fetch and display Keplr balance
+                App.updateKeplrBalance();
+            }
         }
     } catch (error) {
         console.error('Error in setPageParams:', error);
+    }
+  },
+
+  updateKeplrBalance: async function() {
+    try {
+        if (!App.isKeplrConnected) return;
+        if (!window.cosmjsLoaded || !window.cosmjs || !window.cosmjs.stargate) {
+            throw new Error("CosmJS not properly loaded");
+        }
+
+        const offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+        const signingClient = await window.cosmjs.stargate.SigningStargateClient.connectWithSigner(
+            'https://node-palmito.tellorlayer.com/rpc',
+            offlineSigner
+        );
+
+        const balance = await signingClient.getBalance(App.account, "loya");
+        console.log('Raw balance:', balance);
+
+        const balanceAmount = parseInt(balance.amount);
+        const readableBalance = (balanceAmount / 1000000).toFixed(6);
+
+        const balanceElement = document.getElementById("currentBalance");
+        if (balanceElement) {
+            balanceElement.textContent = `${readableBalance} TRB`;
+        }
+    } catch (error) {
+        console.error("Error fetching Keplr balance:", error);
+        const balanceElement = document.getElementById("currentBalance");
+        if (balanceElement) {
+            balanceElement.textContent = "0 TRB";
+        }
     }
   },
 
@@ -480,11 +741,32 @@ var App = {
     // Fetch TRB price from CoinGecko API
     async function updateTrbPrice() {
       try {
-        const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=tellor&vs_currencies=usd');
+        const response = await fetch('https://node-palmito.tellorlayer.com/tellor-io/layer/oracle/get_current_aggregate_report/5c13cd9c97dbb98f2429c101a2a8150e6c7a0ddaff6124ee176a3a411067ded0', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const data = await response.json();
-        trbPrice = data.tellor.usd;
+        console.log('TRB price data:', data);
+
+        // The aggregate_value is in hex format, convert it to decimal
+        const hexValue = data.aggregate.aggregate_value;
+        const decimalValue = BigInt('0x' + hexValue);
+        
+        // Convert to USD (divide by 1e18 since the value is in wei)
+        trbPrice = Number(decimalValue) / 1e18;
+        
+        console.log('TRB price in USD:', trbPrice);
       } catch (error) {
-        console.error('Error fetching TRB price:', error);
+        console.warn('Error fetching TRB price from Tellor Layer:', error);
+        trbPrice = 0.5; // Default value in USD
       }
     }
 
@@ -495,20 +777,35 @@ var App = {
         if (trbPrice === 0) {
           await updateTrbPrice();
         }
-        const usdValue = (amount * trbPrice).toFixed(2);
-        tooltip.textContent = `≈ $${usdValue} USD`;
+        if (trbPrice > 0) {
+          const usdValue = (amount * trbPrice).toFixed(2);
+          tooltip.textContent = `≈ $${usdValue} USD`;
+        } else {
+          tooltip.textContent = 'Price data unavailable';
+        }
         tooltip.style.display = 'block';
-        // Call positionTooltip after making the tooltip visible
         requestAnimationFrame(positionTooltip);
       } else {
         tooltip.style.display = 'none';
       }
     }
 
-    // Update price every 60 seconds
-    setInterval(updateTrbPrice, 60000);
+    // Update price every 60 seconds, but only if the page is visible
+    let priceUpdateInterval;
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        clearInterval(priceUpdateInterval);
+      } else {
+        updateTrbPrice();
+        priceUpdateInterval = setInterval(updateTrbPrice, 60000);
+      }
+    });
+
     // Initial price fetch
-    updateTrbPrice();
+    updateTrbPrice().catch(error => {
+      console.warn('Initial TRB price fetch failed:', error);
+    });
+    priceUpdateInterval = setInterval(updateTrbPrice, 60000);
 
     stakeAmountInput.addEventListener('input', updateTooltip);
     window.addEventListener('resize', positionTooltip);
@@ -567,6 +864,11 @@ var App = {
   },
 
   getAllowance: async function() {
+    // Skip allowance check for Keplr
+    if (App.isKeplrConnected) {
+      return '0';
+    }
+
     if (!App.account || !App.contracts.Token || !App.contracts.Bridge) {
       console.error('Wallet not connected or contracts not initialized');
       return '0';
@@ -597,6 +899,104 @@ var App = {
         }
     } catch (error) {
         console.error("Error fetching balance:", error);
+    }
+  },
+
+  withdrawFromLayer: async function() {
+    try {
+        if (!App.isKeplrConnected) {
+            alert('Please connect your Keplr wallet first');
+            return;
+        }
+
+        const amount = document.getElementById('stakeAmount').value;
+        const ethereumAddress = document.getElementById('_queryId').value;
+
+        if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+            alert('Please enter a valid amount');
+            return;
+        }
+
+        if (!ethereumAddress || !ethereumAddress.startsWith('0x')) {
+            alert('Please enter a valid Ethereum address');
+            return;
+        }
+
+        // Convert amount to micro units (1 TRB = 1,000,000 micro units)
+        const amountInMicroUnits = Math.floor(parseFloat(amount) * 1000000).toString();
+
+        console.log('Starting withdrawal process...');
+        console.log('Withdrawing with params:', {
+            amount,
+            amountInMicroUnits,
+            ethereumAddress,
+            account: App.account
+        });
+
+        const offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+        console.log('Got offline signer');
+
+        const signingClient = await window.cosmjs.stargate.SigningStargateClient.connectWithSigner(
+            'https://node-palmito.tellorlayer.com/rpc',
+            offlineSigner
+        );
+        console.log('Connected to signing client');
+
+        // Create the withdrawal message using proto helper
+        const msg = window.layerProto.createMsgWithdrawTokens(
+            App.account,
+            ethereumAddress.toLowerCase(),
+            amountInMicroUnits,
+            "loya"
+        );
+
+        console.log('Created message:', msg);
+
+        // Set transaction fee
+        const fee = {
+            amount: [{ denom: "loya", amount: "5000" }],
+            gas: "200000"
+        };
+
+        App.showPendingPopup("Withdrawal transaction pending...");
+        console.log('Showing pending popup');
+
+        try {
+            console.log('Attempting to sign and broadcast transaction...');
+            // Send the transaction
+            const result = await signingClient.signAndBroadcast(
+                App.account,
+                [msg],
+                fee,
+                "Withdraw TRB to Ethereum"
+            );
+
+            console.log('Transaction result:', result);
+
+            if (result.code === 0) {
+                App.hidePendingPopup();
+                App.showSuccessPopup("Withdrawal successful! You will need to wait 12 hours before you can claim your tokens on Ethereum.");
+                await App.updateKeplrBalance();
+            } else {
+                const errorMsg = result.rawLog || 'Transaction failed';
+                console.error('Transaction failed:', errorMsg);
+                App.hidePendingPopup();
+                throw new Error(errorMsg);
+            }
+        } catch (error) {
+            console.error('Transaction error:', error);
+            App.hidePendingPopup();
+            throw error;
+        }
+    } catch (error) {
+        App.hidePendingPopup();
+        console.error("Error in withdrawal:", error);
+        console.error("Error details:", {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+        });
+        alert(error.message || "Error in withdrawal. Please try again.");
     }
   }
 };

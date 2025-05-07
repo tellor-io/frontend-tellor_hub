@@ -601,3 +601,56 @@ input {
     font-family: 'PPNeueMontreal-Thin', Arial, sans-serif;
     font-size: 14px;
 }
+
+.bridge-direction {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: center;
+  margin: 20px 0;
+  width: 100%;
+  max-width: 300px;
+}
+
+.bridge-direction button {
+  width: 100%;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 24px;
+  font-family: 'PPNeueMontreal-Book', monospace;
+  font-size: 20px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+#approveButton {
+  background-color: #003734;
+  color: #eefffb;
+}
+
+#approveButton:hover {
+  background-color: #049159;
+  color: #88FFEC;
+}
+
+#approveButton:disabled {
+  background-color: #cccccc;
+  color: #666666;
+  cursor: not-allowed;
+}
+
+#depositButton, #withdrawButton {
+  background-color: #003734;
+  color: #eefffb;
+}
+
+#depositButton:hover, #withdrawButton:hover {
+  background-color: #049159;
+  color: #88FFEC;
+}
+
+#depositButton:disabled, #withdrawButton:disabled {
+  background-color: #cccccc;
+  color: #666666;
+  cursor: not-allowed;
+}
