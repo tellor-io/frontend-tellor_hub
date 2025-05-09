@@ -6,12 +6,32 @@
 }(this, (function (exports) {
     'use strict';
 
+    // Add registry for custom message types
+    const customTypes = [
+        ["/layer.bridge.MsgWithdrawTokens", {
+            encode: (message) => {
+                return window.layerProto.encodeMessage({
+                    creator: message.creator,
+                    recipient: message.recipient,
+                    amount: {
+                        denom: message.amount.denom,
+                        amount: message.amount.amount
+                    }
+                });
+            },
+            decode: (binary) => {
+                return window.layerProto.decodeMessage(binary);
+            }
+        }]
+    ];
+
     // Stargate client implementation
     class SigningStargateClient {
         constructor(rpcUrl, signer) {
             // Remove any trailing slashes and ensure we don't have /rpc in the base URL
             this.rpcUrl = (rpcUrl || "https://node-palmito.tellorlayer.com").replace(/\/+$/, '').replace(/\/rpc$/, '');
             this.signer = signer;
+            this.registry = new Map(customTypes);
         }
 
         static async connectWithSigner(rpcUrl, signer) {
@@ -176,55 +196,106 @@
                 sequence: tx.sequence
             });
 
+            // Create the transaction to sign with proper structure
+            const txToSign = {
+                chain_id: 'layertest-4',
+                account_number: tx.account_number,
+                sequence: tx.sequence,
+                fee: {
+                    amount: tx.fee.amount,
+                    gas: tx.fee.gas
+                },
+                msgs: tx.msgs.map(msg => ({
+                    type: msg.typeUrl,
+                    value: msg.value
+                })),
+                memo: tx.memo
+            };
+
             // Sign the transaction
-            console.log('Signing transaction:', tx);
+            console.log('Signing transaction:', txToSign);
             console.log('Requesting signature from Keplr...');
-            const signResult = await this.signer.signAmino(signerAddress, tx);
+            const signResult = await this.signer.signAmino(signerAddress, txToSign);
             console.log('Sign result:', signResult);
 
-            // Format the transaction for broadcast
-            const broadcastTx = {
-                body: {
-                    messages: signResult.signed.msgs,
-                    memo: signResult.signed.memo
-                },
-                auth_info: {
-                    signer_infos: [{
-                        public_key: signResult.signature.pub_key,
-                        mode_info: {
-                            single: {
-                                mode: "SIGN_MODE_LEGACY_AMINO_JSON"
-                            }
-                        },
-                        sequence: signResult.signed.sequence
-                    }],
-                    fee: signResult.signed.fee
-                },
-                signatures: [signResult.signature.signature]
+            // Create the transaction body with encoded messages
+            const txBody = {
+                messages: tx.msgs.map(msg => {
+                    // Get the message type from registry
+                    const messageType = this.registry.get(msg.typeUrl);
+                    if (!messageType) {
+                        throw new Error(`Unknown message type: ${msg.typeUrl}`);
+                    }
+
+                    // Encode the message using the registry
+                    const encodedValue = messageType.encode(msg.value);
+                    console.log('Encoded message:', {
+                        typeUrl: msg.typeUrl,
+                        value: encodedValue
+                    });
+
+                    return {
+                        typeUrl: msg.typeUrl,
+                        value: encodedValue
+                    };
+                }),
+                memo: tx.memo,
+                timeoutHeight: "0",
+                extensionOptions: [],
+                nonCriticalExtensionOptions: []
             };
 
-            // Broadcast the transaction
-            const broadcastRequest = {
-                jsonrpc: '2.0',
-                id: 1,
-                method: 'broadcast_tx_commit',
-                params: {
-                    tx: btoa(JSON.stringify(broadcastTx))
+            // Create the auth info
+            const authInfo = {
+                signerInfos: [{
+                    publicKey: {
+                        typeUrl: "/cosmos.crypto.secp256k1.PubKey",
+                        value: window.layerProto.encodeMessage({
+                            key: signResult.signature.pub_key.value
+                        })
+                    },
+                    modeInfo: {
+                        single: {
+                            mode: "SIGN_MODE_LEGACY_AMINO_JSON"
+                        }
+                    },
+                    sequence: tx.sequence
+                }],
+                fee: {
+                    amount: tx.fee.amount,
+                    gasLimit: tx.fee.gas,
+                    payer: "",
+                    granter: ""
                 }
             };
-            console.log('Broadcast request:', broadcastRequest);
-            console.log('Broadcasting transaction...');
 
-            // Use the RPC endpoint for broadcasting
-            const broadcastResponse = await fetch(`${this.rpcUrl}/rpc/broadcast_tx_commit`, {
+            // Encode the entire transaction
+            const encodedTx = window.layerProto.encodeMessage({
+                body: txBody,
+                authInfo: authInfo,
+                signatures: [signResult.signature.signature]
+            });
+
+            // Convert to base64
+            const txBytesBase64 = btoa(String.fromCharCode.apply(null, encodedTx));
+
+            const broadcastTx = {
+                tx_bytes: txBytesBase64,
+                mode: "BROADCAST_MODE_SYNC"
+            };
+
+            // Broadcast the transaction using REST API
+            const broadcastResponse = await fetch(`${this.rpcUrl}/cosmos/tx/v1beta1/txs`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(broadcastRequest)
+                body: JSON.stringify(broadcastTx)
             });
 
             if (!broadcastResponse.ok) {
+                const errorText = await broadcastResponse.text();
+                console.error('Broadcast error:', errorText);
                 throw new Error(`Failed to broadcast transaction: ${broadcastResponse.status}`);
             }
 
@@ -235,14 +306,13 @@
                 throw new Error(result.error.message || 'Transaction failed');
             }
 
-            const txHash = result.result?.hash;
+            const txHash = result.tx_response?.txhash;
             if (!txHash) {
                 throw new Error('No transaction hash returned');
             }
 
             console.log('Transaction hash:', txHash);
 
-            // Return success immediately after broadcast
             return {
                 code: 0,
                 height: 0,
