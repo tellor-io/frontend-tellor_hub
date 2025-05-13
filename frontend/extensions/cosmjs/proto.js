@@ -4,33 +4,100 @@ window.layerProto = {
     MSG_WITHDRAW_TOKENS_TYPE: "/layer.bridge.MsgWithdrawTokens",
     
     // Helper function to create a MsgWithdrawTokens message
-    createMsgWithdrawTokens: (creator, recipient, amount, denom) => {
+    createMsgWithdrawTokens: (creator, recipient, amount) => {
         return {
             typeUrl: window.layerProto.MSG_WITHDRAW_TOKENS_TYPE,
             value: {
                 creator: creator,
-                recipient: recipient,
-                amount: {
-                    amount: amount.toString(),
-                    denom: denom
-                }
+                recipient: recipient.toLowerCase(),
+                amount: amount
             }
         };
     },
 
     // Helper function to encode a message to protobuf format
     encodeMessage: (message) => {
-        // Convert the message to a Uint8Array
-        const jsonStr = JSON.stringify(message);
-        const encoder = new TextEncoder();
-        return encoder.encode(jsonStr);
+        // Check if proto code is loaded
+        if (!window.protobuf) {
+            throw new Error('Protobuf.js library not loaded. Please ensure protobuf.min.js is loaded before using this function.');
+        }
+
+        // Create the message types
+        const root = new protobuf.Root();
+        
+        // Define the Coin type
+        const Coin = new protobuf.Type("Coin")
+            .add(new protobuf.Field("denom", 1, "string"))
+            .add(new protobuf.Field("amount", 2, "string"));
+        
+        // Define the MsgWithdrawTokens type
+        const MsgWithdrawTokens = new protobuf.Type("MsgWithdrawTokens")
+            .add(new protobuf.Field("creator", 1, "string"))
+            .add(new protobuf.Field("recipient", 2, "string"))
+            .add(new protobuf.Field("amount", 3, "Coin"));
+
+        // Add types to root
+        root.add(Coin);
+        root.add(MsgWithdrawTokens);
+
+        // Get the message type
+        const MsgType = root.lookupType("MsgWithdrawTokens");
+
+        // Ensure message has the correct structure
+        const msgData = {
+            creator: message.creator || "",
+            recipient: message.recipient || "",
+            amount: {
+                denom: message.amount?.denom || "",
+                amount: (message.amount?.amount || "0").toString()
+            }
+        };
+
+        console.log('Encoding message:', msgData);
+
+        // Verify the message
+        const errMsg = MsgType.verify(msgData);
+        if (errMsg) {
+            throw Error(errMsg);
+        }
+
+        // Create the message
+        const msg = MsgType.create(msgData);
+
+        // Encode the message
+        return MsgType.encode(msg).finish();
     },
 
     // Helper function to decode a protobuf message
     decodeMessage: (bytes) => {
-        const decoder = new TextDecoder();
-        const jsonStr = decoder.decode(bytes);
-        return JSON.parse(jsonStr);
+        // Check if proto code is loaded
+        if (!window.protobuf) {
+            throw new Error('Protobuf.js library not loaded. Please ensure protobuf.min.js is loaded before using this function.');
+        }
+
+        // Create the message types
+        const root = new protobuf.Root();
+        
+        // Define the Coin type
+        const Coin = new protobuf.Type("Coin")
+            .add(new protobuf.Field("denom", 1, "string"))
+            .add(new protobuf.Field("amount", 2, "string"));
+        
+        // Define the MsgWithdrawTokens type
+        const MsgWithdrawTokens = new protobuf.Type("MsgWithdrawTokens")
+            .add(new protobuf.Field("creator", 1, "string"))
+            .add(new protobuf.Field("recipient", 2, "string"))
+            .add(new protobuf.Field("amount", 3, "Coin"));
+
+        // Add types to root
+        root.add(Coin);
+        root.add(MsgWithdrawTokens);
+
+        // Get the message type
+        const MsgType = root.lookupType("MsgWithdrawTokens");
+
+        // Decode the message
+        return MsgType.decode(bytes);
     },
 
     // Helper function to create a signed transaction
@@ -61,6 +128,11 @@ window.layerProto = {
     // Helper function to decode balance response
     decodeBalanceResponse: function(base64Response) {
         try {
+            // Check if proto code is loaded
+            if (!window.protobuf) {
+                throw new Error('Protobuf.js library not loaded. Please ensure protobuf.min.js is loaded before using this function.');
+            }
+
             console.log('Decoding balance response:', base64Response);
             const binaryData = atob(base64Response);
             const bytes = new Uint8Array(binaryData.length);
@@ -70,42 +142,66 @@ window.layerProto = {
             
             console.log('Binary data:', bytes);
             
-            // Parse the protobuf message
-            const response = {
-                balance: {
-                    amount: "0",
-                    denom: ""
+            // Create the Coin message type
+            const Coin = {
+                fields: {
+                    denom: {
+                        type: "string",
+                        id: 1
+                    },
+                    amount: {
+                        type: "string",
+                        id: 2
+                    }
                 }
             };
 
-            // Simple protobuf parsing for balance response
-            // Format: [1, length, bytes...] for amount
-            //        [2, length, bytes...] for denom
-            let i = 0;
-            while (i < bytes.length) {
-                const fieldNumber = bytes[i] >> 3;
-                const wireType = bytes[i] & 0x7;
-                i++;
-
-                if (wireType === 2) { // Length-delimited
-                    const length = bytes[i];
-                    i++;
-                    const value = new TextDecoder().decode(bytes.slice(i, i + length));
-                    i += length;
-
-                    if (fieldNumber === 1) { // amount
-                        response.balance.amount = value;
-                    } else if (fieldNumber === 2) { // denom
-                        response.balance.denom = value;
+            // Create a root namespace
+            const root = protobuf.Root.fromJSON({
+                nested: {
+                    layer: {
+                        nested: {
+                            bridge: {
+                                nested: {
+                                    Coin: Coin
+                                }
+                            }
+                        }
                     }
                 }
-            }
+            });
 
-            console.log('Decoded response:', response);
-            return response;
+            // Get the message type
+            const CoinType = root.lookupType("layer.bridge.Coin");
+
+            // Decode the message
+            const balance = CoinType.decode(bytes);
+            
+            return {
+                balance: {
+                    amount: balance.amount,
+                    denom: balance.denom
+                }
+            };
         } catch (error) {
             console.error('Error decoding balance response:', error);
             return null;
         }
     }
-}; 
+};
+
+// Remove the test code below
+// const { MsgWithdrawTokens } = window.layer_proto.layer.bridge;
+// 
+// // Create a message
+// const msg = MsgWithdrawTokens.create({
+//     creator: "your_address",
+//     recipient: "recipient_address",
+//     amount: {
+//         denom: "loya",
+//         amount: "1000000"
+//     }
+// });
+// 
+// // Encode the message
+// const encoded = MsgWithdrawTokens.encode(msg).finish(); 

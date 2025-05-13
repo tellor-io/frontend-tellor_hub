@@ -8,6 +8,9 @@
     <link rel="stylesheet" href="main.css" />
     <link rel="icon" type="image/x-icon" href="/drkgrnswsh.png">
 
+    <!-- Load protobuf.js first -->
+    <script src="https://cdn.jsdelivr.net/npm/protobufjs@7.2.4/dist/protobuf.min.js"></script>
+
     <script>
       if (typeof crypto.randomUUID !== 'function') {
         crypto.randomUUID = function() {
@@ -66,6 +69,7 @@
     </div>
     <script src="./extensions/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.7.4/web3.min.js"></script>
+    
     <script>
       // Define a global variable to track CosmJS loading
       window.cosmjsLoaded = false;

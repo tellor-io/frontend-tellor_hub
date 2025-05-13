@@ -945,9 +945,11 @@ var App = {
         // Create the withdrawal message using proto helper
         const msg = window.layerProto.createMsgWithdrawTokens(
             App.account,
-            ethereumAddress.toLowerCase(),
-            amountInMicroUnits,
-            "loya"
+            ethereumAddress,
+            {
+                denom: "loya",
+                amount: amountInMicroUnits
+            }
         );
 
         console.log('Created message:', msg);
