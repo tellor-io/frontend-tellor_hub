@@ -69,17 +69,30 @@
     </div>
     <script src="./extensions/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.7.4/web3.min.js"></script>
-    
-    <script>
+    <!-- Load app.js as a module only once -->
+    <script type="module">
       // Define a global variable to track CosmJS loading
       window.cosmjsLoaded = false;
       
       // Function to load a single script
-      function loadScript(src) {
+      function loadScript(src, type = 'text/javascript') {
         return new Promise((resolve, reject) => {
+          // Skip if app.js is already loaded
+          if (src === 'app.js' && document.querySelector('script[src="app.js"]')) {
+            resolve();
+            return;
+          }
           const script = document.createElement('script');
           script.src = src;
-          script.onload = resolve;
+          script.type = type;
+          script.onload = () => {
+            // For app.js, wait a tick to ensure App is defined
+            if (src === 'app.js') {
+              setTimeout(resolve, 0);
+            } else {
+              resolve();
+            }
+          };
           script.onerror = () => reject(new Error(`Failed to load ${src}`));
           document.head.appendChild(script);
         });
@@ -121,15 +134,25 @@
             throw new Error('Failed to load CosmJS');
           }
           
-          // Load app.js after CosmJS is loaded
-          return loadScript('app.js');
+          // Load app.js as a module
+          return loadScript('app.js', 'module');
+        })
+        .then(() => {
+          // Wait for App to be defined
+          return new Promise((resolve) => {
+            const checkApp = () => {
+              if (typeof window.App !== 'undefined') {
+                resolve();
+              } else {
+                setTimeout(checkApp, 100);
+              }
+            };
+            checkApp();
+          });
         })
         .then(() => {
           // Initialize the app after everything is loaded
-          if (typeof App !== 'undefined') {
-            return App.init();
-          }
-          throw new Error('App not defined');
+          return window.App.init();
         })
         .catch(error => {
           console.error('Initialization error:', error);

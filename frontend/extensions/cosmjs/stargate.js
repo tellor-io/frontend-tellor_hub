@@ -24,6 +24,20 @@
             decode: (binary) => {
                 return window.layerProto.decodeMessage(binary);
             }
+        }],
+        ["/layer.bridge.MsgRequestAttestations", {
+            encode: (message) => {
+                // Create a fresh message each time
+                const msg = {
+                    creator: message.creator,
+                    query_id: message.query_id,
+                    timestamp: message.timestamp
+                };
+                return window.layerProto.encodeMessage(msg);
+            },
+            decode: (binary) => {
+                return window.layerProto.decodeMessage(binary);
+            }
         }]
     ];
 
@@ -655,4 +669,98 @@
             throw error;
         }
     }
+
+    async function requestAttestations(account, queryId, timestamp) {
+        try {
+            console.log('Starting attestation request process...');
+            console.log('Requesting attestations with params:', {
+                account,
+                queryId,
+                timestamp
+            });
+
+            const offlineSigner = window.getOfflineSigner('layertest-4');
+            console.log('Got offline signer');
+
+            const client = await SigningStargateClient.connectWithSigner(
+                'https://node-palmito.tellorlayer.com',
+                offlineSigner
+            );
+            console.log('Connected to signing client');
+
+            // Create the message
+            const msg = {
+                typeUrl: '/layer.bridge.MsgRequestAttestations',
+                value: {
+                    creator: account,
+                    query_id: queryId,
+                    timestamp: timestamp
+                }
+            };
+            console.log('Created message:', msg);
+
+            // Show pending popup
+            showPendingPopup();
+            console.log('Showing pending popup');
+
+            // Sign and broadcast the transaction
+            console.log('Attempting to sign and broadcast transaction...');
+            const result = await client.signAndBroadcast(
+                account,
+                [msg],
+                {
+                    amount: [{ denom: 'loya', amount: '5000' }],
+                    gas: '200000'
+                },
+                'Request attestations for withdrawal'
+            );
+
+            console.log('Transaction result:', result);
+            hidePendingPopup();
+            showSuccessPopup();
+            return result;
+        } catch (error) {
+            console.error('Transaction error:', error);
+            hidePendingPopup();
+            showErrorPopup(error.message);
+            throw error;
+        }
+    }
+
+    async function getWithdrawReport(queryId) {
+        try {
+            console.log('Fetching withdraw report for queryId:', queryId);
+            const response = await fetch(`https://api.tellor.io/tellor-io/layer/oracle/get_current_aggregate_report/${queryId}`);
+            
+            if (!response.ok) {
+                throw new Error(`Failed to fetch withdraw report: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('Withdraw report data:', data);
+            return data;
+        } catch (error) {
+            console.error('Error fetching withdraw report:', error);
+            throw error;
+        }
+    }
+
+    // Export to both module and global scope
+    exports.SigningStargateClient = SigningStargateClient;
+    exports.requestAttestations = requestAttestations;
+    exports.getWithdrawReport = getWithdrawReport;
+
+    // Ensure cosmjs object exists
+    window.cosmjs = window.cosmjs || {};
+    window.cosmjs.stargate = window.cosmjs.stargate || {};
+
+    // Export to both locations
+    window.cosmjs.stargate.SigningStargateClient = SigningStargateClient;
+    window.cosmjs.stargate.requestAttestations = requestAttestations;
+    window.cosmjs.stargate.getWithdrawReport = getWithdrawReport;
+    window.cosmjsStargate = {
+        SigningStargateClient: SigningStargateClient,
+        requestAttestations: requestAttestations,
+        getWithdrawReport: getWithdrawReport
+    };
 }))); 

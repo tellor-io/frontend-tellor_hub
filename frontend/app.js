@@ -1,4 +1,13 @@
-var App = {
+import { ethers } from '../node_modules/ethers/dist/ethers.esm.min.js';
+import { 
+    generateWithdrawalQueryId, 
+    generateDepositQueryId,
+    isWithdrawClaimed,
+    Deposit
+} from './js/bridgeContract.js';
+
+// Create the App object
+const App = {
   web3Provider: null,
   contracts: {},
   account: "0x0",
@@ -6,6 +15,7 @@ var App = {
   bridgeAddress: {},
   tokenAddress: {},
   web3: null,
+  ethers: null,  // Add ethers instance
   tokenDecimals: 0,
   depositLimit: null,
   depositId: 0,
@@ -13,6 +23,8 @@ var App = {
   isProcessingAccountChange: false,
   keplrProvider: null,
   isKeplrConnected: false,
+  connectedWallet: null,
+  keplrAddress: null,
 
   _depositLimit: function() {
     return App.depositLimit;
@@ -21,6 +33,9 @@ var App = {
   init: function () {
     return new Promise((resolve, reject) => {
       try {
+        // Initialize ethers
+        App.ethers = ethers;
+        
         // Wait for CosmJS to be loaded
         if (!window.cosmjsLoaded) {
           throw new Error('CosmJS not loaded yet');
@@ -33,7 +48,7 @@ var App = {
 
         App.initWeb3()
           .then(() => {
-            App.initInputValidation();
+        App.initInputValidation();
             console.log("App initialized successfully");
             resolve();
           })
@@ -51,46 +66,52 @@ var App = {
   initWeb3: function () {
     return new Promise((resolve, reject) => {
       try {
-        // Check for both Keplr and MetaMask
-        if (window.keplr) {
+        // Check for Keplr first
+        if (typeof window.keplr !== 'undefined') {
+          console.log("Keplr detected");
           App.keplrProvider = window.keplr;
+          // Enable the button for Keplr
+          document.getElementById("walletButton").disabled = false;
           resolve();
         } else if (typeof window.ethereum !== 'undefined') {
           // Existing Ethereum provider code
-          const handleDisconnect = () => {
-            console.log('MetaMask disconnected');
-            App.disconnectWallet();
-          };
+            const handleDisconnect = () => {
+                console.log('MetaMask disconnected');
+                App.disconnectWallet();
+            };
 
-          const handleChainChanged = () => {
-            window.location.reload();
-          };
+            const handleChainChanged = () => {
+                window.location.reload();
+            };
 
-          const handleAccountsChanged = (accounts) => {
-            App.handleAccountsChanged(accounts);
-          };
+            const handleAccountsChanged = (accounts) => {
+                App.handleAccountsChanged(accounts);
+            };
 
-          if(App.web3Provider) {
-            window.ethereum.removeListener('disconnect', handleDisconnect);
-            window.ethereum.removeListener('chainChanged', handleChainChanged);
-            window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-          }
-          
-          App.web3Provider = window.ethereum;
-          App.web3 = new Web3(window.ethereum);
-          
-          window.ethereum.on('disconnect', handleDisconnect);
-          window.ethereum.on('chainChanged', handleChainChanged);
-          window.ethereum.on('accountsChanged', handleAccountsChanged);
+            if(App.web3Provider) {
+                window.ethereum.removeListener('disconnect', handleDisconnect);
+                window.ethereum.removeListener('chainChanged', handleChainChanged);
+                window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+            }
+            
+            App.web3Provider = window.ethereum;
+            App.web3 = new Web3(window.ethereum);
+            
+            window.ethereum.on('disconnect', handleDisconnect);
+            window.ethereum.on('chainChanged', handleChainChanged);
+            window.ethereum.on('accountsChanged', handleAccountsChanged);
 
-          resolve();
+            resolve();
         } else {
-          reject(new Error("No Web3 provider detected"));
+          console.log("No Web3 provider detected");
+          // Don't reject, just resolve without a provider
+          resolve();
         }
       } catch (error) {
         console.error("Error in initWeb3:", error);
-        reject(error);
-      }
+        // Don't reject, just resolve without a provider
+        resolve();
+        }
     });
   },
 
@@ -187,6 +208,7 @@ var App = {
           const offlineSigner = window.keplr.getOfflineSigner('layertest-4');
           const accounts = await offlineSigner.getAccounts();
           App.account = accounts[0].address;
+          App.keplrAddress = accounts[0].address;
           App.isKeplrConnected = true;
           App.isConnected = true;
           document.getElementById('walletButton').innerHTML = `Disconnect Wallet <span class="truncated-address">(${App.account.substring(0, 6)}...${App.account.substring(App.account.length - 4)})</span>`;
@@ -212,9 +234,9 @@ var App = {
       metamaskButton.style.fontFamily = "'PPNeueMontreal-Book', Arial, sans-serif";
       metamaskButton.style.fontSize = '16px';
       metamaskButton.onclick = async () => {
-        try {
-          // Request account access
-          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      try {
+        // Request account access
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
           
           // Initialize Web3
           App.web3Provider = window.ethereum;
@@ -233,7 +255,7 @@ var App = {
           try {
             await App.initBridgeContract();
             await App.initTokenContract();
-          } catch (error) {
+      } catch (error) {
             console.error("Contract initialization error:", error);
             throw new Error("Failed to initialize contracts. Please try again.");
           }
@@ -265,7 +287,7 @@ var App = {
             alert('Please connect to a supported network (Sepolia, Arbitrum Goerli, etc.).');
           } else if (error.message.includes("Failed to initialize contracts")) {
             alert('Error initializing contracts. Please try again or contact support.');
-          } else {
+    } else {
             alert('Error connecting to MetaMask. Please make sure you are on the correct network.');
           }
         }
@@ -344,7 +366,9 @@ var App = {
         // Atomic state update
         const updates = {
             account: '0x0',
+            keplrAddress: null,
             isConnected: false,
+            isKeplrConnected: false,
             balance: '0',
             chainId: null
         };
@@ -504,31 +528,32 @@ var App = {
     }
   },
 
-  setPageParams: function () {
-    try {
-        // Update connected address if element exists
-        const connectedAddressElement = document.getElementById('connectedAddress');
+  setPageParams: function() {
+    console.log("Setting page parameters...");
+    // Update connected address in UI
+    const connectedAddressElement = document.getElementById("connectedAddress");
         if (connectedAddressElement) {
-            connectedAddressElement.innerHTML = App.account || 'Not Connected';
-        }
+      connectedAddressElement.textContent = App.account;
+    }
 
-        // Only check for Ethereum contracts if using MetaMask
-        if (!App.isKeplrConnected && App.contracts.Bridge && App.contracts.Bridge.options) {
-            // Ethereum-specific initialization
-            if (App.contracts.Bridge && App.contracts.Bridge.options) {
-                // Ethereum contract initialization logic
-            }
-        } else if (App.isKeplrConnected) {
-            // Keplr-specific initialization
-            // Update UI elements for Keplr
-            const balanceElement = document.getElementById("currentBalance");
-            if (balanceElement) {
-                // Fetch and display Keplr balance
-                App.updateKeplrBalance();
-            }
-        }
-    } catch (error) {
-        console.error('Error in setPageParams:', error);
+    // If not using Keplr, check for Ethereum contracts
+    if (!App.isKeplrConnected) {
+      if (App.contracts.Bridge && App.contracts.Token) {
+        document.getElementById('approveButton').disabled = false;
+        document.getElementById('depositButton').disabled = false;
+      }
+    }
+
+    // If connected to Keplr, fetch and display balance
+    if (App.isKeplrConnected) {
+      App.updateKeplrBalance();
+      document.getElementById('withdrawButton').disabled = false;
+    }
+
+    // Add withdrawal history if wallet is connected
+    if (App.isConnected || App.isKeplrConnected) {
+      console.log("Wallet connected, adding withdrawal history...");
+      App.addWithdrawalHistory();
     }
   },
 
@@ -778,8 +803,8 @@ var App = {
           await updateTrbPrice();
         }
         if (trbPrice > 0) {
-          const usdValue = (amount * trbPrice).toFixed(2);
-          tooltip.textContent = `≈ $${usdValue} USD`;
+        const usdValue = (amount * trbPrice).toFixed(2);
+        tooltip.textContent = `≈ $${usdValue} USD`;
         } else {
           tooltip.textContent = 'Price data unavailable';
         }
@@ -796,7 +821,7 @@ var App = {
       if (document.hidden) {
         clearInterval(priceUpdateInterval);
       } else {
-        updateTrbPrice();
+    updateTrbPrice();
         priceUpdateInterval = setInterval(updateTrbPrice, 60000);
       }
     });
@@ -1000,8 +1025,569 @@ var App = {
         });
         alert(error.message || "Error in withdrawal. Please try again.");
     }
-  }
+  },
+
+  // Add withdrawal history functions
+  addWithdrawalHistory: async function() {
+    console.log("Starting addWithdrawalHistory...");
+    const boxWrapper = document.querySelector('.box-wrapper');
+    console.log("Box wrapper found:", !!boxWrapper);
+
+    // Check if withdrawal history already exists
+    const existingHistory = document.querySelector('.withdrawal-history-container');
+    if (existingHistory) {
+        console.log("Withdrawal history already exists, updating...");
+        await this.updateWithdrawalHistory();
+        return;
+    }
+
+    // Create withdrawal history UI with improved styling
+    const historyContainer = document.createElement('div');
+    historyContainer.className = 'withdrawal-history-container';
+    historyContainer.innerHTML = `
+        <div class="history-header">
+            <h3>Bridge Transactions</h3>
+            <div class="history-subtitle">View your deposits and withdrawals</div>
+        </div>
+        <div class="withdrawal-table-container">
+            <table id="withdrawal-history" class="withdrawal-table">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>ID</th>
+                        <th>Sender</th>
+                        <th>Recipient</th>
+                        <th class="amount-column">Amount (TRB)</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="7" class="loading-message">Loading transaction history...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    // Add styles for the withdrawal history
+    const style = document.createElement('style');
+    style.textContent = `
+        .withdrawal-history-container {
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-top: 20px;
+            padding: 20px;
+        }
+        .history-header {
+            margin-bottom: 20px;
+        }
+        .history-header h3 {
+            color: #2d3748;
+            font-size: 1.5rem;
+            margin: 0;
+        }
+        .history-subtitle {
+            color: #718096;
+            font-size: 0.875rem;
+            margin-top: 4px;
+        }
+        .withdrawal-table-container {
+            overflow-x: auto;
+            width: 100%;
+        }
+        .withdrawal-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+        .withdrawal-table th {
+            background: #f7fafc;
+            color: #4a5568;
+            font-weight: 600;
+            padding: 12px;
+            text-align: left;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .withdrawal-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+            color: #2d3748;
+        }
+        .withdrawal-table tr:hover {
+            background-color: #f7fafc;
+        }
+        .amount-column {
+            text-align: right;
+        }
+        .type-deposit {
+            color: #3182ce;
+            font-weight: 500;
+        }
+        .type-withdrawal {
+            color: #38a169;
+            font-weight: 500;
+        }
+        .status-true {
+            color: #38a169;
+            font-weight: 500;
+        }
+        .status-false {
+            color: #e53e3e;
+            font-weight: 500;
+        }
+        .address-cell {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            position: relative;
+        }
+        .address-cell:hover {
+            color: #3182ce;
+        }
+        .address-cell .tooltip {
+            visibility: hidden;
+            position: absolute;
+            background-color: #2d3748;
+            color: #fff;
+            text-align: center;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            z-index: 1;
+        }
+        .address-cell:hover .tooltip {
+            visibility: visible;
+        }
+        .loading-message, .no-withdrawals, .error-message {
+            text-align: center;
+            padding: 20px;
+            color: #718096;
+        }
+        .error-message {
+            color: #e53e3e;
+        }
+        .error-message small {
+            display: block;
+            margin-top: 8px;
+            font-size: 0.75rem;
+        }
+    `;
+    document.head.appendChild(style);
+
+    // Find the last element in box-wrapper that isn't the withdrawal history
+    const lastElement = Array.from(boxWrapper.children)
+        .filter(child => !child.classList.contains('withdrawal-history-container'))
+        .pop();
+
+    if (lastElement) {
+        console.log("Inserting withdrawal history after last element");
+        lastElement.after(historyContainer);
+    } else {
+        console.log("No elements found, appending to box-wrapper");
+        boxWrapper.appendChild(historyContainer);
+    }
+
+    // Fetch and display withdrawal history
+    console.log("Calling updateWithdrawalHistory...");
+    await this.updateWithdrawalHistory();
+  },
+
+  // Function to fetch withdrawal history
+  getWithdrawalHistory: async function() {
+    try {
+        const address = App.keplrAddress;
+        if (!address) {
+            console.log('No Keplr address available, skipping withdrawal history');
+            return [];
+        }
+
+        console.log('Getting withdrawal history for address:', address);
+        
+        // Use the correct API endpoint
+        const baseEndpoint = 'https://node-palmito.tellorlayer.com';
+        
+        // Get last withdrawal ID with proper error handling
+        const response = await fetch(`${baseEndpoint}/layer/bridge/get_last_withdrawal_id`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            console.error('Failed to fetch last withdrawal ID:', response.status);
+            return [];
+        }
+
+        const data = await response.json();
+        const lastWithdrawalId = Number(data.withdrawal_id);
+        console.log('Last withdrawal ID:', lastWithdrawalId);
+
+        if (!lastWithdrawalId || lastWithdrawalId <= 0) {
+            console.log('No withdrawals found in the system');
+            return [];
+        }
+
+        // Create arrays for withdrawal data and claim status promises
+        const withdrawalPromises = [];
+        const claimStatusPromises = [];
+
+        // Create promises for all withdrawals
+        for (let id = 1; id <= lastWithdrawalId; id++) {
+            const queryId = generateWithdrawalQueryId(id);
+            withdrawalPromises.push(this.fetchWithdrawalData(queryId));
+            // Use the correct endpoint for checking claim status
+            claimStatusPromises.push(
+                fetch(`${baseEndpoint}/layer/bridge/is_withdrawal_claimed/${id}`)
+                    .then(res => res.ok ? res.json() : { claimed: false })
+                    .catch(() => ({ claimed: false }))
+            );
+        }
+
+        console.log(`Fetching data for ${lastWithdrawalId} withdrawals...`);
+
+        // Process all withdrawals in parallel
+        const [withdrawalResults, claimStatuses] = await Promise.all([
+            Promise.all(withdrawalPromises),
+            Promise.all(claimStatusPromises)
+        ]);
+
+        // Filter and process valid withdrawals
+        const withdrawals = withdrawalResults
+            .map((withdrawalData, index) => {
+                if (!withdrawalData) {
+                    console.log(`No data found for withdrawal ${index + 1}`);
+                    return null;
+                }
+
+                const id = index + 1;
+                // Clean up recipient address by removing null bytes and any prefix
+                const cleanRecipient = withdrawalData.recipient
+                    .replace(/\0/g, '')  // Remove null bytes
+                    .replace(/^tellor-?/, '')  // Remove tellor prefix if present
+                    .trim();
+                
+                // Clean up current address
+                const cleanAddress = address
+                    .replace(/^tellor-?/, '')  // Remove tellor prefix if present
+                    .trim();
+
+                console.log('Processing withdrawal', id, {
+                    recipient: cleanRecipient.toLowerCase(),
+                    address: cleanAddress.toLowerCase(),
+                    matches: cleanRecipient.toLowerCase() === cleanAddress.toLowerCase()
+                });
+
+                // Use exact match for addresses
+                if (cleanRecipient.toLowerCase() === cleanAddress.toLowerCase()) {
+                    return {
+                        id,
+                        sender: withdrawalData.sender,
+                        recipient: cleanRecipient,
+                        amount: withdrawalData.amount,
+                        timestamp: withdrawalData.timestamp,
+                        claimed: claimStatuses[index]?.claimed || false
+                    };
+                }
+                return null;
+            })
+            .filter(withdrawal => withdrawal !== null)
+            .sort((a, b) => b.id - a.id); // Sort by ID in descending order
+
+        console.log('Found withdrawals for current address:', withdrawals.length);
+        return withdrawals;
+    } catch (error) {
+        console.error('Error in getWithdrawalHistory:', error);
+        return [];
+    }
+  },
+
+  fetchWithdrawalData: async function(queryId, retryCount = 0) {
+    try {
+        console.log('Fetching withdrawal data for query ID:', queryId);
+        const endpoint = `https://node-palmito.tellorlayer.com/tellor-io/layer/oracle/get_current_aggregate_report/${queryId}`;
+        console.log('Calling endpoint:', endpoint);
+        
+        const response = await fetch(endpoint);
+        console.log('Response status:', response.status);
+        
+        // Check if response is HTML instead of JSON
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('text/html')) {
+            throw new Error('Server returned HTML instead of JSON. The API endpoint may be down.');
+        }
+        
+        if (!response.ok) {
+            if (response.status === 400) {
+                console.log('No data found for query ID:', queryId);
+                return null;
+            }
+            // Retry on server errors (5xx) or network errors
+            if ((response.status >= 500 || response.status === 0) && retryCount < 3) {
+                console.log(`Retrying fetch for query ID ${queryId} (attempt ${retryCount + 1})...`);
+                await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
+                return this.fetchWithdrawalData(queryId, retryCount + 1);
+            }
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('Oracle response data:', data);
+
+        if (!data || !data.aggregate || !data.aggregate.aggregate_value) {
+            console.log('No value in oracle response');
+            return null;
+        }
+
+        // Parse the withdrawal data from the aggregate value
+        const withdrawalData = this.parseWithdrawalData(data.aggregate.aggregate_value);
+        console.log('Parsed withdrawal data:', withdrawalData);
+        
+        if (!withdrawalData) {
+            console.log('Failed to parse withdrawal data');
+            return null;
+        }
+
+        return withdrawalData;
+    } catch (error) {
+        console.error('Error in fetchWithdrawalData:', error);
+        // Retry on network errors or if we haven't exceeded retry limit
+        if (retryCount < 3 && (error.message.includes('NetworkError') || error.message.includes('Failed to fetch'))) {
+            console.log(`Retrying fetch for query ID ${queryId} (attempt ${retryCount + 1})...`);
+            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
+            return this.fetchWithdrawalData(queryId, retryCount + 1);
+        }
+        return null;
+    }
+  },
+
+  parseWithdrawalData: function(data) {
+    try {
+        console.log('Parsing withdrawal data:', data);
+        
+        // Add 0x prefix if not present
+        const hexData = data.startsWith('0x') ? data : '0x' + data;
+        
+        // Convert to bytes
+        const bytes = ethers.utils.arrayify(hexData);
+        
+        // Define the ABI types for decoding
+        const abiCoder = new ethers.utils.AbiCoder();
+        const types = ['address', 'string', 'uint256', 'uint256'];
+        
+        // Decode the bytes
+        const [sender, recipient, amount, tip] = abiCoder.decode(types, bytes);
+        
+        console.log('Decoded withdrawal data:', {
+            sender,
+            recipient,
+            amount: amount.toString(),
+            tip: tip.toString()
+        });
+
+        return {
+            sender,
+            recipient,
+            amount,
+            tip,
+            timestamp: Date.now() // Using current timestamp as fallback
+        };
+    } catch (error) {
+        console.error('Error parsing withdrawal data:', error);
+        return null;
+    }
+  },
+
+  // Function to update withdrawal history UI
+  updateWithdrawalHistory: async function() {
+    try {
+        const withdrawals = await this.getWithdrawalHistory();
+        console.log('Fetched withdrawals:', withdrawals);
+
+        const tableBody = document.querySelector('#withdrawal-history tbody');
+        if (!tableBody) {
+            console.error('Withdrawal history table body not found');
+            return;
+        }
+
+        // Clear existing content
+        tableBody.innerHTML = '';
+
+        if (!withdrawals || withdrawals.length === 0) {
+            console.log('No withdrawals found to display');
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="no-withdrawals">
+                        No bridge transactions found. If you've made transactions, they may still be processing. Check back later.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        // Create and append withdrawal rows
+        for (const withdrawal of withdrawals) {
+            if (!withdrawal || !withdrawal.amount) {
+                console.log('Skipping invalid withdrawal data:', withdrawal);
+                continue;
+            }
+
+            try {
+                // Convert amount from wei to TRB (divide by 1e18)
+                const amount = Number(withdrawal.amount) / 1e18;
+                const date = new Date(withdrawal.timestamp).toLocaleString();
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="type-withdrawal">Withdrawal</td>
+                    <td>${withdrawal.id}</td>
+                    <td class="address-cell" title="${withdrawal.sender}">${this.formatAddress(withdrawal.sender)}</td>
+                    <td class="address-cell" title="${withdrawal.recipient}">${this.formatAddress(withdrawal.recipient)}</td>
+                    <td class="amount-column">${amount.toFixed(6)} TRB</td>
+                    <td>${date}</td>
+                    <td class="status-${withdrawal.claimed}">${withdrawal.claimed ? 'Claimed' : 'Pending'}</td>
+                    <td>
+                        ${!withdrawal.claimed ? 
+                            `<button class="attest-button" onclick="App.requestAttestation(${withdrawal.id})" 
+                                style="background-color: #003734; color: #eefffb; border: none; padding: 5px 10px; 
+                                border-radius: 4px; cursor: pointer; font-family: 'PPNeueMontreal-Book', Arial, sans-serif;">
+                                Request Attestation
+                            </button>` 
+                            : ''}
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            } catch (error) {
+                console.error('Error formatting withdrawal:', withdrawal, error);
+            }
+        }
+
+        // Add styles for the attestation button
+        const style = document.createElement('style');
+        style.textContent = `
+            .attest-button:hover {
+                background-color: #002220 !important;
+            }
+            .attest-button:disabled {
+                background-color: #cccccc !important;
+                cursor: not-allowed;
+            }
+        `;
+        document.head.appendChild(style);
+    } catch (error) {
+        console.error('Error updating withdrawal history:', error);
+        const tableBody = document.querySelector('#withdrawal-history tbody');
+        if (tableBody) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="error-message">
+                        Error loading withdrawal history. Please try again later.
+                        <small>${error.message}</small>
+                    </td>
+                </tr>
+            `;
+        }
+    }
+  },
+
+  formatAddress: function(address) {
+    if (!address) return 'N/A';
+    if (address.startsWith('tellor')) {
+        return `${address.slice(0, 8)}...${address.slice(-4)}`;
+    }
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  },
+
+  formatAmount: function(amount) {
+    const amountInTRB = Number(amount) / 1000000;
+    return amountInTRB.toLocaleString('en-US', {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1
+    });
+  },
+
+  showBalanceErrorPopup: function(message) {
+    const popup = document.createElement('div');
+    popup.id = 'balanceErrorPopup';
+    popup.className = 'balance-error-popup';
+    popup.textContent = message;
+    
+    document.body.appendChild(popup);
+    
+    // Remove the popup after 3 seconds
+    setTimeout(() => {
+      const popup = document.getElementById('balanceErrorPopup');
+      if (popup) {
+        popup.remove();
+      }
+    }, 3000);
+  },
+
+  hideBalanceErrorPopup: function() {
+    const popup = document.getElementById('balanceErrorPopup');
+    if (popup) {
+      popup.remove();
+    }
+  },
+
+  // Add new function to handle attestation requests
+  requestAttestation: async function(withdrawalId) {
+    try {
+        if (!App.isConnected) {
+            alert('Please connect your wallet first');
+            return;
+        }
+
+        const button = document.querySelector(`button[onclick="App.requestAttestation(${withdrawalId})"]`);
+        if (button) {
+            button.disabled = true;
+            button.textContent = 'Requesting...';
+        }
+
+        App.showPendingPopup("Requesting attestation...");
+
+        // Call the contract method to request attestation
+        const result = await App.contracts.Bridge.methods.requestAttestation(withdrawalId)
+            .send({ from: App.account });
+
+        App.hidePendingPopup();
+        
+        if (result.status) {
+            App.showSuccessPopup("Attestation requested successfully!");
+            // Refresh the withdrawal history
+            await this.updateWithdrawalHistory();
+        } else {
+            throw new Error("Transaction failed");
+        }
+    } catch (error) {
+        console.error('Error requesting attestation:', error);
+        App.hidePendingPopup();
+        alert(error.message || "Error requesting attestation. Please try again.");
+        
+        // Re-enable the button if there was an error
+        const button = document.querySelector(`button[onclick="App.requestAttestation(${withdrawalId})"]`);
+        if (button) {
+            button.disabled = false;
+            button.textContent = 'Request Attestation';
+        }
+    }
+  },
 };
+
+// Export App to window object for global access
+window.App = App;
+
+// Export App as default for module usage
+export default App;
 
 function checkWalletConnection() {
     console.log("Checking wallet connection. Is connected:", App.isConnected);
@@ -1016,10 +1602,7 @@ function checkWalletConnection() {
 $(function () {
     $(window).load(function () {
         try {
-            if(!window.ethereum) {
-                throw new Error('No Web3 provider detected');
-            }
-            
+            // Initialize app regardless of provider availability
             document.getElementById("walletButton").disabled = false;
             App.init().catch(error => {
                 console.error('Failed to initialize app:', error);
@@ -1041,9 +1624,9 @@ $(function () {
             });
         } catch (error) {
             console.error('App initialization failed:', error);
-            // Show user-friendly error message
-            document.getElementById("walletButton").textContent = 'Web3 Not Available';
-            document.getElementById("walletButton").disabled = true;
+            // Show user-friendly error message but keep button enabled
+            document.getElementById("walletButton").textContent = 'Connect Wallet';
+            document.getElementById("walletButton").disabled = false;
         }
     });
 });
@@ -1051,30 +1634,6 @@ $(function () {
 $(document).ready(function() {
     document.getElementById('depositButton').disabled = true;
 });
-
-function showBalanceErrorPopup(message) {
-  const popup = document.createElement('div');
-  popup.id = 'balanceErrorPopup';
-  popup.className = 'balance-error-popup';
-  popup.textContent = message;
-  
-  document.body.appendChild(popup);
-  
-  // Remove the popup after 3 seconds
-  setTimeout(() => {
-    const popup = document.getElementById('balanceErrorPopup');
-    if (popup) {
-      popup.remove();
-    }
-  }, 3000);
-}
-
-function hideBalanceErrorPopup() {
-  const popup = document.getElementById('balanceErrorPopup');
-  if (popup) {
-    popup.remove();
-  }
-}
 
 async function checkBalance(amount) {
   if (!App.contracts.Token || !App.account) return true;
@@ -1085,7 +1644,7 @@ async function checkBalance(amount) {
     
     if (App.web3.utils.toBN(amountWei).gt(App.web3.utils.toBN(balance))) {
       const readableBalance = App.web3.utils.fromWei(balance, 'ether');
-      showBalanceErrorPopup(`Insufficient balance. You have ${readableBalance} TRB but trying to deposit ${amount} TRB`);
+      App.showBalanceErrorPopup(`Insufficient balance. You have ${readableBalance} TRB but trying to deposit ${amount} TRB`);
       return false;
     }
     return true;
