@@ -2,16 +2,120 @@
 window.layerProto = {
     // Message type URLs
     MSG_WITHDRAW_TOKENS_TYPE: "/layer.bridge.MsgWithdrawTokens",
+    MSG_REQUEST_ATTESTATIONS_TYPE: "/layer.bridge.MsgRequestAttestations",
     
+    // Initialize proto types
+    bridge: {
+        // Define the Coin type
+        Coin: {
+            create: (data) => ({
+                denom: data.denom || "",
+                amount: (data.amount || "0").toString()
+            }),
+            encode: (message) => {
+                const writer = protobuf.Writer.create();
+                if (message.denom) writer.uint32(10).string(message.denom);
+                if (message.amount) writer.uint32(18).string(message.amount);
+                return writer.finish();
+            },
+            decode: (reader) => {
+                const message = {};
+                while (reader.nextField()) {
+                    if (reader.isEndGroup) break;
+                    switch (reader.getFieldNumber()) {
+                        case 1: message.denom = reader.readString(); break;
+                        case 2: message.amount = reader.readString(); break;
+                        default: reader.skipField();
+                    }
+                }
+                return message;
+            }
+        },
+
+        // Define the MsgWithdrawTokens type
+        MsgWithdrawTokens: {
+            create: (data) => ({
+                creator: data.creator || "",
+                recipient: (data.recipient || "").toLowerCase(),
+                amount: data.amount || { denom: "", amount: "0" }
+            }),
+            encode: (message) => {
+                const writer = protobuf.Writer.create();
+                if (message.creator) writer.uint32(10).string(message.creator);
+                if (message.recipient) writer.uint32(18).string(message.recipient);
+                if (message.amount) {
+                    writer.uint32(26).fork();
+                    window.layerProto.bridge.Coin.encode(message.amount);
+                    writer.ldelim();
+                }
+                return writer.finish();
+            },
+            decode: (reader) => {
+                const message = {};
+                while (reader.nextField()) {
+                    if (reader.isEndGroup) break;
+                    switch (reader.getFieldNumber()) {
+                        case 1: message.creator = reader.readString(); break;
+                        case 2: message.recipient = reader.readString(); break;
+                        case 3: message.amount = window.layerProto.bridge.Coin.decode(reader); break;
+                        default: reader.skipField();
+                    }
+                }
+                return message;
+            }
+        },
+
+        // Define the MsgRequestAttestations type
+        MsgRequestAttestations: {
+            create: (data) => ({
+                creator: data.creator || "",
+                query_id: data.query_id || "",
+                timestamp: (data.timestamp || "0").toString()
+            }),
+            encode: (message) => {
+                const writer = protobuf.Writer.create();
+                if (message.creator) writer.uint32(10).string(message.creator);
+                if (message.query_id) writer.uint32(18).string(message.query_id);
+                if (message.timestamp) writer.uint32(26).string(message.timestamp);
+                return writer.finish();
+            },
+            decode: (reader) => {
+                const message = {};
+                while (reader.nextField()) {
+                    if (reader.isEndGroup) break;
+                    switch (reader.getFieldNumber()) {
+                        case 1: message.creator = reader.readString(); break;
+                        case 2: message.query_id = reader.readString(); break;
+                        case 3: message.timestamp = reader.readString(); break;
+                        default: reader.skipField();
+                    }
+                }
+                return message;
+            }
+        }
+    },
+
     // Helper function to create a MsgWithdrawTokens message
     createMsgWithdrawTokens: (creator, recipient, amount) => {
         return {
             typeUrl: window.layerProto.MSG_WITHDRAW_TOKENS_TYPE,
-            value: {
-                creator: creator,
-                recipient: recipient.toLowerCase(),
-                amount: amount
-            }
+            value: window.layerProto.bridge.MsgWithdrawTokens.create({
+                creator,
+                recipient,
+                amount
+            })
+        };
+    },
+
+    // Helper function to create a MsgRequestAttestations message
+    createMsgRequestAttestations: (creator, queryId, timestamp) => {
+        return {
+            typeUrl: window.layerProto.MSG_REQUEST_ATTESTATIONS_TYPE,
+            value: window.layerProto.bridge.MsgRequestAttestations.create({
+                creator,
+                query_id: queryId,
+                timestamp
+            })
         };
     },
 
@@ -22,50 +126,18 @@ window.layerProto = {
             throw new Error('Protobuf.js library not loaded. Please ensure protobuf.min.js is loaded before using this function.');
         }
 
-        // Create the message types
-        const root = new protobuf.Root();
-        
-        // Define the Coin type
-        const Coin = new protobuf.Type("Coin")
-            .add(new protobuf.Field("denom", 1, "string"))
-            .add(new protobuf.Field("amount", 2, "string"));
-        
-        // Define the MsgWithdrawTokens type
-        const MsgWithdrawTokens = new protobuf.Type("MsgWithdrawTokens")
-            .add(new protobuf.Field("creator", 1, "string"))
-            .add(new protobuf.Field("recipient", 2, "string"))
-            .add(new protobuf.Field("amount", 3, "Coin"));
-
-        // Add types to root
-        root.add(Coin);
-        root.add(MsgWithdrawTokens);
-
-        // Get the message type
-        const MsgType = root.lookupType("MsgWithdrawTokens");
-
-        // Ensure message has the correct structure
-        const msgData = {
-            creator: message.creator || "",
-            recipient: message.recipient || "",
-            amount: {
-                denom: message.amount?.denom || "",
-                amount: (message.amount?.amount || "0").toString()
-            }
-        };
-
-        console.log('Encoding message:', msgData);
-
-        // Verify the message
-        const errMsg = MsgType.verify(msgData);
-        if (errMsg) {
-            throw Error(errMsg);
+        // Get the appropriate message type based on typeUrl
+        let encoder;
+        if (message.typeUrl === window.layerProto.MSG_WITHDRAW_TOKENS_TYPE) {
+            encoder = window.layerProto.bridge.MsgWithdrawTokens;
+        } else if (message.typeUrl === window.layerProto.MSG_REQUEST_ATTESTATIONS_TYPE) {
+            encoder = window.layerProto.bridge.MsgRequestAttestations;
+        } else {
+            throw new Error(`Unknown message type: ${message.typeUrl}`);
         }
 
-        // Create the message
-        const msg = MsgType.create(msgData);
-
-        // Encode the message
-        return MsgType.encode(msg).finish();
+        // Encode the message using the appropriate encoder
+        return encoder.encode(message.value);
     },
 
     // Helper function to decode a protobuf message
@@ -189,6 +261,13 @@ window.layerProto = {
         }
     }
 };
+
+// Log initialization for debugging
+console.log('Proto types initialized:', {
+    MsgWithdrawTokens: !!window.layerProto.bridge.MsgWithdrawTokens,
+    MsgRequestAttestations: !!window.layerProto.bridge.MsgRequestAttestations,
+    Coin: !!window.layerProto.bridge.Coin
+});
 
 // Remove the test code below
 // const { MsgWithdrawTokens } = window.layer_proto.layer.bridge;

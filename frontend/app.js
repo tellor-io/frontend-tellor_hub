@@ -1357,6 +1357,10 @@ const App = {
             return null;
         }
 
+        // Add the timestamp from the oracle data
+        withdrawalData.timestamp = data.timestamp;
+        console.log('Added timestamp from oracle data:', withdrawalData.timestamp);
+
         return withdrawalData;
     } catch (error) {
         console.error('Error in fetchWithdrawalData:', error);
@@ -1398,8 +1402,7 @@ const App = {
             sender,
             recipient,
             amount,
-            tip,
-            timestamp: Date.now() // Using current timestamp as fallback
+            tip
         };
     } catch (error) {
         console.error('Error parsing withdrawal data:', error);
@@ -1555,23 +1558,43 @@ const App = {
 
         App.showPendingPopup("Requesting attestation...");
 
-        // Call the contract method to request attestation
-        const result = await App.contracts.Bridge.methods.requestAttestation(withdrawalId)
-            .send({ from: App.account });
+        // Generate the query ID for the withdrawal
+        const queryId = generateWithdrawalQueryId(withdrawalId);
+
+        // Fetch the withdrawal data to get the correct timestamp
+        const withdrawalData = await this.fetchWithdrawalData(queryId);
+        if (!withdrawalData || !withdrawalData.timestamp) {
+            throw new Error('Could not find withdrawal data in oracle. The withdrawal may not be ready for attestation yet.');
+        }
+
+        // Use the timestamp from the oracle data
+        const timestamp = withdrawalData.timestamp;
+
+        // Get the Layer account from Keplr
+        const offlineSigner = window.getOfflineSigner('layertest-4');
+        const accounts = await offlineSigner.getAccounts();
+        const layerAccount = accounts[0].address;
+
+        // Create and send the attestation request
+        const result = await window.cosmjs.stargate.requestAttestations(
+            layerAccount,
+            queryId,
+            timestamp
+        );
 
         App.hidePendingPopup();
         
-        if (result.status) {
+        if (result && result.code === 0) {
             App.showSuccessPopup("Attestation requested successfully!");
             // Refresh the withdrawal history
             await this.updateWithdrawalHistory();
         } else {
-            throw new Error("Transaction failed");
+            throw new Error(result?.rawLog || "Transaction failed");
         }
     } catch (error) {
         console.error('Error requesting attestation:', error);
         App.hidePendingPopup();
-        alert(error.message || "Error requesting attestation. Please try again.");
+        App.showErrorPopup(error.message || "Error requesting attestation. Please try again.");
         
         // Re-enable the button if there was an error
         const button = document.querySelector(`button[onclick="App.requestAttestation(${withdrawalId})"]`);
@@ -1580,6 +1603,39 @@ const App = {
             button.textContent = 'Request Attestation';
         }
     }
+  },
+
+  showErrorPopup: function(message) {
+    const popup = document.createElement('div');
+    popup.id = 'errorPopup';
+    popup.style.position = 'fixed';
+    popup.style.top = '50%';
+    popup.style.left = '50%';
+    popup.style.transform = 'translate(-50%, -50%)';
+    popup.style.padding = '50px';
+    popup.style.backgroundColor = '#FFE5E5';
+    popup.style.color = '#D32F2F';
+    popup.style.borderRadius = '10px';
+    popup.style.zIndex = '1000';
+    popup.style.border = '3px solid #D32F2F';
+    popup.style.fontFamily = "'PPNeueMontreal-Book', Arial, sans-serif";
+    popup.style.fontSize = "15px";
+    popup.style.width = '250px';
+    popup.style.textAlign = 'center';
+  
+    const messageSpan = document.createElement('span');
+    messageSpan.textContent = message;
+    popup.appendChild(messageSpan);
+  
+    document.body.appendChild(popup);
+  
+    // Remove the popup after 5 seconds
+    setTimeout(() => {
+      const popup = document.getElementById('errorPopup');
+      if (popup) {
+        popup.remove();
+      }
+    }, 5000);
   },
 };
 

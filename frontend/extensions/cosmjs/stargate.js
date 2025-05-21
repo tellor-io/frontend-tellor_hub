@@ -19,10 +19,10 @@
                         amount: message.amount.amount.toString()
                     }
                 };
-                return window.layerProto.encodeMessage(msg);
+                return window.layerProto.bridge.MsgWithdrawTokens.encode(msg);
             },
             decode: (binary) => {
-                return window.layerProto.decodeMessage(binary);
+                return window.layerProto.bridge.MsgWithdrawTokens.decode(binary);
             }
         }],
         ["/layer.bridge.MsgRequestAttestations", {
@@ -31,12 +31,12 @@
                 const msg = {
                     creator: message.creator,
                     query_id: message.query_id,
-                    timestamp: message.timestamp
+                    timestamp: message.timestamp.toString()
                 };
-                return window.layerProto.encodeMessage(msg);
+                return window.layerProto.bridge.MsgRequestAttestations.encode(msg);
             },
             decode: (binary) => {
-                return window.layerProto.decodeMessage(binary);
+                return window.layerProto.bridge.MsgRequestAttestations.decode(binary);
             }
         }]
     ];
@@ -206,7 +206,7 @@
                         gas: fee.gas
                     },
                     msgs: messages.map(msg => {
-                        // If this is a withdrawal message, remove '0x' prefix from recipient
+                        // Only modify recipient for withdrawal messages
                         if (msg.typeUrl === '/layer.bridge.MsgWithdrawTokens' && msg.value.recipient) {
                             return {
                                 type: msg.typeUrl,
@@ -216,6 +216,7 @@
                                 }
                             };
                         }
+                        // For attestation requests, just pass through the message as is
                         return {
                             type: msg.typeUrl,
                             value: msg.value
@@ -236,21 +237,35 @@
                 this.publicKey = signResult.signature.pub_key.value;
                 this.sequence = accountInfo.sequence;
 
-                // Create a fresh message with the recipient address without '0x' prefix
-                const messageToEncode = {
-                    ...messages[0],
-                    value: {
-                        ...messages[0].value,
-                        recipient: messages[0].value.recipient.toLowerCase().replace('0x', '')
+                // Create a fresh message based on type
+                const messageToEncode = messages[0].typeUrl === '/layer.bridge.MsgWithdrawTokens' 
+                    ? {
+                        ...messages[0],
+                        value: {
+                            ...messages[0].value,
+                            recipient: messages[0].value.recipient.toLowerCase().replace('0x', '')
+                        }
                     }
-                };
+                    : {
+                        ...messages[0],
+                        value: {
+                            creator: messages[0].value.creator,
+                            query_id: messages[0].value.query_id,
+                            timestamp: messages[0].value.timestamp.toString()
+                        }
+                    };
 
-                // Encode the message
-                const encodedMessage = window.layerProto.encodeMessage(messageToEncode.value);
+                // Encode the message using the appropriate encoder
+                console.log('Encoding message:', messageToEncode.value);
+                const encoder = this.registry.get(messageToEncode.typeUrl);
+                if (!encoder) {
+                    throw new Error(`No encoder found for message type: ${messageToEncode.typeUrl}`);
+                }
+                const encodedMessage = encoder.encode(messageToEncode.value);
                 console.log('Encoded message:', encodedMessage);
 
                 // Broadcast the transaction
-                const result = await this.broadcastTransaction(encodedMessage);
+                const result = await this.broadcastTransaction(encodedMessage, messages[0]);
                 console.log('Broadcast result:', result);
 
                 return result;
@@ -261,9 +276,10 @@
         }
 
         // Helper method to handle transaction broadcasting
-        async broadcastTransaction(txBytes, mode = "BROADCAST_MODE_SYNC") {
+        async broadcastTransaction(txBytes, originalMessage, mode = "BROADCAST_MODE_SYNC") {
             console.log('Broadcasting transaction...');
             console.log('Transaction bytes:', txBytes);
+            console.log('Original message:', originalMessage);
 
             // Create protobuf types
             const root = new protobuf.Root();
@@ -358,7 +374,7 @@
 
                 // Create the message Any
                 const messageAny = {
-                    typeUrl: "/layer.bridge.MsgWithdrawTokens",
+                    typeUrl: originalMessage.typeUrl,
                     value: txBytes
                 };
                 console.log('Creating message Any:', messageAny);
@@ -366,7 +382,9 @@
                 // Create the TxBody with the message
                 const txBody = {
                     messages: [messageAny],
-                    memo: "Withdraw TRB to Ethereum",
+                    memo: originalMessage.typeUrl === '/layer.bridge.MsgWithdrawTokens' 
+                        ? "Withdraw TRB to Ethereum"
+                        : "Request attestations for withdrawal",
                     timeoutHeight: 0
                 };
                 console.log('Creating TxBody:', txBody);
@@ -688,22 +706,18 @@
             );
             console.log('Connected to signing client');
 
-            // Create the message
+            // Create the message using the same pattern as withdrawal
             const msg = {
                 typeUrl: '/layer.bridge.MsgRequestAttestations',
                 value: {
                     creator: account,
                     query_id: queryId,
-                    timestamp: timestamp
+                    timestamp: timestamp.toString() // Ensure timestamp is a string
                 }
             };
             console.log('Created message:', msg);
 
-            // Show pending popup
-            showPendingPopup();
-            console.log('Showing pending popup');
-
-            // Sign and broadcast the transaction
+            // Sign and broadcast using the same pattern as withdrawal
             console.log('Attempting to sign and broadcast transaction...');
             const result = await client.signAndBroadcast(
                 account,
@@ -716,31 +730,9 @@
             );
 
             console.log('Transaction result:', result);
-            hidePendingPopup();
-            showSuccessPopup();
             return result;
         } catch (error) {
             console.error('Transaction error:', error);
-            hidePendingPopup();
-            showErrorPopup(error.message);
-            throw error;
-        }
-    }
-
-    async function getWithdrawReport(queryId) {
-        try {
-            console.log('Fetching withdraw report for queryId:', queryId);
-            const response = await fetch(`https://api.tellor.io/tellor-io/layer/oracle/get_current_aggregate_report/${queryId}`);
-            
-            if (!response.ok) {
-                throw new Error(`Failed to fetch withdraw report: ${response.status}`);
-            }
-
-            const data = await response.json();
-            console.log('Withdraw report data:', data);
-            return data;
-        } catch (error) {
-            console.error('Error fetching withdraw report:', error);
             throw error;
         }
     }
@@ -748,7 +740,6 @@
     // Export to both module and global scope
     exports.SigningStargateClient = SigningStargateClient;
     exports.requestAttestations = requestAttestations;
-    exports.getWithdrawReport = getWithdrawReport;
 
     // Ensure cosmjs object exists
     window.cosmjs = window.cosmjs || {};
@@ -757,10 +748,8 @@
     // Export to both locations
     window.cosmjs.stargate.SigningStargateClient = SigningStargateClient;
     window.cosmjs.stargate.requestAttestations = requestAttestations;
-    window.cosmjs.stargate.getWithdrawReport = getWithdrawReport;
     window.cosmjsStargate = {
         SigningStargateClient: SigningStargateClient,
-        requestAttestations: requestAttestations,
-        getWithdrawReport: getWithdrawReport
+        requestAttestations: requestAttestations
     };
 }))); 
