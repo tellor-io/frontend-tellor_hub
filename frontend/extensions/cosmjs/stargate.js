@@ -641,7 +641,7 @@
             console.log('Got offline signer');
 
             const client = await SigningStargateClient.connectWithSigner(
-                'https://node-palmito.tellorlayer.com',
+                'https://node-palmito.tellorlayer.com/rpc',
                 offlineSigner
             );
             console.log('Connected to signing client');
@@ -701,7 +701,7 @@
             console.log('Got offline signer');
 
             const client = await SigningStargateClient.connectWithSigner(
-                'https://node-palmito.tellorlayer.com',
+                'https://node-palmito.tellorlayer.com/rpc',
                 offlineSigner
             );
             console.log('Connected to signing client');

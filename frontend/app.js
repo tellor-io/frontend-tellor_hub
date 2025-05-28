@@ -1,4 +1,4 @@
-import { ethers } from '../node_modules/ethers/dist/ethers.esm.min.js';
+import { ethers } from 'https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.esm.min.js';
 import { 
     generateWithdrawalQueryId, 
     generateDepositQueryId,
@@ -246,9 +246,13 @@ const App = {
           const chainId = await App.web3.eth.getChainId();
           App.chainId = chainId;
           
-          if (!SUPPORTED_CHAIN_IDS[chainId]) {
-            App.showNetworkAlert();
-            throw new Error(`Unsupported network: ${chainId}`);
+          // Validate chain ID with more descriptive error
+          try {
+              validateChainId(chainId);
+          } catch (error) {
+              console.error('Chain validation error:', error);
+              alert('Please connect to Sepolia (chain ID: 11155111). Mainnet support coming soon.');
+              throw error;
           }
           
           // Initialize contracts
@@ -284,7 +288,10 @@ const App = {
           if (error.code === 4001) {
             alert('Please connect to MetaMask to continue.');
           } else if (error.message.includes("Unsupported network")) {
-            alert('Please connect to a supported network (Sepolia, Arbitrum Goerli, etc.).');
+            const supportedNetworks = Object.entries(SUPPORTED_CHAIN_IDS)
+                .map(([id, name]) => `${name} (${id})`)
+                .join(' or ');
+            alert(`Please connect to one of the supported networks: ${supportedNetworks}`);
           } else if (error.message.includes("Failed to initialize contracts")) {
             alert('Error initializing contracts. Please try again or contact support.');
     } else {
@@ -400,7 +407,7 @@ const App = {
   },
 
   showNetworkAlert: function() {
-    alert("Please connect to the Sepolia network. Mainnet coming soon.");
+    alert("Please connect to Sepolia (chain ID: 11155111). Mainnet support coming soon.");
   },
 
   handleError: function(error) {
@@ -410,11 +417,24 @@ const App = {
 
   initBridgeContract: async function () {
     try {
+        console.log('Initializing bridge contract...', {
+            isKeplrConnected: App.isKeplrConnected,
+            web3Provider: !!App.web3Provider,
+            web3: !!App.web3,
+            chainId: App.chainId
+        });
+
         // Skip contract initialization for Keplr
         if (App.isKeplrConnected) {
+            console.log('Skipping bridge contract initialization for Keplr');
             return true;
         }
 
+        if (!App.web3 || !App.web3Provider) {
+            throw new Error('Web3 not properly initialized');
+        }
+
+        console.log('Fetching bridge contract ABI...');
         const response = await fetch("./abis/TokenBridge.json");
         if (!response.ok) {
             throw new Error(`Failed to load ABI: ${response.statusText}`);
@@ -427,6 +447,7 @@ const App = {
             throw new Error("Invalid ABI format");
         }
 
+        console.log('Creating bridge contract instance...');
         App.contracts.Bridge = new App.web3.eth.Contract(abi);
         
         const contractAddresses = {
@@ -449,10 +470,17 @@ const App = {
             throw new Error(`No contract address for chainId: ${App.chainId}`);
         }
 
+        console.log('Setting bridge contract address:', address);
         App.contracts.Bridge.options.address = address;
+        console.log('Bridge contract initialized successfully');
         return true;
     } catch (error) {
         console.error("Bridge contract initialization error:", error);
+        console.error("Error details:", {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+        });
         throw error;
     }
   },
@@ -1203,14 +1231,30 @@ const App = {
   // Function to fetch withdrawal history
   getWithdrawalHistory: async function() {
     try {
-        const address = App.keplrAddress;
-        if (!address) {
-            console.log('No Keplr address available, skipping withdrawal history');
+        let address;
+        let isEvmWallet = false;
+
+        if (App.isKeplrConnected) {
+            address = App.keplrAddress;
+            console.log('Getting withdrawal history for Keplr address:', address);
+        } else if (App.isConnected && App.account) {
+            address = App.account;
+            isEvmWallet = true;
+            console.log('Getting withdrawal history for EVM address:', address);
+        } else {
+            console.log('No wallet connected, skipping withdrawal history');
             return [];
         }
 
-        console.log('Getting withdrawal history for address:', address);
-        
+        if (!address) {
+            console.log('No address available, skipping withdrawal history');
+            return [];
+        }
+
+        // Clean the connected address
+        const cleanAddress = address.toLowerCase().trim();
+        console.log('Cleaned connected address:', cleanAddress);
+
         // Use the correct API endpoint
         const baseEndpoint = 'https://node-palmito.tellorlayer.com';
         
@@ -1245,7 +1289,6 @@ const App = {
         for (let id = 1; id <= lastWithdrawalId; id++) {
             const queryId = generateWithdrawalQueryId(id);
             withdrawalPromises.push(this.fetchWithdrawalData(queryId));
-            // Use the correct endpoint for checking claim status
             claimStatusPromises.push(
                 fetch(`${baseEndpoint}/layer/bridge/is_withdrawal_claimed/${id}`)
                     .then(res => res.ok ? res.json() : { claimed: false })
@@ -1264,38 +1307,44 @@ const App = {
         // Filter and process valid withdrawals
         const withdrawals = withdrawalResults
             .map((withdrawalData, index) => {
-                if (!withdrawalData) {
-                    console.log(`No data found for withdrawal ${index + 1}`);
+                if (!withdrawalData?.parsed) {
+                    console.log(`No parsed data found for withdrawal ${index + 1}`);
                     return null;
                 }
 
                 const id = index + 1;
-                // Clean up recipient address by removing null bytes and any prefix
-                const cleanRecipient = withdrawalData.recipient
-                    .replace(/\0/g, '')  // Remove null bytes
-                    .replace(/^tellor-?/, '')  // Remove tellor prefix if present
-                    .trim();
+                const parsedData = withdrawalData.parsed;
+
+                // Clean up addresses - handle both EVM and Cosmos addresses
+                const cleanRecipient = parsedData.recipient
+                    ? parsedData.recipient.toLowerCase().trim()
+                    : '';
                 
-                // Clean up current address
-                const cleanAddress = address
-                    .replace(/^tellor-?/, '')  // Remove tellor prefix if present
-                    .trim();
+                const cleanSender = parsedData.sender
+                    ? parsedData.sender.toLowerCase().trim()
+                    : '';
 
                 console.log('Processing withdrawal', id, {
-                    recipient: cleanRecipient.toLowerCase(),
-                    address: cleanAddress.toLowerCase(),
-                    matches: cleanRecipient.toLowerCase() === cleanAddress.toLowerCase()
+                    sender: cleanSender,
+                    recipient: cleanRecipient,
+                    address: cleanAddress,
+                    isEvmWallet,
+                    matches: isEvmWallet ? 
+                        cleanSender === cleanAddress :
+                        cleanRecipient === cleanAddress
                 });
 
-                // Use exact match for addresses
-                if (cleanRecipient.toLowerCase() === cleanAddress.toLowerCase()) {
+                // For EVM wallet, match sender address. For Keplr, match recipient address
+                if ((isEvmWallet && cleanSender === cleanAddress) ||
+                    (!isEvmWallet && cleanRecipient === cleanAddress)) {
                     return {
                         id,
-                        sender: withdrawalData.sender,
-                        recipient: cleanRecipient,
-                        amount: withdrawalData.amount,
-                        timestamp: withdrawalData.timestamp,
-                        claimed: claimStatuses[index]?.claimed || false
+                        sender: parsedData.sender,
+                        recipient: parsedData.recipient,
+                        amount: parsedData.amount.toString(),
+                        timestamp: withdrawalData.raw.timestamp,
+                        claimed: claimStatuses[index]?.claimed || false,
+                        type: isEvmWallet ? 'deposit' : 'withdrawal'
                     };
                 }
                 return null;
@@ -1303,7 +1352,7 @@ const App = {
             .filter(withdrawal => withdrawal !== null)
             .sort((a, b) => b.id - a.id); // Sort by ID in descending order
 
-        console.log('Found withdrawals for current address:', withdrawals.length);
+        console.log('Found transactions for current address:', withdrawals.length);
         return withdrawals;
     } catch (error) {
         console.error('Error in getWithdrawalHistory:', error);
@@ -1348,20 +1397,11 @@ const App = {
             return null;
         }
 
-        // Parse the withdrawal data from the aggregate value
-        const withdrawalData = this.parseWithdrawalData(data.aggregate.aggregate_value);
-        console.log('Parsed withdrawal data:', withdrawalData);
-        
-        if (!withdrawalData) {
-            console.log('Failed to parse withdrawal data');
-            return null;
-        }
-
-        // Add the timestamp from the oracle data
-        withdrawalData.timestamp = data.timestamp;
-        console.log('Added timestamp from oracle data:', withdrawalData.timestamp);
-
-        return withdrawalData;
+        // Return both the raw data and the parsed data
+        return {
+            raw: data,
+            parsed: this.parseWithdrawalData(data.aggregate.aggregate_value)
+        };
     } catch (error) {
         console.error('Error in fetchWithdrawalData:', error);
         // Retry on network errors or if we haven't exceeded retry limit
@@ -1413,20 +1453,20 @@ const App = {
   // Function to update withdrawal history UI
   updateWithdrawalHistory: async function() {
     try {
-        const withdrawals = await this.getWithdrawalHistory();
-        console.log('Fetched withdrawals:', withdrawals);
+        const transactions = await this.getWithdrawalHistory();
+        console.log('Fetched transactions:', transactions);
 
         const tableBody = document.querySelector('#withdrawal-history tbody');
         if (!tableBody) {
-            console.error('Withdrawal history table body not found');
+            console.error('Transaction history table body not found');
             return;
         }
 
         // Clear existing content
         tableBody.innerHTML = '';
 
-        if (!withdrawals || withdrawals.length === 0) {
-            console.log('No withdrawals found to display');
+        if (!transactions || transactions.length === 0) {
+            console.log('No transactions found to display');
             tableBody.innerHTML = `
                 <tr>
                     <td colspan="8" class="no-withdrawals">
@@ -1437,63 +1477,89 @@ const App = {
             return;
         }
 
-        // Create and append withdrawal rows
-        for (const withdrawal of withdrawals) {
-            if (!withdrawal || !withdrawal.amount) {
-                console.log('Skipping invalid withdrawal data:', withdrawal);
+        // Create and append transaction rows
+        for (const tx of transactions) {
+            if (!tx || !tx.amount) {
+                console.log('Skipping invalid transaction data:', tx);
                 continue;
             }
 
             try {
-                // Convert amount from wei to TRB (divide by 1e18)
-                const amount = Number(withdrawal.amount) / 1e18;
-                const date = new Date(withdrawal.timestamp).toLocaleString();
+                // Convert amount from micro units to TRB (divide by 1e6)
+                const amount = Number(tx.amount) / 1e6;
+                // Convert timestamp to milliseconds if it's in seconds
+                const timestamp = tx.timestamp * (tx.timestamp < 1e12 ? 1000 : 1);
+                const date = new Date(timestamp).toLocaleString();
+                
+                // Determine transaction type based on addresses and wallet type
+                const isDeposit = tx.type === 'deposit';
+                const txType = isDeposit ? 'deposit' : 'withdrawal';
                 
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td class="type-withdrawal">Withdrawal</td>
-                    <td>${withdrawal.id}</td>
-                    <td class="address-cell" title="${withdrawal.sender}">${this.formatAddress(withdrawal.sender)}</td>
-                    <td class="address-cell" title="${withdrawal.recipient}">${this.formatAddress(withdrawal.recipient)}</td>
-                    <td class="amount-column">${amount.toFixed(6)} TRB</td>
+                    <td class="type-${txType}">${txType === 'deposit' ? 'Deposit' : 'Withdrawal'}</td>
+                    <td>${tx.id}</td>
+                    <td class="address-cell" title="${tx.sender}">${this.formatAddress(tx.sender)}</td>
+                    <td class="address-cell" title="${tx.recipient}">${this.formatAddress(tx.recipient)}</td>
+                    <td class="amount-column">${amount.toFixed(2)} TRB</td>
                     <td>${date}</td>
-                    <td class="status-${withdrawal.claimed}">${withdrawal.claimed ? 'Claimed' : 'Pending'}</td>
+                    <td class="status-${tx.claimed}">${tx.claimed ? 'Claimed' : 'Pending'}</td>
                     <td>
-                        ${!withdrawal.claimed ? 
-                            `<button class="attest-button" onclick="App.requestAttestation(${withdrawal.id})" 
-                                style="background-color: #003734; color: #eefffb; border: none; padding: 5px 10px; 
-                                border-radius: 4px; cursor: pointer; font-family: 'PPNeueMontreal-Book', Arial, sans-serif;">
-                                Request Attestation
-                            </button>` 
+                        ${!tx.claimed ? 
+                            txType === 'withdrawal' ? 
+                                `<button class="attest-button" onclick="App.requestAttestation(${tx.id})" 
+                                    style="background-color: #003734; color: #eefffb; border: none; padding: 5px 10px; 
+                                    border-radius: 4px; cursor: pointer; font-family: 'PPNeueMontreal-Book', Arial, sans-serif;">
+                                    Request Attestation
+                                </button>
+                                <button class="claim-button" onclick="App.claimWithdrawal(${tx.id})" 
+                                    style="background-color: #38a169; color: #eefffb; border: none; padding: 5px 10px; 
+                                    border-radius: 4px; cursor: pointer; font-family: 'PPNeueMontreal-Book', Arial, sans-serif; margin-left: 5px;">
+                                    Claim Withdrawal
+                                </button>` 
+                                : 
+                                `<button class="claim-button" onclick="App.claimWithdrawal(${tx.id})" 
+                                    style="background-color: #38a169; color: #eefffb; border: none; padding: 5px 10px; 
+                                    border-radius: 4px; cursor: pointer; font-family: 'PPNeueMontreal-Book', Arial, sans-serif;">
+                                    Claim Deposit
+                                </button>`
                             : ''}
                     </td>
                 `;
                 tableBody.appendChild(row);
             } catch (error) {
-                console.error('Error formatting withdrawal:', withdrawal, error);
+                console.error('Error formatting transaction:', tx, error);
             }
         }
 
-        // Add styles for the attestation button
+        // Add styles for the buttons and transaction types
         const style = document.createElement('style');
         style.textContent = `
-            .attest-button:hover {
-                background-color: #002220 !important;
+            .attest-button:hover, .claim-button:hover {
+                opacity: 0.9;
             }
-            .attest-button:disabled {
+            .attest-button:disabled, .claim-button:disabled {
                 background-color: #cccccc !important;
                 cursor: not-allowed;
+            }
+            .type-deposit {
+                color: #3182ce;
+                font-weight: 500;
+            }
+            .type-withdrawal {
+                color: #38a169;
+                font-weight: 500;
             }
         `;
         document.head.appendChild(style);
     } catch (error) {
-        console.error('Error updating withdrawal history:', error);
+        console.error('Error updating transaction history:', error);
         const tableBody = document.querySelector('#withdrawal-history tbody');
         if (tableBody) {
             tableBody.innerHTML = `
                 <tr>
                     <td colspan="8" class="error-message">
-                        Error loading withdrawal history. Please try again later.
+                        Error loading transaction history. Please try again later.
                         <small>${error.message}</small>
                     </td>
                 </tr>
@@ -1562,20 +1628,33 @@ const App = {
         const queryId = generateWithdrawalQueryId(withdrawalId);
 
         // Fetch the withdrawal data to get the correct timestamp
-        const withdrawalData = await this.fetchWithdrawalData(queryId);
-        if (!withdrawalData || !withdrawalData.timestamp) {
+        const response = await fetch(`https://node-palmito.tellorlayer.com/tellor-io/layer/oracle/get_current_aggregate_report/${queryId}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch withdrawal data from oracle');
+        }
+
+        const data = await response.json();
+        console.log('Oracle response for attestation:', data);
+
+        if (!data || !data.timestamp) {
             throw new Error('Could not find withdrawal data in oracle. The withdrawal may not be ready for attestation yet.');
         }
 
-        // Use the timestamp from the oracle data
-        const timestamp = withdrawalData.timestamp;
+        // Use the timestamp from the oracle response
+        const timestamp = data.timestamp;
 
         // Get the Layer account from Keplr
-        const offlineSigner = window.getOfflineSigner('layertest-4');
+        const offlineSigner = window.keplr.getOfflineSigner('layertest-4');
         const accounts = await offlineSigner.getAccounts();
         const layerAccount = accounts[0].address;
 
-        // Create and send the attestation request
+        console.log('Requesting attestation with params:', {
+            layerAccount,
+            queryId,
+            timestamp
+        });
+
+        // Create and send the attestation request using the simpler approach
         const result = await window.cosmjs.stargate.requestAttestations(
             layerAccount,
             queryId,
@@ -1605,6 +1684,546 @@ const App = {
     }
   },
 
+  // Add validation helper functions
+  validateWithdrawalData: async function(withdrawalId, attestData, valset, sigs) {
+        try {
+            console.log('Starting withdrawal validation with data:', {
+                withdrawalId,
+                attestData,
+                valsetLength: valset.length,
+                sigsLength: sigs.length,
+                currentTime: Math.floor(Date.now() / 1000),
+                withdrawalTime: parseInt(attestData.report.timestamp) / 1000
+            });
+
+            // Validate validator set
+            if (!valset || !Array.isArray(valset)) {
+                throw new Error('Invalid validator set: must be an array');
+            }
+
+            // Check each validator
+            for (let i = 0; i < valset.length; i++) {
+                const validator = valset[i];
+                console.log(`Validating validator ${i}:`, validator);
+                
+                // Check if validator has required fields
+                if (!validator.addr || !validator.power) {
+                    console.error('Invalid validator structure:', validator);
+                    throw new Error(`Invalid validator at index ${i}: missing required fields`);
+                }
+
+                // Validate address format
+                try {
+                    ethers.utils.getAddress(validator.addr);
+                } catch (e) {
+                    console.error('Invalid validator address:', validator.addr);
+                    throw new Error(`Invalid validator at index ${i}: invalid address format`);
+                }
+
+                // Validate power is a positive number
+                if (!ethers.BigNumber.from(validator.power).gt(0)) {
+                    console.error('Invalid validator power:', validator.power);
+                    throw new Error(`Invalid validator at index ${i}: power must be positive`);
+                }
+            }
+
+            // Validate signatures
+            if (!sigs || !Array.isArray(sigs)) {
+                throw new Error('Invalid signatures: must be an array');
+            }
+
+            // Check each signature
+            for (let i = 0; i < sigs.length; i++) {
+                const sig = sigs[i];
+                console.log(`Validating signature ${i}:`, {
+                    v: sig.v,
+                    r: typeof sig.r === 'string' ? sig.r.slice(0, 10) + '...' : '0x' + sig.r.slice(0, 10).toString('hex') + '...',
+                    s: typeof sig.s === 'string' ? sig.s.slice(0, 10) + '...' : '0x' + sig.s.slice(0, 10).toString('hex') + '...'
+                });
+
+                // For blank attestations, v should be 0 and r/s should be zero bytes
+                if (sig.v === 0) {
+                    const zeroBytes = '0x0000000000000000000000000000000000000000000000000000000000000000';
+                    const rHex = typeof sig.r === 'string' ? sig.r : '0x' + sig.r.toString('hex');
+                    const sHex = typeof sig.s === 'string' ? sig.s : '0x' + sig.s.toString('hex');
+                    
+                    if (rHex !== zeroBytes || sHex !== zeroBytes) {
+                        throw new Error(`Invalid signature at index ${i}: zero signature must have zero r and s`);
+                    }
+                } else if (sig.v !== 27 && sig.v !== 28) {
+                    throw new Error(`Invalid signature at index ${i}: v must be 0, 27, or 28`);
+                }
+            }
+
+            // Rest of existing validation...
+            // Check bridge state
+            const bridgeState = await App.contracts.Bridge.methods.bridgeState().call();
+            console.log('Bridge state:', bridgeState);
+            if (bridgeState !== '0') { // Assuming 0 is the active state
+                throw new Error(`Bridge is not active. Current state: ${bridgeState}`);
+            }
+
+            console.log('Validation successful');
+        } catch (error) {
+            console.error('Validation error:', error);
+            throw error;
+        }
+    },
+
+  // Modify the claimWithdrawal function to include validation
+  claimWithdrawal: async function(withdrawalId, button) {
+    try {
+        if (!App.isConnected) {
+            alert('Please connect your wallet first');
+            return;
+        }
+
+        // Check if withdrawal is already claimed
+        const isClaimed = await App.contracts.Bridge.methods.withdrawClaimed(withdrawalId).call();
+        if (isClaimed) {
+            alert('This withdrawal has already been claimed');
+            return;
+        }
+
+        const button = document.querySelector(`button[onclick="App.claimWithdrawal(${withdrawalId})"]`);
+        if (button) {
+            button.disabled = true;
+            button.textContent = 'Validating...';
+        }
+
+        App.showPendingPopup("Validating withdrawal data...");
+
+        // Fetch withdrawal data
+        const withdrawalData = await this.fetchWithdrawalData(generateWithdrawalQueryId(withdrawalId));
+        if (!withdrawalData) {
+            throw new Error('Could not fetch withdrawal data');
+        }
+
+        // Get the timestamp from the withdrawal data
+        const withdrawalTimestamp = withdrawalData.raw.timestamp;
+        console.log('Withdrawal timestamp:', withdrawalTimestamp);
+
+        // Fetch attestation data with the withdrawal timestamp
+        const attestationData = await this.fetchAttestationData(
+            generateWithdrawalQueryId(withdrawalId),
+            withdrawalTimestamp
+        );
+        if (!attestationData) {
+            throw new Error('Could not fetch attestation data');
+        }
+
+        // Format the data for the contract call
+        const txData = await this.formatWithdrawalData(withdrawalId, withdrawalData, attestationData);
+        
+        // Log detailed contract call data
+        console.log('Detailed contract call data:', {
+            attestData: {
+                queryId: txData.attestData.queryId,
+                report: {
+                    value: txData.attestData.report.value,
+                    timestamp: txData.attestData.report.timestamp.toString(),
+                    aggregatePower: txData.attestData.report.aggregatePower.toString(),
+                    previousTimestamp: txData.attestData.report.previousTimestamp.toString(),
+                    nextTimestamp: txData.attestData.report.nextTimestamp.toString(),
+                    lastConsensusTimestamp: txData.attestData.report.lastConsensusTimestamp.toString()
+                },
+                attestationTimestamp: txData.attestData.attestationTimestamp.toString()
+            },
+            valset: txData.valset.map(v => ({
+                addr: v.addr,
+                power: v.power.toString()
+            })),
+            sigs: txData.sigs.map(s => ({
+                v: s.v,
+                r: s.r,
+                s: s.s,
+                isValid: s.r !== '0x0000000000000000000000000000000000000000000000000000000000000000' || 
+                        s.s !== '0x0000000000000000000000000000000000000000000000000000000000000000'
+            })),
+            depositId: txData.depositId.toString(),
+            sigsLength: txData.sigs.length,
+            valsetLength: txData.valset.length,
+            hasValidSigs: txData.sigs.some(s => s.r !== '0x0000000000000000000000000000000000000000000000000000000000000000' || 
+                                              s.s !== '0x0000000000000000000000000000000000000000000000000000000000000000')
+        });
+
+        // Validate the data before sending to contract
+        await this.validateWithdrawalData(withdrawalId, txData.attestData, txData.valset, txData.sigs);
+
+        // Ensure all parameters are defined before making the contract call
+        if (!txData.attestData || !txData.valset || !txData.sigs || !txData.depositId) {
+            throw new Error('Missing required contract parameters');
+        }
+
+        // Make the contract call
+        const tx = await App.contracts.Bridge.methods.withdrawFromLayer(
+            txData.attestData,
+            txData.valset,
+            txData.sigs,
+            txData.depositId
+        ).send({ from: App.account });
+
+        console.log('Withdrawal claim transaction:', tx);
+        return tx;
+
+    } catch (error) {
+        console.error('Error claiming withdrawal:', error);
+        App.handleError(error);
+        throw error;
+    }
+  },
+
+  // Helper function to fetch attestation data
+  fetchAttestationData: async function(queryId, timestamp) {
+    try {
+        console.log('Fetching attestation data for:', { queryId, timestamp });
+        
+        // Remove 0x prefix for API calls if present
+        const apiQueryId = queryId.startsWith('0x') ? queryId.slice(2) : queryId;
+        const baseEndpoint = 'https://node-palmito.tellorlayer.com';
+        
+        // Step 1: Get snapshots for this report
+        const snapshotsResponse = await fetch(
+            `${baseEndpoint}/layer/bridge/get_snapshots_by_report/${apiQueryId}/${timestamp}`
+        );
+
+        if (!snapshotsResponse.ok) {
+            const errorText = await snapshotsResponse.text();
+            console.error('Snapshots response error:', { status: snapshotsResponse.status, text: errorText });
+            throw new Error(`Failed to fetch snapshots: ${errorText}`);
+        }
+
+        const snapshotsData = await snapshotsResponse.json();
+        console.log('Snapshots data:', snapshotsData);
+        
+        if (!snapshotsData?.snapshots?.length) {
+            throw new Error('Invalid snapshots data: missing snapshots array');
+        }
+
+        const lastSnapshot = snapshotsData.snapshots[snapshotsData.snapshots.length - 1];
+        console.log('Last snapshot:', lastSnapshot);
+
+        // Step 2: Get attestation data using the snapshot
+        const attestationDataResponse = await fetch(
+            `${baseEndpoint}/layer/bridge/get_attestation_data_by_snapshot/${lastSnapshot}`
+        );
+
+        if (!attestationDataResponse.ok) {
+            throw new Error(`Failed to fetch attestation data: ${attestationDataResponse.statusText}`);
+        }
+
+        const rawAttestationData = await attestationDataResponse.json();
+        console.log('Raw attestation data:', rawAttestationData);
+
+        // First get the current validator set timestamp
+        const validatorSetTimestampResponse = await fetch(
+            `${baseEndpoint}/layer/bridge/get_current_validator_set_timestamp`
+        );
+
+        if (!validatorSetTimestampResponse.ok) {
+            throw new Error(`Failed to fetch current validator set timestamp: ${validatorSetTimestampResponse.statusText}`);
+        }
+
+        const validatorSetTimestampData = await validatorSetTimestampResponse.json();
+        const currentValidatorSetTimestamp = validatorSetTimestampData.timestamp;
+        console.log('Current validator set timestamp:', currentValidatorSetTimestamp);
+
+        // Get validator set for the current timestamp
+        const validatorsResponse = await fetch(
+            `${baseEndpoint}/layer/bridge/get_valset_by_timestamp/${currentValidatorSetTimestamp}`
+        );
+
+        if (!validatorsResponse.ok) {
+            const errorText = await validatorsResponse.text();
+            console.error('Validator response error:', { 
+                status: validatorsResponse.status, 
+                text: errorText,
+                currentTimestamp: currentValidatorSetTimestamp,
+                reportTimestamp: rawAttestationData.timestamp,
+                attestationTimestamp: rawAttestationData.attestation_timestamp
+            });
+            throw new Error(`Failed to fetch validator set: ${validatorsResponse.statusText}`);
+        }
+
+        const validatorsData = await validatorsResponse.json();
+        console.log('Raw validator set data:', validatorsData);
+
+        // Log validator addresses for debugging
+        console.log('Validator addresses in set:', validatorsData.bridge_validator_set.map(v => ({
+            address: v.ethereumAddress.toLowerCase(),
+            power: v.power
+        })));
+
+        // Get power threshold for this timestamp
+        const checkpointParamsResponse = await fetch(
+            `${baseEndpoint}/layer/bridge/get_validator_checkpoint_params/${currentValidatorSetTimestamp}`
+        );
+
+        if (!checkpointParamsResponse.ok) {
+            throw new Error(`Failed to fetch checkpoint params: ${checkpointParamsResponse.statusText}`);
+        }
+
+        const checkpointParams = await checkpointParamsResponse.json();
+        const powerThreshold = checkpointParams.power_threshold;
+        console.log('Power threshold:', powerThreshold);
+
+        // Get attestations
+        const attestationsResponse = await fetch(
+            `${baseEndpoint}/layer/bridge/get_attestations_by_snapshot/${lastSnapshot}`
+        );
+
+        if (!attestationsResponse.ok) {
+            throw new Error(`Failed to fetch attestations: ${attestationsResponse.statusText}`);
+        }
+
+        const attestationsResult = await attestationsResponse.json();
+        console.log('Raw signatures data:', attestationsResult);
+
+        // Process attestations
+        const validatorSet = validatorsData.bridge_validator_set;
+        console.log('Processing attestations:', {
+            attestationCount: attestationsResult.attestations.length,
+            validatorCount: validatorSet.length,
+            checkpoint: rawAttestationData.checkpoint,
+            currentValidatorSetTimestamp: currentValidatorSetTimestamp,
+            reportTimestamp: rawAttestationData.timestamp,
+            attestationTimestamp: rawAttestationData.attestation_timestamp
+        });
+
+        // Create a map of validator addresses to their indices
+        const validatorMap = new Map();
+        validatorSet.forEach((validator, index) => {
+            const address = validator.ethereumAddress.toLowerCase();
+            validatorMap.set(address, index);
+            console.log(`Added validator to map: ${address} at index ${index}`);
+        });
+
+        // Process each attestation
+        const signatureMap = new Map();
+        // Ensure checkpoint has 0x prefix before arrayifying
+        const checkpointWithPrefix = rawAttestationData.checkpoint.startsWith('0x') ? 
+            rawAttestationData.checkpoint : 
+            '0x' + rawAttestationData.checkpoint;
+        const messageHash = ethers.utils.sha256(ethers.utils.arrayify(checkpointWithPrefix));
+        console.log('Message hash for signature recovery:', messageHash);
+
+        // Process each attestation
+        for (let i = 0; i < attestationsResult.attestations.length; i++) {
+            const attestation = attestationsResult.attestations[i];
+            if (!attestation || attestation.length === 0) {
+                // Add zero signature for validators who didn't sign
+                signatureMap.set(i, {
+                    v: 0,
+                    r: "0x0000000000000000000000000000000000000000000000000000000000000000",
+                    s: "0x0000000000000000000000000000000000000000000000000000000000000000"
+                });
+                continue;
+            }
+
+            console.log('Processing attestation', i, {
+                r: '0x' + attestation.slice(0, 64),
+                s: '0x' + attestation.slice(64, 128),
+                messageHash: messageHash,
+                validatorAddress: validatorSet[i]?.ethereumAddress.toLowerCase() || 'unknown'
+            });
+
+            // Try both v values (27 and 28)
+            for (const v of [27, 28]) {
+                const recoveredAddress = ethers.utils.recoverAddress(
+                    messageHash,
+                    ethers.utils.joinSignature({
+                        r: '0x' + attestation.slice(0, 64),
+                        s: '0x' + attestation.slice(64, 128),
+                        v: v
+                    })
+                ).toLowerCase();
+
+                console.log('Recovered address for v=' + v + ':', {
+                    recoveredAddress: recoveredAddress,
+                    attestationIndex: i,
+                    expectedValidator: validatorSet[i]?.ethereumAddress.toLowerCase() || 'unknown',
+                    isInValidatorMap: validatorMap.has(recoveredAddress)
+                });
+
+                const validatorIndex = validatorMap.get(recoveredAddress);
+                if (validatorIndex !== undefined) {
+                    console.log('Found matching validator:', {
+                        recoveredAddress: recoveredAddress,
+                        validatorIndex: validatorIndex,
+                        attestationIndex: i,
+                        validatorAddress: validatorSet[validatorIndex].ethereumAddress.toLowerCase(),
+                        power: validatorSet[validatorIndex].power
+                    });
+                    signatureMap.set(validatorIndex, {
+                        v: v,
+                        r: '0x' + attestation.slice(0, 64),
+                        s: '0x' + attestation.slice(64, 128)
+                    });
+                    break;
+                } else {
+                    console.log('No matching validator found for address:', {
+                        recoveredAddress: recoveredAddress,
+                        attestationIndex: i,
+                        expectedValidator: validatorSet[i]?.ethereumAddress.toLowerCase() || 'unknown',
+                        validatorMapKeys: Array.from(validatorMap.keys())
+                    });
+                }
+            }
+        }
+
+        console.log('Signature map after processing:', {
+            size: signatureMap.size,
+            keys: Array.from(signatureMap.keys())
+        });
+
+        // Convert signature map to array
+        const signatures = Array(validatorSet.length).fill(null).map((_, i) => {
+            const sig = signatureMap.get(i);
+            if (!sig) {
+                return {
+                    v: 0,
+                    r: "0x0000000000000000000000000000000000000000000000000000000000000000",
+                    s: "0x0000000000000000000000000000000000000000000000000000000000000000"
+                };
+            }
+            return sig;
+        });
+
+        // Process attestations using deriveSignatures with lastSnapshot as checkpoint
+        const derivedSignatures = this.deriveSignatures(
+            attestationsResult.attestations,
+            validatorSet,
+            lastSnapshot  // Use lastSnapshot instead of rawAttestationData.checkpoint
+        );
+
+        // Format the attestation data according to the contract's expected structure
+        const formattedAttestationData = {
+            queryId: ethers.utils.arrayify(this.ensureHexPrefix(rawAttestationData.query_id)),
+            report: {
+                value: ethers.utils.arrayify(this.ensureHexPrefix(rawAttestationData.aggregate_value)),
+                timestamp: parseInt(rawAttestationData.timestamp),
+                aggregatePower: parseInt(rawAttestationData.aggregate_power),
+                previousTimestamp: parseInt(rawAttestationData.previous_report_timestamp),
+                nextTimestamp: parseInt(rawAttestationData.next_report_timestamp),
+                lastConsensusTimestamp: parseInt(rawAttestationData.last_consensus_timestamp)
+            },
+            attestationTimestamp: parseInt(rawAttestationData.attestation_timestamp)
+        };
+
+        // Format the validator set according to the contract's expected structure
+        const formattedValidatorSet = validatorSet.map(validator => ({
+            addr: validator.ethereumAddress,
+            power: parseInt(validator.power)
+        }));
+
+        return {
+            attestationData: formattedAttestationData,
+            validatorSet: formattedValidatorSet,
+            signatures: derivedSignatures,
+            powerThreshold: powerThreshold,
+            checkpoint: rawAttestationData.checkpoint,
+            rawAttestationData: rawAttestationData  // Include raw data for debugging
+        };
+    } catch (error) {
+        console.error('Error in fetchAttestationData:', error);
+        throw error;
+    }
+  },
+
+  deriveSignatures: function(signatures, validatorSet, checkpoint) {
+    console.log("Deriving signatures with:", {
+        signatureCount: signatures.length,
+        validatorCount: validatorSet.length,
+        checkpoint
+    });
+
+    const derivedSignatures = [];
+    // Ensure checkpoint has 0x prefix
+    const checkpointHex = checkpoint.startsWith('0x') ? checkpoint : '0x' + checkpoint;
+    
+    // Get message hash using ethers - this matches Python's sha256(data).digest()
+    const messageHash = ethers.utils.sha256(ethers.utils.arrayify(checkpointHex));
+    console.log('Message hash for signature recovery:', messageHash);
+    
+    const zeroBytes = '0x0000000000000000000000000000000000000000000000000000000000000000';
+    
+    // Create a map of validator addresses to their indices for faster lookup
+    const validatorMap = new Map();
+    validatorSet.forEach((validator, index) => {
+        validatorMap.set(validator.ethereumAddress.toLowerCase(), index);
+    });
+    
+    for (let i = 0; i < signatures.length; i++) {
+        const signature = signatures[i];
+        const validator = validatorSet[i];
+        
+        if (!signature || signature.length === 0) {
+            console.log(`Empty signature at index ${i}, adding zero signature`);
+            derivedSignatures.push({
+                v: 0,
+                r: zeroBytes,
+                s: zeroBytes
+            });
+            continue;
+        }
+
+        if (signature.length !== 128) {
+            console.error(`Invalid signature length at index ${i}:`, signature.length);
+            derivedSignatures.push({
+                v: 0,
+                r: zeroBytes,
+                s: zeroBytes
+            });
+            continue;
+        }
+
+        const r = '0x' + signature.slice(0, 64);
+        const s = '0x' + signature.slice(64, 128);
+        let foundValidSignature = false;
+        
+        // Try both v values (27 and 28)
+        for (const v of [27, 28]) {
+            try {
+                const recoveredAddress = ethers.utils.recoverAddress(
+                    messageHash,
+                    { r, s, v }
+                ).toLowerCase();
+                
+                console.log(`Recovered address for v=${v}:`, {
+                    recoveredAddress,
+                    expectedValidator: validator.ethereumAddress.toLowerCase(),
+                    isMatch: recoveredAddress === validator.ethereumAddress.toLowerCase()
+                });
+
+                if (recoveredAddress === validator.ethereumAddress.toLowerCase()) {
+                    derivedSignatures.push({ v, r, s });
+                    foundValidSignature = true;
+                    break;
+                }
+            } catch (error) {
+                console.error(`Error recovering address for v=${v}:`, error);
+            }
+        }
+
+        if (!foundValidSignature) {
+            console.log(`No valid signature found for validator at index ${i}, adding zero signature`);
+            derivedSignatures.push({
+                v: 0,
+                r: zeroBytes,
+                s: zeroBytes
+            });
+        }
+    }
+    
+    console.log('Derived signatures:', {
+        total: derivedSignatures.length,
+        valid: derivedSignatures.filter(s => s.v !== 0).length,
+        zero: derivedSignatures.filter(s => s.v === 0).length
+    });
+    
+    return derivedSignatures;
+  },
+
   showErrorPopup: function(message) {
     const popup = document.createElement('div');
     popup.id = 'errorPopup';
@@ -1612,15 +2231,15 @@ const App = {
     popup.style.top = '50%';
     popup.style.left = '50%';
     popup.style.transform = 'translate(-50%, -50%)';
-    popup.style.padding = '50px';
-    popup.style.backgroundColor = '#FFE5E5';
-    popup.style.color = '#D32F2F';
+    popup.style.padding = '20px';
+    popup.style.backgroundColor = '#FEE2E2';
+    popup.style.color = '#991B1B';
     popup.style.borderRadius = '10px';
     popup.style.zIndex = '1000';
-    popup.style.border = '3px solid #D32F2F';
+    popup.style.border = '2px solid #DC2626';
     popup.style.fontFamily = "'PPNeueMontreal-Book', Arial, sans-serif";
     popup.style.fontSize = "15px";
-    popup.style.width = '250px';
+    popup.style.width = '300px';
     popup.style.textAlign = 'center';
   
     const messageSpan = document.createElement('span');
@@ -1637,10 +2256,53 @@ const App = {
       }
     }, 5000);
   },
+
+  // Add helper function before formatWithdrawalData
+  ensureHexPrefix: function(value) {
+    if (!value) return value;
+    return value.startsWith('0x') ? value : '0x' + value;
+  },
+
+  formatWithdrawalData: function(withdrawalId, withdrawalData, attestationData) {
+        if (!attestationData) {
+            throw new Error('Missing attestation data');
+        }
+
+        // The attestation data is already formatted in fetchAttestationData
+        const { attestationData: formattedAttestationData, validatorSet, signatures } = attestationData;
+
+        if (!formattedAttestationData || !validatorSet || !signatures) {
+            throw new Error('Invalid attestation data structure');
+        }
+
+        console.log('Formatting withdrawal data with:', {
+            withdrawalId,
+            withdrawalData,
+            attestationData: formattedAttestationData,
+            validatorSet: validatorSet.map(v => ({
+                address: v.addr.toLowerCase(),
+                power: v.power
+            })),
+            signatures: signatures.map(s => ({
+                v: s.v,
+                r: s.r,
+                s: s.s
+            }))
+        });
+
+        return {
+            attestData: formattedAttestationData,
+            valset: validatorSet,
+            sigs: signatures,
+            depositId: withdrawalId
+        };
+    },
 };
 
 // Export App to window object for global access
 window.App = App;
+window.App.claimWithdrawal = App.claimWithdrawal;  // Explicitly expose claimWithdrawal
+window.App.requestAttestation = App.requestAttestation;  // Also explicitly expose requestAttestation
 
 // Export App as default for module usage
 export default App;
@@ -1711,12 +2373,12 @@ async function checkBalance(amount) {
 }
 
 const SUPPORTED_CHAIN_IDS = {
-    11155111: 'Sepolia'
+    11155111: 'Sepolia'  // Only Sepolia is supported for now
 };
 
 function validateChainId(chainId) {
     if (!chainId || !SUPPORTED_CHAIN_IDS[chainId]) {
-        throw new Error(`Unsupported network. Please connect to ${Object.values(SUPPORTED_CHAIN_IDS).join(' or ')}`);
+        throw new Error(`Please connect to Sepolia (chain ID: 11155111). Mainnet support coming soon.`);
     }
     return true;
 }
