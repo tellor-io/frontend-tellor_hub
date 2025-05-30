@@ -986,63 +986,216 @@ const App = {
             account: App.account
         });
 
+        // Get offline signer from Keplr
         const offlineSigner = window.keplr.getOfflineSigner('layertest-4');
         console.log('Got offline signer');
 
-        const signingClient = await window.cosmjs.stargate.SigningStargateClient.connectWithSigner(
-            'https://node-palmito.tellorlayer.com/rpc',
-            offlineSigner
-        );
-        console.log('Connected to signing client');
+        // Get account info first
+        const accountUrl = `https://node-palmito.tellorlayer.com/cosmos/auth/v1beta1/accounts/${App.account}`;
+        const accountResponse = await fetch(accountUrl);
+        const accountData = await accountResponse.json();
+        
+        const accountInfo = {
+            account_number: accountData.account?.account_number || "0",
+            sequence: accountData.account?.sequence || "0"
+        };
 
-        // Create the withdrawal message using proto helper
-        const msg = window.layerProto.createMsgWithdrawTokens(
-            App.account,
-            ethereumAddress,
-            {
+        // Create the message data for signing
+        const msgData = {
+            creator: App.account,
+            recipient: ethereumAddress.toLowerCase().replace('0x', ''), // Remove 0x prefix for chain
+            amount: {
                 denom: "loya",
                 amount: amountInMicroUnits
             }
-        );
-
-        console.log('Created message:', msg);
-
-        // Set transaction fee
-        const fee = {
-            amount: [{ denom: "loya", amount: "5000" }],
-            gas: "200000"
         };
 
+        // Create the transaction to sign
+        const txToSign = {
+            chain_id: 'layertest-4',
+            account_number: accountInfo.account_number,
+            sequence: accountInfo.sequence,
+            fee: {
+                amount: [{ denom: "loya", amount: "5000" }],
+                gas: "200000"
+            },
+            msgs: [{
+                type: "/layer.bridge.MsgWithdrawTokens",
+                value: msgData
+            }],
+            memo: "Withdraw TRB to Ethereum"
+        };
+
+        console.log('Transaction to sign:', txToSign);
+
+        // Sign the transaction
+        const signResult = await offlineSigner.signAmino(App.account, txToSign);
+        console.log('Sign result:', signResult);
+
+        const signature = signResult.signature.signature;
+        const publicKey = signResult.signature.pub_key.value;
+
+        // Create protobuf types for transaction
+        const root = new protobuf.Root();
+        
+        // Define all necessary types
+        const Coin = new protobuf.Type("Coin")
+            .add(new protobuf.Field("denom", 1, "string"))
+            .add(new protobuf.Field("amount", 2, "string"));
+
+        const MsgWithdrawTokens = new protobuf.Type("MsgWithdrawTokens")
+            .add(new protobuf.Field("creator", 1, "string"))
+            .add(new protobuf.Field("recipient", 2, "string"))
+            .add(new protobuf.Field("amount", 3, "Coin"));
+
+        const Any = new protobuf.Type("Any")
+            .add(new protobuf.Field("typeUrl", 1, "string"))
+            .add(new protobuf.Field("value", 2, "bytes"));
+
+        const TxBody = new protobuf.Type("TxBody")
+            .add(new protobuf.Field("messages", 1, "Any", "repeated"))
+            .add(new protobuf.Field("memo", 2, "string"));
+
+        const PubKey = new protobuf.Type("PubKey")
+            .add(new protobuf.Field("key", 1, "bytes"));
+
+        const Single = new protobuf.Type("Single")
+            .add(new protobuf.Field("mode", 1, "uint32"));
+
+        const ModeInfo = new protobuf.Type("ModeInfo")
+            .add(new protobuf.Field("single", 1, "Single"));
+
+        const SignerInfo = new protobuf.Type("SignerInfo")
+            .add(new protobuf.Field("publicKey", 1, "Any"))
+            .add(new protobuf.Field("modeInfo", 2, "ModeInfo"))
+            .add(new protobuf.Field("sequence", 3, "uint64"));
+
+        const Fee = new protobuf.Type("Fee")
+            .add(new protobuf.Field("amount", 1, "Coin", "repeated"))
+            .add(new protobuf.Field("gasLimit", 2, "uint64"));
+
+        const AuthInfo = new protobuf.Type("AuthInfo")
+            .add(new protobuf.Field("signerInfos", 1, "SignerInfo", "repeated"))
+            .add(new protobuf.Field("fee", 2, "Fee"));
+
+        const Tx = new protobuf.Type("Tx")
+            .add(new protobuf.Field("body", 1, "TxBody"))
+            .add(new protobuf.Field("authInfo", 2, "AuthInfo"))
+            .add(new protobuf.Field("signatures", 3, "bytes", "repeated"));
+
+        // Add all types to root
+        root.add(Coin);
+        root.add(MsgWithdrawTokens);
+        root.add(Any);
+        root.add(TxBody);
+        root.add(PubKey);
+        root.add(Single);
+        root.add(ModeInfo);
+        root.add(SignerInfo);
+        root.add(Fee);
+        root.add(AuthInfo);
+        root.add(Tx);
+
+        // Encode the message
+        const MsgType = root.lookupType("MsgWithdrawTokens");
+        const msg = MsgType.create(msgData);
+        const encodedMessage = MsgType.encode(msg).finish();
+
+        // Create the public key Any
+        const pubKeyAny = {
+            typeUrl: "/cosmos.crypto.secp256k1.PubKey",
+            value: PubKey.encode({ key: publicKey }).finish()
+        };
+
+        // Create the message Any
+        const messageAny = {
+            typeUrl: "/layer.bridge.MsgWithdrawTokens",
+            value: encodedMessage
+        };
+
+        // Create the final transaction
+        const tx = {
+            body: {
+                messages: [messageAny],
+                memo: "Withdraw TRB to Ethereum"
+            },
+            authInfo: {
+                signerInfos: [{
+                    publicKey: pubKeyAny,
+                    modeInfo: {
+                        single: {
+                            mode: 127 // SIGN_MODE_LEGACY_AMINO_JSON
+                        }
+                    },
+                    sequence: parseInt(accountInfo.sequence)
+                }],
+                fee: {
+                    amount: [{ denom: "loya", amount: "5000" }],
+                    gasLimit: 200000
+                }
+            },
+            signatures: [signature]
+        };
+
+        console.log('Final transaction:', tx);
+
+        // Encode and broadcast the transaction
+        const txObj = Tx.create(tx);
+        const encodedTx = Tx.encode(txObj).finish();
+        const base64Tx = btoa(String.fromCharCode.apply(null, encodedTx));
+
         App.showPendingPopup("Withdrawal transaction pending...");
-        console.log('Showing pending popup');
 
-        try {
-            console.log('Attempting to sign and broadcast transaction...');
-            // Send the transaction
-            const result = await signingClient.signAndBroadcast(
-                App.account,
-                [msg],
-                fee,
-                "Withdraw TRB to Ethereum"
-            );
+        // Broadcast the transaction
+        const response = await fetch('https://node-palmito.tellorlayer.com/cosmos/tx/v1beta1/txs', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                tx_bytes: base64Tx,
+                mode: "BROADCAST_MODE_SYNC"
+            })
+        });
 
-            console.log('Transaction result:', result);
+        const result = await response.json();
+        console.log('Transaction result:', result);
 
-            if (result.code === 0) {
-                App.hidePendingPopup();
-                App.showSuccessPopup("Withdrawal successful! You will need to wait 12 hours before you can claim your tokens on Ethereum.");
-                await App.updateKeplrBalance();
-            } else {
-                const errorMsg = result.rawLog || 'Transaction failed';
-                console.error('Transaction failed:', errorMsg);
-                App.hidePendingPopup();
-                throw new Error(errorMsg);
-            }
-        } catch (error) {
-            console.error('Transaction error:', error);
-            App.hidePendingPopup();
-            throw error;
+        if (result.tx_response?.code !== 0) {
+            throw new Error(result.tx_response?.raw_log || 'Transaction failed');
         }
+
+        // Poll for transaction status
+        const txHash = result.tx_response.txhash;
+        let attempts = 0;
+        const maxAttempts = 10;
+        const pollInterval = 2000;
+
+        while (attempts < maxAttempts) {
+            attempts++;
+            const statusResponse = await fetch(`https://node-palmito.tellorlayer.com/cosmos/tx/v1beta1/txs/${txHash}`);
+            const statusData = await statusResponse.json();
+            
+            if (statusResponse.ok && statusData.tx_response) {
+                const txResponse = statusData.tx_response;
+                if (txResponse.height !== "0") {
+                    if (txResponse.code === 0) {
+                        App.hidePendingPopup();
+                        App.showSuccessPopup("Withdrawal successful! You will need to wait 12 hours before you can claim your tokens on Ethereum.");
+                        await App.updateKeplrBalance();
+                        return txResponse;
+                    } else {
+                        throw new Error(txResponse.raw_log || 'Transaction failed');
+                    }
+                }
+            }
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
+        }
+
+        // If we get here, the transaction hasn't been included in a block
+        App.hidePendingPopup();
+        return result.tx_response;
+
     } catch (error) {
         App.hidePendingPopup();
         console.error("Error in withdrawal:", error);
@@ -1054,6 +1207,7 @@ const App = {
         alert(error.message || "Error in withdrawal. Please try again.");
     }
   },
+
 
   // Add withdrawal history functions
   addWithdrawalHistory: async function() {
