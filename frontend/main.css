@@ -104,21 +104,23 @@ p {
     color: #131e20; 
 }
 .box-wrapper {
-    margin-top: 10px;
-    border: 2px solid #7FAFB1;
-    border-radius: 24px;
-    padding: 20px;
-    max-width: 400px;
-    width: 100%;
-    margin: 5px auto;
-    background-color: #EFFEFC;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     display: flex;
-    flex-direction: column;
-    align-items: center; /* Center children horizontally */
+    flex-direction: row;
+    gap: 40px;
     padding: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
     position: relative;
-    gap: 5px; /* Uniform 5px gap */
+    overflow: visible;
+    transition: all 0.3s ease-in-out;
+    justify-content: center;
+    align-items: stretch;
+}
+
+/* Update direction classes to maintain centering */
+.box-wrapper.layer-direction,
+.box-wrapper.ethereum-direction {
+    justify-content: center;
 }
 
 .box {
@@ -173,23 +175,75 @@ a {
     background-color: #003734;
     font-family: 'PPNeueMontreal-Book', monospace;  
     color: #eefffb;
-    padding: 10px 50px;
+    padding: 10px 20px;
     border: none;
-    font-size: 20px;
+    font-size: 16px;
     border-radius: 24px;
     cursor: pointer;
     text-align: center;
-    width: 300px; /* Make the button span the full width of its container */
-    margin-top: 5px; /* Change from 20px to 12px */
-    display: block; /* Changed from inline to block */
-    margin-left: auto; /* Center horizontally */
-    margin-right: auto; /* Center horizontally */
-    transition: background-color 0.3s ease; /* Add smooth transition */
+    transition: background-color 0.3s ease;
 }
 
-.button-style-2:hover {
-    background-color: #049159; /* Darker shade for hover effect */
-    color: #88FFEC
+/* Wallet connection container styles */
+.wallet-connection-container .button-style-2 {
+    width: auto;
+    min-width: 140px; /* Increased from 120px */
+    max-width: 180px; /* Increased from 160px */
+    font-size: 12px; /* Reduced from 16px */
+    padding: 8px 6px;
+    flex: 1;
+    white-space: normal;
+    line-height: 1.2;
+    height: auto;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+}
+
+.wallet-connection-container .button-style-2 .truncated-address {
+    font-size: 11px; /* Reduced from 14px */
+    display: block;
+    margin-top: 2px;
+}
+
+.wallet-connection-container .button-style-2:hover {
+    background-color: #049159;
+    color: #88FFEC;
+}
+
+.wallet-connection-container .button-style-2:disabled {
+    background-color: #cccccc;
+    color: #666666;
+    cursor: not-allowed;
+}
+
+/* Remove the conflicting media query */
+@media (max-width: 400px) {
+    .box-wrapper {
+        padding: 20px;
+        width: 90%;
+        max-width: 350px;
+        margin-left: -5px;
+    }
+
+    .box {
+        padding: 10px;
+        width: 100%;
+        margin-top: 0;
+    }
+
+    /* Update wallet button styles for mobile */
+    .wallet-connection-container .button-style-2 {
+        font-size: 11px; /* Reduced from 15px */
+        padding: 6px 4px;
+        min-width: 120px; /* Increased from 100px */
+    }
+    
+    .wallet-connection-container .button-style-2 .truncated-address {
+        font-size: 10px; /* Reduced from 13px */
+    }
 }
 
 .button-style-3 {
@@ -354,8 +408,21 @@ input:not(:placeholder-shown) {
 }
 
 .input-address {
-    font-size: 11.5px !important; /* Adjust this value as needed */
-  }
+    font-size: 20px !important;
+    padding: 10px !important;
+    width: 400px !important;
+    color: #008D8B !important;
+    border: 1px solid #7FAFB1 !important;
+    border-radius: 12px !important;
+    background-color: #f0f0f0 !important;
+    height: 43px !important;
+    box-sizing: border-box !important;
+    margin-top: 12px !important;
+}
+
+.input-address:not(:placeholder-shown) {
+    color: #008D8B !important;
+}
 
 .deposit-limit {
     font-size: 12px;
@@ -436,23 +503,38 @@ input:not(:placeholder-shown) {
 }
 
 .main-content {
-    width: 100%;
+    flex: 0 0 420px;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    padding-top: 40px; /* Add space for the Connect Wallet button */
+    transition: all 0.3s ease-in-out;
+    height: 600px;
+    box-sizing: border-box;
+    gap: 20px;
+}
+
+.main-content a {
+    padding: 10px 0;
+}
+
+/* Remove the transform-based positioning */
+.ethereum-direction .main-content {
+    transform: none;
 }
 
 #connectButton {
     background-color: #08D482;
     font-family: 'PPNeueMontreal-Book', monospace;  
     color: #191B24;
-    padding: 10px 20px;
+    padding: 6px 8px;
     border: none;
-    font-size: 16px;
+    font-size: 12px;
     border-radius: 24px;
     cursor: pointer;
     transition: background-color 0.3s ease;
+    white-space: nowrap;
+    min-width: 90px;
+    flex: 1;
+    max-width: 140px;
 }
 
 #connectButton:hover {
@@ -462,9 +544,20 @@ input:not(:placeholder-shown) {
 
 #walletAddress {
     font-family: 'PPNeueMontreal-Book', monospace;
-    font-size: 14px;
+    font-size: 10px;
     color: #131e20;
-    margin-top: 10px;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+    flex: 1;
+    text-align: center;
+    padding: 6px 3px;
+    background-color: #f0f0f0;
+    border: 1px solid #7FAFB1;
+    border-radius: 24px;
+    line-height: 1.2;
 }
 
 input {
@@ -501,11 +594,14 @@ input {
     font-family: 'PPNeueMontreal-Bold', Arial, sans-serif;
     font-size: 12px;
     color: #131e20;
-    margin: 2px 0; /* Reduced vertical spacing between the two lines */
+    margin: 2px 0;
+    text-align: center;
+    width: 100%;
 }
 
 .info-text span {
-    font-family: 'PPNeueMontreal-Book', Arial, sans-serif;}
+    font-family: 'PPNeueMontreal-Book', Arial, sans-serif;
+}
 
 .input-fields {
     margin-bottom: 10px; /* Reduced spacing between input fields */
@@ -592,7 +688,7 @@ input {
     font-family: 'PPNeueMontreal-Book', monospace;
     font-size: clamp(10px, 3vw, 16px);
     margin: 0;
-    padding: 0 20px 15px;
+    padding: 0 20px 1px;
     background-color: transparent;
     z-index: 1000;
 }
@@ -607,13 +703,14 @@ input {
   flex-direction: column;
   gap: 10px;
   justify-content: center;
-  margin: 20px 0;
+  align-items: center;
+  margin: 20px auto;
   width: 100%;
   max-width: 300px;
 }
 
 .bridge-direction button {
-  width: 100%;
+  width: 300px;
   padding: 10px 20px;
   border: none;
   border-radius: 24px;
@@ -621,6 +718,7 @@ input {
   font-size: 20px;
   cursor: pointer;
   transition: background-color 0.3s;
+  margin: 0 auto;
 }
 
 #approveButton {
@@ -656,18 +754,14 @@ input {
 }
 
 .withdrawal-history-container {
-    margin-top: 2rem;
+    margin-top: 0;
     padding: 1rem;
     background: #EFFEFC;
     border: 2px solid #7FAFB1;
     border-radius: 24px;
     width: 100%;
-    max-width: 400px;
-    margin-left: auto;
-    margin-right: auto;
-    display: block !important; /* Ensure visibility */
-    position: relative !important; /* Ensure proper stacking */
-    z-index: 1 !important; /* Ensure it's above other elements */
+    position: relative;
+    z-index: 1;
 }
 
 .withdrawal-history-container h3 {
@@ -679,35 +773,123 @@ input {
     display: block !important; /* Ensure visibility */
 }
 
+.withdrawal-table-container {
+    flex: 1;
+    overflow-y: auto;
+    position: relative;
+    scrollbar-width: thin;
+    scrollbar-color: #083b44 #C4EDEB;
+    height: calc(100% - 60px); /* Subtract header height */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Custom scrollbar styling */
+.withdrawal-table-container::-webkit-scrollbar {
+    width: 8px;
+    display: block;
+}
+
+.withdrawal-table-container::-webkit-scrollbar-track {
+    background: #C4EDEB;
+    border-radius: 4px;
+}
+
+.withdrawal-table-container::-webkit-scrollbar-thumb {
+    background-color: #083b44;
+    border-radius: 4px;
+    border: 2px solid #C4EDEB;
+}
+
 .withdrawal-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 1rem;
-    font-family: 'PPNeueMontreal-Book', monospace;
-    font-size: 14px;
-    display: table !important; /* Ensure visibility */
+    margin-top: 10px;
+    table-layout: fixed;
 }
 
-.withdrawal-table th,
-.withdrawal-table td {
-    padding: 0.75rem;
-    text-align: left;
-    border-bottom: 1px solid #7FAFB1;
-    display: table-cell !important; /* Ensure visibility */
+/* Set column widths */
+.withdrawal-table th:nth-child(1), /* Actions */
+.withdrawal-table td:nth-child(1) {
+    width: 120px;
+    white-space: normal;
 }
 
-.withdrawal-table th {
-    background-color: #f0f0f0;
-    font-weight: bold;
-    color: #003734;
+.withdrawal-table th:nth-child(2), /* ID */
+.withdrawal-table td:nth-child(2) {
+    width: 60px;
 }
 
-.withdrawal-table tr {
-    display: table-row !important; /* Ensure visibility */
+.withdrawal-table th:nth-child(3), /* Sender */
+.withdrawal-table td:nth-child(3),
+.withdrawal-table th:nth-child(4), /* Recipient */
+.withdrawal-table td:nth-child(4) {
+    width: 160px;
 }
 
-.withdrawal-table tr:hover {
-    background-color: #f5f5f5;
+.withdrawal-table th:nth-child(5), /* Amount */
+.withdrawal-table td:nth-child(5) {
+    width: 100px;
+}
+
+.withdrawal-table th:nth-child(6), /* Time */
+.withdrawal-table td:nth-child(6) {
+    width: 160px;
+}
+
+.withdrawal-table th:nth-child(7), /* Status */
+.withdrawal-table td:nth-child(7) {
+    width: 80px;
+}
+
+/* Style for action buttons */
+.attest-button, .claim-button {
+    background-color: #003734;
+    color: #eefffb;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'PPNeueMontreal-Book', Arial, sans-serif;
+    margin: 2px;
+    white-space: normal;
+    display: inline-block;
+    width: 100px;
+    min-height: 40px;
+    line-height: 1.2;
+    text-align: center;
+    font-size: 12px;
+    transition: all 0.3s ease;
+}
+
+.attest-button span, .claim-button span {
+    display: block;
+}
+
+.attest-button:hover, .claim-button:hover {
+    background-color: #049159;
+    color: #88FFEC;
+}
+
+.attest-button:disabled, .claim-button:disabled {
+    background-color: #cccccc;
+    color: #666666;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* Update mobile styles for action buttons */
+@media (max-width: 1024px) {
+    .withdrawal-table th:nth-child(1),
+    .withdrawal-table td:nth-child(1) {
+        width: 100px;
+    }
+
+    .attest-button, .claim-button {
+        width: 90px;
+        font-size: 11px;
+        padding: 3px 6px;
+    }
 }
 
 .no-withdrawals {
@@ -722,4 +904,376 @@ input {
     padding: 2rem;
     color: #ff0000;
     display: block !important; /* Ensure visibility */
+}
+
+@media (max-width: 800px) {
+    .box-wrapper {
+        flex-direction: column;
+        align-items: center;
+        overflow: visible;
+        padding: 20px 10px;
+        min-height: auto;
+    }
+
+    .main-content {
+        width: 100%;
+        max-width: 400px;
+    }
+
+    .transactions-container {
+        width: 100%;
+        max-width: 800px; /* Increased from 600px to match new width */
+        min-width: unset;
+        height: auto;
+        min-height: 500px;
+        margin-top: 20px;
+        position: relative;
+    }
+
+    .transactions-container:not(.active) {
+        display: none;
+    }
+
+    .withdrawal-table {
+        min-width: 800px; /* Increased from 600px to match new width */
+    }
+}
+
+/* Update small screen styles */
+@media (max-width: 600px) {
+    .box-wrapper {
+        padding: 10px;
+    }
+
+    .main-content {
+        max-width: 100%;
+    }
+
+    .transactions-container {
+        max-width: 100%;
+    }
+
+    .withdrawal-table {
+        min-width: 100%;
+    }
+}
+
+/* Bridge Direction Selector Styles */
+.bridge-direction-selector {
+    display: flex;
+    justify-content: stretch; /* Changed from flex-start to stretch */
+    gap: 0;
+    margin: -20px -20px 20px -20px;
+    border-bottom: 3px solid black;
+    background-color: #C4EDEB;
+    border-radius: 10px 10px 0 0;
+    padding: 0;
+    position: relative;
+    width: calc(100% + 40px); /* Ensure full width accounting for container padding */
+}
+
+.bridge-direction-btn {
+    flex: 1; /* Make each button take equal space */
+    padding: 12px 24px;
+    border: none;
+    font-family: 'PPNeueMontreal-Book', Arial, sans-serif;
+    font-size: 16px;
+    cursor: pointer;
+    background-color: #E0E0E0; /* Greyed out background for unselected */
+    color: #666666; /* Muted text color for unselected */
+    transition: all 0.3s ease;
+    border-right: 1px solid #7FAFB1;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -3px;
+    position: relative;
+    border-radius: 0;
+    text-align: center;
+}
+
+.bridge-direction-btn:first-child {
+    border-top-left-radius: 7px;
+}
+
+.bridge-direction-btn:last-child {
+    border-right: none; /* Remove right border from last tab */
+}
+
+.bridge-direction-btn.active {
+    background-color: #003734; /* Darker, more prominent background for active */
+    color: #eefffb; /* Light text for contrast */
+    border-bottom: 3px solid #003734;
+    font-weight: bold;
+}
+
+.bridge-direction-btn:hover:not(.active) {
+    background-color: #CCCCCC; /* Slightly lighter on hover for unselected */
+    color: #333333; /* Darker text on hover */
+}
+
+/* Update bridge-buttons-container to accommodate tabs */
+.bridge-buttons-container {
+    background-color: #C4EDEB;
+    border: 3px solid black;
+    border-radius: 10px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+    height: calc(600px - 46px);
+    box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Add styles for the link container */
+.bridge-buttons-container a {
+    margin-top: auto;
+    text-align: center;
+    padding: 10px 0;
+    border-top: 1px solid #7FAFB1;
+    margin-left: -20px;
+    margin-right: -20px;
+    padding-left: 20px;
+    padding-right: 20px;
+    background-color: #EFFEFC;
+}
+
+/* Update bridge section to account for link */
+.bridge-section {
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+    padding-top: 10px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.bridge-section.active {
+    display: flex;
+    flex-direction: column;
+    opacity: 1;
+}
+
+/* Wallet Connection Container */
+.wallet-connection-container {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 15px;
+    flex-wrap: nowrap;
+    width: 100%;
+    padding: 0 5px;
+    box-sizing: border-box;
+}
+
+.wallet-disclaimer {
+    text-align: center;
+    color: #083b44;
+    font-size: 14px;
+    margin-bottom: 12px;
+    font-style: italic;
+    font-family: 'PPNeueMontreal-Book', Arial, sans-serif;
+}
+
+.wallet-button-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    gap: 4px;
+}
+
+.wallet-button-group .button-style-2 {
+    width: auto;
+    min-width: 140px; /* Increased from 120px */
+    max-width: 180px; /* Increased from 160px */
+    font-size: 12px; /* Reduced from 16px */
+    padding: 8px 6px;
+    white-space: normal;
+    line-height: 1.2;
+    height: auto;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+}
+
+.wallet-button-group .info-text {
+    font-size: 12px;
+    margin: 0;
+    text-align: center;
+    width: 100%;
+    max-width: 160px;
+}
+
+.wallet-button-group .truncated-address {
+    font-size: 11px; /* Reduced from 14px */
+    display: block;
+    margin-top: 2px;
+}
+
+/* Remove the old balance-info styles that we're replacing */
+.balance-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
+    gap: 10px;
+}
+
+.balance-info .info-text {
+    margin: 0;
+}
+
+@media (max-width: 400px) {
+    .wallet-button-group .button-style-2 {
+        font-size: 11px; /* Reduced from 15px */
+        padding: 6px 4px;
+        min-width: 120px; /* Increased from 100px */
+    }
+    
+    .wallet-button-group .info-text {
+        font-size: 10px; /* Reduced from 13px */
+    }
+    
+    .wallet-button-group .truncated-address {
+        font-size: 10px; /* Reduced from 13px */
+    }
+}
+
+/* Update existing styles */
+.transactions-container {
+    background-color: #C4EDEB;
+    border: 3px solid black;
+    border-radius: 10px;
+    padding: 20px;
+    flex: 0 0 900px; /* Increased from 820px to accommodate all columns */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+    opacity: 1;
+    visibility: visible;
+    height: calc(600px - 46px);
+    position: relative;
+    margin-left: 0;
+    box-sizing: border-box;
+}
+
+.transactions-container:not(.active) {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    display: none;
+}
+
+.history-header {
+    flex: 0 0 auto;
+    margin-bottom: 10px;
+    height: 60px; /* Fixed height for header */
+}
+
+.history-header h3 {
+    font-family: 'PPNeueMontreal-Medium', monospace;
+    color: #003734;
+    margin: 0 0 0.5rem 0;
+}
+
+.history-subtitle {
+    color: #666;
+    font-size: 0.9rem;
+    font-family: 'PPNeueMontreal-Book', Arial, sans-serif;
+}
+
+/* Update media queries to maintain centering */
+@media (max-width: 1024px) {
+    .box-wrapper {
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .main-content,
+    .transactions-container,
+    .bridge-buttons-container {
+        width: 100%;
+        height: calc(500px - 46px); /* Adjust mobile height */
+    }
+
+    .withdrawal-table-container {
+        min-height: 200px;
+    }
+
+    .transactions-container:not(.active) {
+        transform: translateX(100%);
+        right: -100%;
+        width: 100%;
+    }
+
+    .transactions-container {
+        width: 100%;
+        flex: 0 0 auto;
+    }
+
+    .box-wrapper {
+        flex-direction: column;
+        align-items: center;
+        overflow: visible;
+    }
+}
+
+/* Update media queries for responsive design */
+@media (max-width: 1400px) {
+    .box-wrapper {
+        max-width: 100%;
+        padding: 20px 40px;
+    }
+
+    .transactions-container {
+        flex: 0 0 900px; /* Maintain width on larger screens */
+    }
+}
+
+/* Update media queries for responsive height */
+@media (max-width: 1024px) {
+    .transactions-container {
+        min-height: 500px; /* Adjusted for mobile */
+    }
+
+    .withdrawal-table-container {
+        min-height: 400px; /* Adjusted for mobile */
+    }
+}
+
+@media (max-width: 800px) {
+    .transactions-container {
+        min-width: 900px; /* Maintain minimum width on smaller screens */
+        width: 100%;
+        margin: 20px 0;
+    }
+
+    .withdrawal-table-container {
+        overflow-x: auto; /* Ensure horizontal scrolling is available */
+    }
+}
+
+@media (max-width: 400px) {
+    #connectButton {
+        font-size: 11px;
+        padding: 5px 6px;
+        min-width: 80px;
+    }
+
+    #walletAddress {
+        font-size: 9px;
+        padding: 5px 2px;
+    }
 }
