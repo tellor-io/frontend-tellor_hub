@@ -61,16 +61,10 @@ const App = {
                 const newWalletButton = walletButton.cloneNode(true);
                 walletButton.parentNode.replaceChild(newWalletButton, walletButton);
                 newWalletButton.addEventListener('click', async () => {
-                    console.log('Wallet button clicked, current state:', {
-                        isConnected: App.isConnected,
-                        account: App.account
-                    });
                     try {
                         if (App.isConnected) {
-                            console.log('Attempting to disconnect MetaMask...');
                             await App.disconnectMetaMask();
                         } else {
-                            console.log('Attempting to connect MetaMask...');
                             await App.connectMetaMask();
                         }
                     } catch (error) {
@@ -84,16 +78,10 @@ const App = {
                 const newMetamaskButton = metamaskButton.cloneNode(true);
                 metamaskButton.parentNode.replaceChild(newMetamaskButton, metamaskButton);
                 newMetamaskButton.addEventListener('click', async () => {
-                    console.log('MetaMask button clicked, current state:', {
-                        isConnected: App.isConnected,
-                        account: App.account
-                    });
                     try {
                         if (App.isConnected) {
-                            console.log('Attempting to disconnect MetaMask...');
                             await App.disconnectMetaMask();
                         } else {
-                            console.log('Attempting to connect MetaMask...');
                             await App.connectMetaMask();
                         }
                     } catch (error) {
@@ -107,16 +95,10 @@ const App = {
                 const newKeplrButton = keplrButton.cloneNode(true);
                 keplrButton.parentNode.replaceChild(newKeplrButton, keplrButton);
                 newKeplrButton.addEventListener('click', async () => {
-                    console.log('Keplr button clicked, current state:', {
-                        isKeplrConnected: App.isKeplrConnected,
-                        keplrAddress: App.keplrAddress
-                    });
                     try {
                         if (App.isKeplrConnected) {
-                            console.log('Attempting to disconnect Keplr...');
                             await App.disconnectKeplr();
                         } else {
-                            console.log('Attempting to connect Keplr...');
                             await App.connectKeplr();
                         }
                     } catch (error) {
@@ -126,7 +108,6 @@ const App = {
                 });
             }
 
-            console.log("App initialized successfully");
             resolve();
           })
           .catch(error => {
@@ -147,17 +128,13 @@ const App = {
         const hasMetaMask = typeof window.ethereum !== 'undefined';
         const hasKeplr = typeof window.keplr !== 'undefined';
         
-        console.log("Wallet detection:", { hasMetaMask, hasKeplr });
-        
         // Handle MetaMask if available
         if (hasMetaMask) {
-          console.log("MetaMask detected");
           App.web3Provider = window.ethereum;
           App.web3 = new Web3(window.ethereum);
           
           // Set up event listeners
           const handleDisconnect = () => {
-            console.log('MetaMask disconnected');
             App.disconnectMetaMask();
           };
 
@@ -190,13 +167,11 @@ const App = {
         
         // Handle Keplr if available
         if (hasKeplr) {
-          console.log("Keplr detected");
           App.keplrProvider = window.keplr;
           // Enable Keplr button
           const keplrButton = document.getElementById("keplrButton");
           if (keplrButton) {
             keplrButton.disabled = false;
-            console.log("Keplr button enabled");
           }
         }
         
@@ -214,14 +189,11 @@ const App = {
             throw new Error('MetaMask not installed');
         }
 
-        console.log('Requesting MetaMask account access...');
         const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
         
         if (!accounts || accounts.length === 0) {
             throw new Error('No accounts found');
         }
-
-        console.log('MetaMask accounts:', accounts);
         
         // Initialize Web3
         App.web3Provider = window.ethereum;
@@ -267,7 +239,6 @@ const App = {
         ]);
         
         App.setPageParams();
-        console.log('MetaMask connected successfully');
     } catch (error) {
         console.error("Error connecting MetaMask:", error);
         App.handleError(error);
@@ -280,8 +251,6 @@ const App = {
         if (!window.keplr) {
             throw new Error('Keplr not installed');
         }
-
-        console.log('Initializing Keplr connection...');
         
         // First try to disable any existing connection
         try {
@@ -335,7 +304,6 @@ const App = {
             },
         });
 
-        console.log('Requesting Keplr account access...');
         // Enable the chain
         await window.keplr.enable('layertest-4');
         
@@ -347,13 +315,9 @@ const App = {
             throw new Error('No accounts found in Keplr');
         }
         
-        console.log('Keplr accounts:', accounts);
-        
         // Set Keplr state
         App.keplrAddress = accounts[0].address;
         App.isKeplrConnected = true;
-        
-        console.log('Keplr connected with address:', App.keplrAddress);
         
         // Update button text
         const truncatedAddress = `${App.keplrAddress.substring(0, 6)}...${App.keplrAddress.substring(App.keplrAddress.length - 4)}`;
@@ -374,7 +338,6 @@ const App = {
         }
         
         App.setPageParams();
-        console.log('Keplr connection completed successfully');
     } catch (error) {
         // Clear connection state on error
         App.keplrAddress = null;
@@ -389,9 +352,7 @@ const App = {
 
   disconnectMetaMask: async function() {
     try {
-        console.log('Disconnecting MetaMask...');
         if (!App.isConnected) {
-            console.log('MetaMask already disconnected');
             return;
         }
 
@@ -407,12 +368,10 @@ const App = {
         
         if (walletButton) {
             walletButton.innerHTML = 'Connect MetaMask';
-            console.log('Updated main wallet button');
         }
         
         if (metamaskButton) {
             metamaskButton.innerHTML = 'Connect MetaMask';
-            console.log('Updated MetaMask button');
         }
 
         // Update balances
@@ -600,24 +559,15 @@ const App = {
 
   initBridgeContract: async function () {
     try {
-        console.log('Initializing bridge contract...', {
-            isKeplrConnected: App.isKeplrConnected,
-            web3Provider: !!App.web3Provider,
-            web3: !!App.web3,
-            chainId: App.chainId
-        });
-
         // Only initialize bridge contract if we have Web3 and we're not in a Keplr-only state
         if (!App.web3 || !App.web3Provider) {
             if (App.isKeplrConnected && !App.isConnected) {
                 // If we're only using Keplr, we don't need the bridge contract
-                console.log('Keplr-only mode: bridge contract not needed');
                 return true;
             }
             throw new Error('Web3 not properly initialized');
         }
 
-        console.log('Fetching bridge contract ABI...');
         const response = await fetch("./abis/TokenBridge.json");
         if (!response.ok) {
             throw new Error(`Failed to load ABI: ${response.statusText}`);
@@ -630,7 +580,6 @@ const App = {
             throw new Error("Invalid ABI format");
         }
 
-        console.log('Creating bridge contract instance...');
         App.contracts.Bridge = new App.web3.eth.Contract(abi);
         
         const contractAddresses = {
@@ -653,9 +602,7 @@ const App = {
             throw new Error(`No contract address for chainId: ${App.chainId}`);
         }
 
-        console.log('Setting bridge contract address:', address);
         App.contracts.Bridge.options.address = address;
-        console.log('Bridge contract initialized successfully');
         return true;
     } catch (error) {
         console.error("Bridge contract initialization error:", error);
@@ -740,7 +687,6 @@ const App = {
   },
 
   setPageParams: function() {
-    console.log("Setting page parameters...");
     // Update connected address in UI
     const connectedAddressElement = document.getElementById("connectedAddress");
     if (connectedAddressElement) {
@@ -783,7 +729,6 @@ const App = {
 
     // Add withdrawal history if either wallet is connected
     if (App.isConnected || App.isKeplrConnected) {
-      console.log("Wallet connected, adding withdrawal history...");
       App.addWithdrawalHistory();
     }
   },
@@ -791,14 +736,7 @@ const App = {
   updateKeplrBalance: async function() {
     try {
         if (!App.isKeplrConnected || !App.keplrAddress) {
-            console.log('Keplr not connected or no address available');
             return;
-        }
-
-        console.log('Updating Keplr balance for address:', App.keplrAddress);
-        
-        if (!window.cosmjsLoaded || !window.cosmjs || !window.cosmjs.stargate) {
-            throw new Error("CosmJS not properly loaded");
         }
 
         const offlineSigner = window.keplr.getOfflineSigner('layertest-4');
@@ -807,9 +745,7 @@ const App = {
             offlineSigner
         );
 
-        console.log('Fetching balance for address:', App.keplrAddress);
         const balance = await signingClient.getBalance(App.keplrAddress, "loya");
-        console.log('Raw balance response:', balance);
 
         if (!balance || !balance.amount) {
             throw new Error('Invalid balance response from chain');
@@ -818,21 +754,18 @@ const App = {
         const balanceAmount = parseInt(balance.amount);
         // Format balance to 6 decimal places consistently
         const readableBalance = (balanceAmount / 1000000).toFixed(6);
-        console.log('Converted balance:', readableBalance, 'TRB');
 
         // Update the appropriate balance element based on current direction
         if (App.currentBridgeDirection === 'layer') {
             const balanceElement = document.getElementById("currentBalance");
             if (balanceElement) {
                 balanceElement.textContent = `${readableBalance} TRB`;
-                console.log('Updated Layer section balance:', readableBalance);
             }
         } else {
             // In Ethereum section, update Keplr balance
             const keplrBalanceElement = document.getElementById("ethKeplrBalance");
             if (keplrBalanceElement) {
                 keplrBalanceElement.textContent = `${readableBalance} TRB`;
-                console.log('Updated Ethereum section Keplr balance:', readableBalance);
             }
         }
     } catch (error) {
@@ -840,7 +773,6 @@ const App = {
         const balanceElement = document.getElementById(App.currentBridgeDirection === 'layer' ? "currentBalance" : "ethKeplrBalance");
         if (balanceElement) {
             balanceElement.textContent = "0.000000 TRB";
-            console.log('Set balance to 0 due to error');
         }
     }
   },
@@ -848,7 +780,7 @@ const App = {
   uintTob32: function (n) {
     let vars = App.web3.utils.toBN(n).toString('hex');
     vars = vars.padStart(64, '0');
-    return  vars;
+    return vars;
   },
   
   reportValue: function () {
@@ -856,16 +788,12 @@ const App = {
     value = document.getElementById("_value").value;
     nonce = document.getElementById("_nonce").value;
     queryData = document.getElementById("_queryData").value;
-    console.log("_queryId: " + queryId);
-    console.log("_value: "  + value.padStart(64, '0'));
-    console.log("_nonce: " + nonce);
-    console.log("_queryData: " + queryData);
-    console.log("Attempting to interact with contract at address:", App.contracts.Bridge.options.address);
+    
     App.contracts.Bridge.methods
       .submitValue(queryId, value, nonce, queryData)
       .send({ from: App.account })
       .then(function (result) {
-        console.log(result);
+        // Handle result silently
       });
   },
 
@@ -947,18 +875,15 @@ const App = {
 
         const amountToSend = App.web3.utils.toWei(amount, 'ether');
         
-        // Add debug logging for balance check
         const balance = await App.contracts.Token.methods.balanceOf(App.account).call();
 
         const balanceBN = new App.web3.utils.BN(balance);
         const amountBN = new App.web3.utils.BN(amountToSend);
 
-
         if (balanceBN.lt(amountBN)) {
             const errorMsg = `Insufficient token balance. You have ${App.web3.utils.fromWei(balance, 'ether')} TRB but trying to deposit ${amount} TRB`;
-            console.log('Showing error:', errorMsg);
             alert(errorMsg);
-            return; // Make sure to return here to prevent the transaction
+            return;
         }
 
         // Only reach here if balance is sufficient
@@ -1032,16 +957,12 @@ const App = {
         }
 
         const data = await response.json();
-        console.log('TRB price data:', data);
-
         // The aggregate_value is in hex format, convert it to decimal
         const hexValue = data.aggregate.aggregate_value;
         const decimalValue = BigInt('0x' + hexValue);
         
         // Convert to USD (divide by 1e18 since the value is in wei)
         trbPrice = Number(decimalValue) / 1e18;
-        
-        console.log('TRB price in USD:', trbPrice);
       } catch (error) {
         console.warn('Error fetching TRB price from Tellor Layer:', error);
         trbPrice = 0.5; // Default value in USD
@@ -1123,7 +1044,7 @@ const App = {
     popup.style.left = '50%';
     popup.style.transform = 'translate(-50%, -50%)';
     popup.style.padding = '50px';
-    popup.style.backgroundColor = '#C4EDEB';
+    popup.style.backgroundColor = '#d4d8e3';
     popup.style.color = '#083b44';
     popup.style.borderRadius = '10px';
     popup.style.zIndex = '1000';
@@ -1241,17 +1162,8 @@ const App = {
         // Convert amount to micro units (1 TRB = 1,000,000 micro units)
         const amountInMicroUnits = Math.floor(parseFloat(amount) * 1000000).toString();
 
-        console.log('Starting withdrawal process...');
-        console.log('Withdrawing with params:', {
-            amount,
-            amountInMicroUnits,
-            ethereumAddress,
-            keplrAddress: App.keplrAddress
-        });
-
         // Get offline signer from Keplr
         const offlineSigner = window.keplr.getOfflineSigner('layertest-4');
-        console.log('Got offline signer');
 
         // Get account info first - use keplrAddress instead of account
         const accountUrl = `https://node-palmito.tellorlayer.com/cosmos/auth/v1beta1/accounts/${App.keplrAddress}`;
@@ -1289,11 +1201,8 @@ const App = {
             memo: "Withdraw TRB to Ethereum"
         };
 
-        console.log('Transaction to sign:', txToSign);
-
         // Sign the transaction
         const signResult = await offlineSigner.signAmino(App.keplrAddress, txToSign);
-        console.log('Sign result:', signResult);
 
         const signature = signResult.signature.signature;
         const publicKey = signResult.signature.pub_key.value;
@@ -1471,17 +1380,13 @@ const App = {
     }
   },
 
-
   // Add withdrawal history functions
   addWithdrawalHistory: async function() {
-    console.log("Starting addWithdrawalHistory...");
     const transactionsContainer = document.querySelector('.transactions-container');
-    console.log("Transactions container found:", !!transactionsContainer);
 
     // Check if withdrawal history already exists
     const existingHistory = document.querySelector('#withdrawal-history');
     if (existingHistory) {
-        console.log("Withdrawal history already exists, updating...");
         await this.updateWithdrawalHistory();
         return;
     }
@@ -1498,24 +1403,19 @@ const App = {
 
         if (App.isKeplrConnected) {
             address = App.keplrAddress;
-            console.log('Getting withdrawal history for Keplr address:', address);
         } else if (App.isConnected && App.account) {
             address = App.account;
             isEvmWallet = true;
-            console.log('Getting withdrawal history for EVM address:', address);
         } else {
-            console.log('No wallet connected, skipping withdrawal history');
             return [];
         }
 
         if (!address) {
-            console.log('No address available, skipping withdrawal history');
             return [];
         }
 
         // Clean the connected address
         const cleanAddress = address.toLowerCase().trim();
-        console.log('Cleaned connected address:', cleanAddress);
 
         // Use the correct API endpoint
         const baseEndpoint = 'https://node-palmito.tellorlayer.com';
@@ -1536,10 +1436,8 @@ const App = {
 
         const data = await response.json();
         const lastWithdrawalId = Number(data.withdrawal_id);
-        console.log('Last withdrawal ID:', lastWithdrawalId);
 
         if (!lastWithdrawalId || lastWithdrawalId <= 0) {
-            console.log('No withdrawals found in the system');
             return [];
         }
 
@@ -1559,8 +1457,6 @@ const App = {
             );
         }
 
-        console.log(`Fetching data for ${lastWithdrawalId} withdrawals...`);
-
         // Process all withdrawals in parallel
         const [withdrawalResults, claimStatuses] = await Promise.all([
             Promise.all(withdrawalPromises),
@@ -1571,7 +1467,6 @@ const App = {
         const withdrawals = withdrawalResults
             .map((withdrawalData, index) => {
                 if (!withdrawalData?.parsed) {
-                    console.log(`No parsed data found for withdrawal ${index + 1}`);
                     return null;
                 }
 
@@ -1586,16 +1481,6 @@ const App = {
                 const cleanSender = parsedData.sender
                     ? parsedData.sender.toLowerCase().trim()
                     : '';
-
-                console.log('Processing withdrawal', id, {
-                    sender: cleanSender,
-                    recipient: cleanRecipient,
-                    address: cleanAddress,
-                    isEvmWallet,
-                    matches: isEvmWallet ? 
-                        cleanSender === cleanAddress :
-                        cleanRecipient === cleanAddress
-                });
 
                 // For EVM wallet, match sender address. For Keplr, match recipient address
                 if ((isEvmWallet && cleanSender === cleanAddress) ||
@@ -1614,7 +1499,6 @@ const App = {
             .filter(withdrawal => withdrawal !== null)
             .sort((a, b) => b.id - a.id); // Sort by ID in descending order
 
-        console.log('Found transactions for current address:', withdrawals.length);
         return withdrawals;
     } catch (error) {
         console.error('Error in getWithdrawalHistory:', error);
@@ -1624,12 +1508,9 @@ const App = {
 
   fetchWithdrawalData: async function(queryId, retryCount = 0) {
     try {
-        console.log('Fetching withdrawal data for query ID:', queryId);
         const endpoint = `https://node-palmito.tellorlayer.com/tellor-io/layer/oracle/get_current_aggregate_report/${queryId}`;
-        console.log('Calling endpoint:', endpoint);
         
         const response = await fetch(endpoint);
-        console.log('Response status:', response.status);
         
         // Check if response is HTML instead of JSON
         const contentType = response.headers.get('content-type');
@@ -1639,12 +1520,10 @@ const App = {
         
         if (!response.ok) {
             if (response.status === 400) {
-                console.log('No data found for query ID:', queryId);
                 return null;
             }
             // Retry on server errors (5xx) or network errors
             if ((response.status >= 500 || response.status === 0) && retryCount < 3) {
-                console.log(`Retrying fetch for query ID ${queryId} (attempt ${retryCount + 1})...`);
                 await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
                 return this.fetchWithdrawalData(queryId, retryCount + 1);
             }
@@ -1652,10 +1531,8 @@ const App = {
         }
 
         const data = await response.json();
-        console.log('Oracle response data:', data);
 
         if (!data || !data.aggregate || !data.aggregate.aggregate_value) {
-            console.log('No value in oracle response');
             return null;
         }
 
@@ -1668,7 +1545,6 @@ const App = {
         console.error('Error in fetchWithdrawalData:', error);
         // Retry on network errors or if we haven't exceeded retry limit
         if (retryCount < 3 && (error.message.includes('NetworkError') || error.message.includes('Failed to fetch'))) {
-            console.log(`Retrying fetch for query ID ${queryId} (attempt ${retryCount + 1})...`);
             await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
             return this.fetchWithdrawalData(queryId, retryCount + 1);
         }
@@ -1678,8 +1554,6 @@ const App = {
 
   parseWithdrawalData: function(data) {
     try {
-        console.log('Parsing withdrawal data:', data);
-        
         // Add 0x prefix if not present
         const hexData = data.startsWith('0x') ? data : '0x' + data;
         
@@ -1692,13 +1566,6 @@ const App = {
         
         // Decode the bytes
         const [sender, recipient, amount, tip] = abiCoder.decode(types, bytes);
-        
-        console.log('Decoded withdrawal data:', {
-            sender,
-            recipient,
-            amount: amount.toString(),
-            tip: tip.toString()
-        });
 
         return {
             sender,
@@ -1716,7 +1583,6 @@ const App = {
   updateWithdrawalHistory: async function() {
     try {
         const transactions = await this.getWithdrawalHistory();
-        console.log('Fetched transactions:', transactions);
 
         const tableBody = document.querySelector('#withdrawal-history tbody');
         if (!tableBody) {
@@ -1814,7 +1680,6 @@ const App = {
         }
 
         if (!transactions || transactions.length === 0) {
-            console.log('No transactions found to display');
             tableBody.innerHTML = `
                 <tr>
                     <td colspan="7" style="padding: 40px 20px; text-align: center; border: none;">
@@ -1838,7 +1703,6 @@ const App = {
         // Create and append transaction rows
         for (const tx of transactions) {
             if (!tx || !tx.amount) {
-                console.log('Skipping invalid transaction data:', tx);
                 continue;
             }
 
@@ -1982,7 +1846,6 @@ const App = {
         }
 
         const data = await response.json();
-        console.log('Oracle response for attestation:', data);
 
         if (!data || !data.timestamp) {
             throw new Error('Could not find withdrawal data in oracle. The withdrawal may not be ready for attestation yet.');
@@ -1995,12 +1858,6 @@ const App = {
         const offlineSigner = window.keplr.getOfflineSigner('layertest-4');
         const accounts = await offlineSigner.getAccounts();
         const layerAccount = accounts[0].address;
-
-        console.log('Requesting attestation with params:', {
-            layerAccount,
-            queryId,
-            timestamp
-        });
 
         // Create and send the attestation request using the simpler approach
         const result = await window.cosmjs.stargate.requestAttestations(
@@ -2040,15 +1897,6 @@ const App = {
   // Add validation helper functions
   validateWithdrawalData: async function(withdrawalId, attestData, valset, sigs) {
         try {
-            console.log('Starting withdrawal validation with data:', {
-                withdrawalId,
-                attestData,
-                valsetLength: valset.length,
-                sigsLength: sigs.length,
-                currentTime: Math.floor(Date.now() / 1000),
-                withdrawalTime: parseInt(attestData.report.timestamp) / 1000
-            });
-
             // Validate validator set
             if (!valset || !Array.isArray(valset)) {
                 throw new Error('Invalid validator set: must be an array');
@@ -2057,7 +1905,6 @@ const App = {
             // Check each validator
             for (let i = 0; i < valset.length; i++) {
                 const validator = valset[i];
-                console.log(`Validating validator ${i}:`, validator);
                 
                 // Check if validator has required fields
                 if (!validator.addr || !validator.power) {
@@ -2088,11 +1935,6 @@ const App = {
             // Check each signature
             for (let i = 0; i < sigs.length; i++) {
                 const sig = sigs[i];
-                console.log(`Validating signature ${i}:`, {
-                    v: sig.v,
-                    r: typeof sig.r === 'string' ? sig.r.slice(0, 10) + '...' : '0x' + sig.r.slice(0, 10).toString('hex') + '...',
-                    s: typeof sig.s === 'string' ? sig.s.slice(0, 10) + '...' : '0x' + sig.s.slice(0, 10).toString('hex') + '...'
-                });
 
                 // For blank attestations, v should be 0 and r/s should be zero bytes
                 if (sig.v === 0) {
@@ -2108,15 +1950,11 @@ const App = {
                 }
             }
 
-            // Rest of existing validation...
             // Check bridge state
             const bridgeState = await App.contracts.Bridge.methods.bridgeState().call();
-            console.log('Bridge state:', bridgeState);
             if (bridgeState !== '0') { // Assuming 0 is the active state
                 throw new Error(`Bridge is not active. Current state: ${bridgeState}`);
             }
-
-            console.log('Validation successful');
         } catch (error) {
             console.error('Validation error:', error);
             throw error;
@@ -2125,6 +1963,7 @@ const App = {
 
   // Modify the claimWithdrawal function to include validation
   claimWithdrawal: async function(withdrawalId) {
+    let txHash = null;
     try {
         if (!App.isConnected) {
             alert('Please connect your MetaMask wallet first');
@@ -2177,6 +2016,7 @@ const App = {
             txData.depositId
         ).send({ from: App.account });
 
+        txHash = tx.transactionHash;
         console.log('Withdrawal claim transaction:', tx);
         App.showSuccessPopup("Withdrawal claimed successfully!");
         await this.updateWithdrawalHistory();
@@ -2184,7 +2024,20 @@ const App = {
 
     } catch (error) {
         console.error('Error claiming withdrawal:', error);
-        App.showErrorPopup(error.message || "Error claiming withdrawal. Please try requesting attestation again to get the latest validator set.");
+        // Get transaction hash from error if available
+        if (error.transactionHash) {
+            txHash = error.transactionHash;
+        } else if (error.receipt && error.receipt.transactionHash) {
+            txHash = error.receipt.transactionHash;
+        }
+        
+        let errorMessage = "Claim Withdrawal failed. Try requesting attestation again for updated validator set.";
+        if (txHash) {
+            const etherscanUrl = `https://sepolia.etherscan.io/tx/${txHash}`;
+            errorMessage += ` <a href="${etherscanUrl}" target="_blank" style="color: #DC2626; text-decoration: underline;">View on Etherscan</a>`;
+        }
+        
+        App.showErrorPopup(errorMessage);
     } finally {
         App.hidePendingPopup();
     }
@@ -2193,8 +2046,6 @@ const App = {
   // Helper function to fetch attestation data
   fetchAttestationData: async function(queryId, timestamp) {
     try {
-        console.log('Fetching attestation data for:', { queryId, timestamp });
-        
         // Remove 0x prefix for API calls if present
         const apiQueryId = queryId.startsWith('0x') ? queryId.slice(2) : queryId;
         const baseEndpoint = 'https://node-palmito.tellorlayer.com';
@@ -2211,14 +2062,12 @@ const App = {
         }
 
         const snapshotsData = await snapshotsResponse.json();
-        console.log('Snapshots data:', snapshotsData);
         
         if (!snapshotsData?.snapshots?.length) {
             throw new Error('Invalid snapshots data: missing snapshots array');
         }
 
         const lastSnapshot = snapshotsData.snapshots[snapshotsData.snapshots.length - 1];
-        console.log('Last snapshot:', lastSnapshot);
 
         // Step 2: Get attestation data using the snapshot
         const attestationDataResponse = await fetch(
@@ -2230,7 +2079,6 @@ const App = {
         }
 
         const rawAttestationData = await attestationDataResponse.json();
-        console.log('Raw attestation data:', rawAttestationData);
 
         // First get the current validator set timestamp
         const validatorSetTimestampResponse = await fetch(
@@ -2243,7 +2091,6 @@ const App = {
 
         const validatorSetTimestampData = await validatorSetTimestampResponse.json();
         const currentValidatorSetTimestamp = validatorSetTimestampData.timestamp;
-        console.log('Current validator set timestamp:', currentValidatorSetTimestamp);
 
         // Get validator set for the current timestamp
         const validatorsResponse = await fetch(
@@ -2263,13 +2110,6 @@ const App = {
         }
 
         const validatorsData = await validatorsResponse.json();
-        console.log('Raw validator set data:', validatorsData);
-
-        // Log validator addresses for debugging
-        console.log('Validator addresses in set:', validatorsData.bridge_validator_set.map(v => ({
-            address: v.ethereumAddress.toLowerCase(),
-            power: v.power
-        })));
 
         // Get power threshold for this timestamp
         const checkpointParamsResponse = await fetch(
@@ -2282,7 +2122,6 @@ const App = {
 
         const checkpointParams = await checkpointParamsResponse.json();
         const powerThreshold = checkpointParams.power_threshold;
-        console.log('Power threshold:', powerThreshold);
 
         // Get attestations
         const attestationsResponse = await fetch(
@@ -2294,25 +2133,15 @@ const App = {
         }
 
         const attestationsResult = await attestationsResponse.json();
-        console.log('Raw signatures data:', attestationsResult);
 
         // Process attestations
         const validatorSet = validatorsData.bridge_validator_set;
-        console.log('Processing attestations:', {
-            attestationCount: attestationsResult.attestations.length,
-            validatorCount: validatorSet.length,
-            checkpoint: rawAttestationData.checkpoint,
-            currentValidatorSetTimestamp: currentValidatorSetTimestamp,
-            reportTimestamp: rawAttestationData.timestamp,
-            attestationTimestamp: rawAttestationData.attestation_timestamp
-        });
 
         // Create a map of validator addresses to their indices
         const validatorMap = new Map();
         validatorSet.forEach((validator, index) => {
             const address = validator.ethereumAddress.toLowerCase();
             validatorMap.set(address, index);
-            console.log(`Added validator to map: ${address} at index ${index}`);
         });
 
         // Process each attestation
@@ -2322,7 +2151,6 @@ const App = {
             rawAttestationData.checkpoint : 
             '0x' + rawAttestationData.checkpoint;
         const messageHash = ethers.utils.sha256(ethers.utils.arrayify(checkpointWithPrefix));
-        console.log('Message hash for signature recovery:', messageHash);
 
         // Process each attestation
         for (let i = 0; i < attestationsResult.attestations.length; i++) {
@@ -2337,13 +2165,6 @@ const App = {
                 continue;
             }
 
-            console.log('Processing attestation', i, {
-                r: '0x' + attestation.slice(0, 64),
-                s: '0x' + attestation.slice(64, 128),
-                messageHash: messageHash,
-                validatorAddress: validatorSet[i]?.ethereumAddress.toLowerCase() || 'unknown'
-            });
-
             // Try both v values (27 and 28)
             for (const v of [27, 28]) {
                 const recoveredAddress = ethers.utils.recoverAddress(
@@ -2355,43 +2176,17 @@ const App = {
                     })
                 ).toLowerCase();
 
-                console.log('Recovered address for v=' + v + ':', {
-                    recoveredAddress: recoveredAddress,
-                    attestationIndex: i,
-                    expectedValidator: validatorSet[i]?.ethereumAddress.toLowerCase() || 'unknown',
-                    isInValidatorMap: validatorMap.has(recoveredAddress)
-                });
-
                 const validatorIndex = validatorMap.get(recoveredAddress);
                 if (validatorIndex !== undefined) {
-                    console.log('Found matching validator:', {
-                        recoveredAddress: recoveredAddress,
-                        validatorIndex: validatorIndex,
-                        attestationIndex: i,
-                        validatorAddress: validatorSet[validatorIndex].ethereumAddress.toLowerCase(),
-                        power: validatorSet[validatorIndex].power
-                    });
                     signatureMap.set(validatorIndex, {
                         v: v,
                         r: '0x' + attestation.slice(0, 64),
                         s: '0x' + attestation.slice(64, 128)
                     });
                     break;
-                } else {
-                    console.log('No matching validator found for address:', {
-                        recoveredAddress: recoveredAddress,
-                        attestationIndex: i,
-                        expectedValidator: validatorSet[i]?.ethereumAddress.toLowerCase() || 'unknown',
-                        validatorMapKeys: Array.from(validatorMap.keys())
-                    });
                 }
             }
         }
-
-        console.log('Signature map after processing:', {
-            size: signatureMap.size,
-            keys: Array.from(signatureMap.keys())
-        });
 
         // Convert signature map to array
         const signatures = Array(validatorSet.length).fill(null).map((_, i) => {
@@ -2475,7 +2270,6 @@ const App = {
         const validator = validatorSet[i];
         
         if (!signature || signature.length === 0) {
-            console.log(`Empty signature at index ${i}, adding zero signature`);
             derivedSignatures.push({
                 v: 0,
                 r: zeroBytes,
@@ -2505,12 +2299,6 @@ const App = {
                     messageHash,
                     { r, s, v }
                 ).toLowerCase();
-                
-                console.log(`Recovered address for v=${v}:`, {
-                    recoveredAddress,
-                    expectedValidator: validator.ethereumAddress.toLowerCase(),
-                    isMatch: recoveredAddress === validator.ethereumAddress.toLowerCase()
-                });
 
                 if (recoveredAddress === validator.ethereumAddress.toLowerCase()) {
                     derivedSignatures.push({ v, r, s });
@@ -2523,7 +2311,6 @@ const App = {
         }
 
         if (!foundValidSignature) {
-            console.log(`No valid signature found for validator at index ${i}, adding zero signature`);
             derivedSignatures.push({
                 v: 0,
                 r: zeroBytes,
@@ -2531,12 +2318,6 @@ const App = {
             });
         }
     }
-    
-    console.log('Derived signatures:', {
-        total: derivedSignatures.length,
-        valid: derivedSignatures.filter(s => s.v !== 0).length,
-        zero: derivedSignatures.filter(s => s.v === 0).length
-    });
     
     return derivedSignatures;
   },
@@ -2558,10 +2339,10 @@ const App = {
     popup.style.fontSize = "15px";
     popup.style.width = '300px';
     popup.style.textAlign = 'center';
+    popup.style.lineHeight = '1.4';
   
-    const messageSpan = document.createElement('span');
-    messageSpan.textContent = message;
-    popup.appendChild(messageSpan);
+    // Use innerHTML to allow for the Etherscan link
+    popup.innerHTML = message;
   
     document.body.appendChild(popup);
   
@@ -2591,21 +2372,6 @@ const App = {
         if (!formattedAttestationData || !validatorSet || !signatures) {
             throw new Error('Invalid attestation data structure');
         }
-
-        console.log('Formatting withdrawal data with:', {
-            withdrawalId,
-            withdrawalData,
-            attestationData: formattedAttestationData,
-            validatorSet: validatorSet.map(v => ({
-                address: v.addr.toLowerCase(),
-                power: v.power
-            })),
-            signatures: signatures.map(s => ({
-                v: s.v,
-                r: s.r,
-                s: s.s
-            }))
-        });
 
         return {
             attestData: formattedAttestationData,
@@ -2730,8 +2496,6 @@ window.App.requestAttestation = App.requestAttestation;  // Also explicitly expo
 export default App;
 
 function checkWalletConnection() {
-    console.log("Checking wallet connection. Is connected:", App.isConnected);
-    console.log("Current account:", App.account);
     if (!App.isConnected) {
         alert("Please connect your wallet first");
         return false;

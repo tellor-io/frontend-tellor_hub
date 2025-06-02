@@ -30,9 +30,8 @@
     <header>
       <div class="top-right">
       </div>
-      <h1 style="display: grid; grid-template-columns: auto auto; gap: 5px; align-items: center; justify-content: center; margin: 0; padding: 20px 0 0 0;">
-        <img src="circle_logo.png" alt="Circle Logo" style="width: 40px; height: 40px; object-fit: contain; display: block;">
-        <span style="font-size: 50px; display: block;">TRB BRIDGE</span>
+      <h1 style="display: flex; align-items: center; justify-content: center; margin: 0; padding: 32px 0 0 0;">
+        <img src="bridge-title.png" alt="Bridge Title" style="max-width:600px;width:100%;height:auto;display:block;margin:0 auto;">
       </h1>
       <div class="disclaimer">*Sepolia Test Network Only*</div>
     </header>
@@ -62,7 +61,7 @@
               <div class="input-button-container">
                 <div class="input-with-label">
                   <input class="input-address" type="text" id="_queryId" placeholder="To address (e.g. tellor1py3fs...)" />
-                  <span class="info-icon" data-tooltip="Enter your Tellor Layer address (tellor1...)">ⓘ</span>
+                  <span class="info-icon" data-tooltip="Don't have a tellor prefix address? <a href='https://docs.tellor.io/layer-docs/running-tellor-layer/node-setup' target='_blank'>Click here</a> to learn how to create one">ⓘ</span>
                 </div>
               </div>
 
@@ -242,41 +241,160 @@
         const infoIcons = document.querySelectorAll('.info-icon');
         let tooltipTimer;
         
-        infoIcons.forEach(icon => {
-          const tooltip = document.createElement('div');
-          tooltip.className = 'tooltip';
-          tooltip.innerHTML = icon.getAttribute('data-tooltip');
-          icon.appendChild(tooltip);
-          
-          icon.addEventListener('click', function(e) {
-            e.stopPropagation();
-            
-            // Clear any existing timer
+        // Function to hide all tooltips
+        function hideAllTooltips() {
             clearTimeout(tooltipTimer);
-            
-            // Toggle tooltip visibility
-            if (tooltip.style.display === 'block') {
-              tooltip.style.display = 'none';
-            } else {
-              // Hide all other tooltips
-              document.querySelectorAll('.tooltip').forEach(t => t.style.display = 'none');
-              
-              // Show this tooltip
-              tooltip.style.display = 'block';
-              
-              // Set timer to hide tooltip after 3 seconds
-              tooltipTimer = setTimeout(() => {
+            document.querySelectorAll('.tooltip').forEach(tooltip => {
                 tooltip.style.display = 'none';
-              }, 3000);
+            });
+        }
+        
+        // Add tab switch handlers
+        const bridgeToLayerBtn = document.getElementById('bridgeToLayerBtn');
+        const bridgeToEthBtn = document.getElementById('bridgeToEthBtn');
+        
+        bridgeToLayerBtn.addEventListener('click', hideAllTooltips);
+        bridgeToEthBtn.addEventListener('click', hideAllTooltips);
+        
+        infoIcons.forEach(icon => {
+            // Only add tooltip functionality to the icon in the Bridge to Layer section
+            if (icon.closest('#bridgeToLayerSection')) {
+                const tooltip = document.createElement('div');
+                tooltip.className = 'tooltip';
+                tooltip.innerHTML = icon.getAttribute('data-tooltip');
+                document.body.appendChild(tooltip);
+                
+                // Show tooltip on hover
+                icon.addEventListener('mouseenter', function(e) {
+                    // Only show tooltip if we're in the Bridge to Layer section
+                    if (!document.getElementById('bridgeToLayerSection').classList.contains('active')) {
+                        return;
+                    }
+                    
+                    e.stopPropagation();
+                    clearTimeout(tooltipTimer);
+                    
+                    // Hide all other tooltips
+                    hideAllTooltips();
+                    
+                    // Calculate position
+                    const iconRect = icon.getBoundingClientRect();
+                    const tooltipRect = tooltip.getBoundingClientRect();
+                    
+                    // Position tooltip to the right of the icon
+                    let left = iconRect.right + 10;
+                    let top = iconRect.top + (iconRect.height / 2) - (tooltipRect.height / 2);
+                    
+                    // Ensure tooltip stays within viewport
+                    if (left + tooltipRect.width > window.innerWidth) {
+                        left = iconRect.left - tooltipRect.width - 10;
+                    }
+                    if (top + tooltipRect.height > window.innerHeight) {
+                        top = window.innerHeight - tooltipRect.height - 10;
+                    }
+                    if (top < 10) {
+                        top = 10;
+                    }
+                    
+                    // Apply position
+                    tooltip.style.left = left + 'px';
+                    tooltip.style.top = top + 'px';
+                    tooltip.style.display = 'block';
+                });
+                
+                // Hide tooltip when mouse leaves
+                icon.addEventListener('mouseleave', function(e) {
+                    e.stopPropagation();
+                    tooltipTimer = setTimeout(() => {
+                        tooltip.style.display = 'none';
+                    }, 500);
+                });
+                
+                // Also handle click for mobile devices
+                icon.addEventListener('click', function(e) {
+                    // Only show tooltip if we're in the Bridge to Layer section
+                    if (!document.getElementById('bridgeToLayerSection').classList.contains('active')) {
+                        return;
+                    }
+                    
+                    e.stopPropagation();
+                    clearTimeout(tooltipTimer);
+                    
+                    // Calculate position for click
+                    const iconRect = icon.getBoundingClientRect();
+                    const tooltipRect = tooltip.getBoundingClientRect();
+                    
+                    let left = iconRect.right + 10;
+                    let top = iconRect.top + (iconRect.height / 2) - (tooltipRect.height / 2);
+                    
+                    // Ensure tooltip stays within viewport
+                    if (left + tooltipRect.width > window.innerWidth) {
+                        left = iconRect.left - tooltipRect.width - 10;
+                    }
+                    if (top + tooltipRect.height > window.innerHeight) {
+                        top = window.innerHeight - tooltipRect.height - 10;
+                    }
+                    if (top < 10) {
+                        top = 10;
+                    }
+                    
+                    // Toggle tooltip visibility
+                    if (tooltip.style.display === 'block') {
+                        tooltip.style.display = 'none';
+                    } else {
+                        // Hide all other tooltips
+                        hideAllTooltips();
+                        
+                        // Show this tooltip
+                        tooltip.style.left = left + 'px';
+                        tooltip.style.top = top + 'px';
+                        tooltip.style.display = 'block';
+                        
+                        // Set timer to hide tooltip after 3 seconds on mobile
+                        tooltipTimer = setTimeout(() => {
+                            tooltip.style.display = 'none';
+                        }, 3000);
+                    }
+                });
             }
-          });
         });
         
-        document.addEventListener('click', function() {
-          clearTimeout(tooltipTimer);
-          document.querySelectorAll('.tooltip').forEach(tooltip => {
-            tooltip.style.display = 'none';
-          });
+        // Hide tooltips when clicking anywhere else
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.info-icon') && !e.target.closest('.tooltip')) {
+                hideAllTooltips();
+            }
+        });
+
+        // Update tooltip position on window resize
+        window.addEventListener('resize', function() {
+            document.querySelectorAll('.tooltip').forEach(tooltip => {
+                if (tooltip.style.display === 'block') {
+                    const icon = document.querySelector('.info-icon[data-tooltip="' + tooltip.innerHTML + '"]');
+                    if (icon && document.getElementById('bridgeToLayerSection').classList.contains('active')) {
+                        const iconRect = icon.getBoundingClientRect();
+                        const tooltipRect = tooltip.getBoundingClientRect();
+                        
+                        let left = iconRect.right + 10;
+                        let top = iconRect.top + (iconRect.height / 2) - (tooltipRect.height / 2);
+                        
+                        if (left + tooltipRect.width > window.innerWidth) {
+                            left = iconRect.left - tooltipRect.width - 10;
+                        }
+                        if (top + tooltipRect.height > window.innerHeight) {
+                            top = window.innerHeight - tooltipRect.height - 10;
+                        }
+                        if (top < 10) {
+                            top = 10;
+                        }
+                        
+                        tooltip.style.left = left + 'px';
+                        tooltip.style.top = top + 'px';
+                    } else {
+                        tooltip.style.display = 'none';
+                    }
+                }
+            });
         });
 
         // Add event listeners for input fields

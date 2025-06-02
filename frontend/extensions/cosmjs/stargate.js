@@ -56,19 +56,14 @@
 
         async getAccount(address) {
             try {
-                console.log('Fetching account info for:', address);
-                
                 // Use the correct REST API endpoint
                 const accountUrl = `${this.rpcUrl}/cosmos/auth/v1beta1/accounts/${address}`;
-                console.log('Fetching account from:', accountUrl);
                 
                 const response = await fetch(accountUrl);
-                console.log('Account response status:', response.status);
 
                 if (!response.ok) {
                     if (response.status === 404) {
                         // If account is new, return default values
-                        console.log('Account not found on chain, using default values for new account');
                         return {
                             account_number: "0",
                             sequence: "0"
@@ -80,7 +75,6 @@
                 }
 
                 const data = await response.json();
-                console.log('Account data:', data);
 
                 if (!data || !data.account) {
                     console.error('Invalid account response format:', data);
@@ -94,19 +88,12 @@
                 };
             } catch (error) {
                 console.error('Error in getAccount:', error);
-                console.error('Error details:', {
-                    message: error.message,
-                    stack: error.stack,
-                    name: error.name
-                });
                 throw error;
             }
         }
 
         async getBalance(address, searchDenom) {
             try {
-                console.log('Fetching balance for:', { address, searchDenom });
-                
                 // Use the offline signer to get the account
                 const accounts = await this.signer.getAccounts();
                 const account = accounts.find(acc => acc.address === address);
@@ -116,14 +103,10 @@
                     throw new Error('Account not found');
                 }
 
-                console.log('Found account:', account);
-
                 // Use the correct REST API endpoint
                 const baseUrl = 'https://node-palmito.tellorlayer.com';
                 const balanceUrl = `${baseUrl}/cosmos/bank/v1beta1/balances/${address}`;
                 
-                console.log('Fetching balance from:', balanceUrl);
-
                 const response = await fetch(balanceUrl, {
                     method: 'GET',
                     headers: {
@@ -132,11 +115,8 @@
                     }
                 });
 
-                console.log('Balance response status:', response.status);
-
                 if (!response.ok) {
                     if (response.status === 404) {
-                        console.log('No balances found for account');
                         return {
                             amount: "0",
                             denom: searchDenom
@@ -148,7 +128,6 @@
                 }
 
                 const data = await response.json();
-                console.log('Full balance response data:', JSON.stringify(data, null, 2));
 
                 if (!data || !data.balances) {
                     console.error('Invalid balance response format:', data);
@@ -168,11 +147,6 @@
                 };
             } catch (error) {
                 console.error('Error in getBalance:', error);
-                console.error('Error details:', {
-                    message: error.message,
-                    stack: error.stack,
-                    name: error.name
-                });
                 return {
                     amount: "0",
                     denom: searchDenom
@@ -181,16 +155,9 @@
         }
 
         async signAndBroadcast(signerAddress, messages, fee, memo = "") {
-            console.log('Starting signAndBroadcast...');
-            console.log('Signer address:', signerAddress);
-            console.log('Messages:', messages);
-            console.log('Fee:', fee);
-            console.log('Memo:', memo);
-
             try {
                 // Get account info
                 const accountInfo = await this.getAccount(signerAddress);
-                console.log('Account info:', accountInfo);
 
                 if (!accountInfo) {
                     throw new Error('Account not found');
@@ -225,12 +192,8 @@
                     memo: memo
                 };
 
-                console.log('Transaction to sign:', txToSign);
-
                 // Sign the transaction
-                console.log('Requesting signature from Keplr...');
                 const signResult = await this.signer.signAmino(signerAddress, txToSign);
-                console.log('Sign result:', signResult);
 
                 // Store the signature and public key for broadcasting
                 this.signature = signResult.signature.signature;
@@ -256,18 +219,14 @@
                     };
 
                 // Encode the message using the appropriate encoder
-                console.log('Encoding message:', messageToEncode.value);
                 const encoder = this.registry.get(messageToEncode.typeUrl);
                 if (!encoder) {
                     throw new Error(`No encoder found for message type: ${messageToEncode.typeUrl}`);
                 }
                 const encodedMessage = encoder.encode(messageToEncode.value);
-                console.log('Encoded message:', encodedMessage);
 
                 // Broadcast the transaction
                 const result = await this.broadcastTransaction(encodedMessage, messages[0]);
-                console.log('Broadcast result:', result);
-
                 return result;
             } catch (error) {
                 console.error('Error in signAndBroadcast:', error);
@@ -277,107 +236,101 @@
 
         // Helper method to handle transaction broadcasting
         async broadcastTransaction(txBytes, originalMessage, mode = "BROADCAST_MODE_SYNC") {
-            console.log('Broadcasting transaction...');
-            console.log('Transaction bytes:', txBytes);
-            console.log('Original message:', originalMessage);
-
-            // Create protobuf types
-            const root = new protobuf.Root();
-            
-            // Define Coin type
-            const Coin = new protobuf.Type("Coin")
-                .add(new protobuf.Field("denom", 1, "string"))
-                .add(new protobuf.Field("amount", 2, "string"));
-            
-            // Define Any type
-            const Any = new protobuf.Type("Any")
-                .add(new protobuf.Field("typeUrl", 1, "string"))
-                .add(new protobuf.Field("value", 2, "bytes"));
-            
-            // Define PubKey type for secp256k1
-            const PubKey = new protobuf.Type("PubKey")
-                .add(new protobuf.Field("key", 1, "bytes"));
-            
-            // Define TxBody type
-            const TxBody = new protobuf.Type("TxBody")
-                .add(new protobuf.Field("messages", 1, "Any", "repeated"))
-                .add(new protobuf.Field("memo", 2, "string"))
-                .add(new protobuf.Field("timeoutHeight", 3, "uint64"));
-            
-            // Define SignMode enum
-            const SignMode = new protobuf.Enum("SignMode")
-                .add("SIGN_MODE_UNSPECIFIED", 0)
-                .add("SIGN_MODE_DIRECT", 1)
-                .add("SIGN_MODE_TEXTUAL", 2)
-                .add("SIGN_MODE_LEGACY_AMINO_JSON", 127);
-            
-            // Define Single type
-            const Single = new protobuf.Type("Single")
-                .add(new protobuf.Field("mode", 1, "SignMode"));
-            
-            // Define ModeInfo type
-            const ModeInfo = new protobuf.Type("ModeInfo")
-                .add(new protobuf.Field("single", 1, "Single"));
-            
-            // Define SignerInfo type
-            const SignerInfo = new protobuf.Type("SignerInfo")
-                .add(new protobuf.Field("publicKey", 1, "Any"))
-                .add(new protobuf.Field("modeInfo", 2, "ModeInfo"))
-                .add(new protobuf.Field("sequence", 3, "uint64"));
-            
-            // Define Fee type
-            const Fee = new protobuf.Type("Fee")
-                .add(new protobuf.Field("amount", 1, "Coin", "repeated"))
-                .add(new protobuf.Field("gasLimit", 2, "uint64"))
-                .add(new protobuf.Field("payer", 3, "string"))
-                .add(new protobuf.Field("granter", 4, "string"));
-            
-            // Define AuthInfo type
-            const AuthInfo = new protobuf.Type("AuthInfo")
-                .add(new protobuf.Field("signerInfos", 1, "SignerInfo", "repeated"))
-                .add(new protobuf.Field("fee", 2, "Fee"));
-            
-            // Define Tx type
-            const Tx = new protobuf.Type("Tx")
-                .add(new protobuf.Field("body", 1, "TxBody"))
-                .add(new protobuf.Field("authInfo", 2, "AuthInfo"))
-                .add(new protobuf.Field("signatures", 3, "bytes", "repeated"));
-
-            // Add types to root
-            root.add(Coin);
-            root.add(Any);
-            root.add(PubKey);
-            root.add(TxBody);
-            root.add(SignMode);
-            root.add(Single);
-            root.add(ModeInfo);
-            root.add(SignerInfo);
-            root.add(Fee);
-            root.add(AuthInfo);
-            root.add(Tx);
-
-            // Get the types
-            const TxType = root.lookupType("Tx");
-            const AnyType = root.lookupType("Any");
-            const TxBodyType = root.lookupType("TxBody");
-            const AuthInfoType = root.lookupType("AuthInfo");
-            const PubKeyType = root.lookupType("PubKey");
-
             try {
+                // Create protobuf types
+                const root = new protobuf.Root();
+                
+                // Define Coin type
+                const Coin = new protobuf.Type("Coin")
+                    .add(new protobuf.Field("denom", 1, "string"))
+                    .add(new protobuf.Field("amount", 2, "string"));
+                
+                // Define Any type
+                const Any = new protobuf.Type("Any")
+                    .add(new protobuf.Field("typeUrl", 1, "string"))
+                    .add(new protobuf.Field("value", 2, "bytes"));
+                
+                // Define PubKey type for secp256k1
+                const PubKey = new protobuf.Type("PubKey")
+                    .add(new protobuf.Field("key", 1, "bytes"));
+                
+                // Define TxBody type
+                const TxBody = new protobuf.Type("TxBody")
+                    .add(new protobuf.Field("messages", 1, "Any", "repeated"))
+                    .add(new protobuf.Field("memo", 2, "string"))
+                    .add(new protobuf.Field("timeoutHeight", 3, "uint64"));
+                
+                // Define SignMode enum
+                const SignMode = new protobuf.Enum("SignMode")
+                    .add("SIGN_MODE_UNSPECIFIED", 0)
+                    .add("SIGN_MODE_DIRECT", 1)
+                    .add("SIGN_MODE_TEXTUAL", 2)
+                    .add("SIGN_MODE_LEGACY_AMINO_JSON", 127);
+                
+                // Define Single type
+                const Single = new protobuf.Type("Single")
+                    .add(new protobuf.Field("mode", 1, "SignMode"));
+                
+                // Define ModeInfo type
+                const ModeInfo = new protobuf.Type("ModeInfo")
+                    .add(new protobuf.Field("single", 1, "Single"));
+                
+                // Define SignerInfo type
+                const SignerInfo = new protobuf.Type("SignerInfo")
+                    .add(new protobuf.Field("publicKey", 1, "Any"))
+                    .add(new protobuf.Field("modeInfo", 2, "ModeInfo"))
+                    .add(new protobuf.Field("sequence", 3, "uint64"));
+                
+                // Define Fee type
+                const Fee = new protobuf.Type("Fee")
+                    .add(new protobuf.Field("amount", 1, "Coin", "repeated"))
+                    .add(new protobuf.Field("gasLimit", 2, "uint64"))
+                    .add(new protobuf.Field("payer", 3, "string"))
+                    .add(new protobuf.Field("granter", 4, "string"));
+                
+                // Define AuthInfo type
+                const AuthInfo = new protobuf.Type("AuthInfo")
+                    .add(new protobuf.Field("signerInfos", 1, "SignerInfo", "repeated"))
+                    .add(new protobuf.Field("fee", 2, "Fee"));
+                
+                // Define Tx type
+                const Tx = new protobuf.Type("Tx")
+                    .add(new protobuf.Field("body", 1, "TxBody"))
+                    .add(new protobuf.Field("authInfo", 2, "AuthInfo"))
+                    .add(new protobuf.Field("signatures", 3, "bytes", "repeated"));
+
+                // Add types to root
+                root.add(Coin);
+                root.add(Any);
+                root.add(PubKey);
+                root.add(TxBody);
+                root.add(SignMode);
+                root.add(Single);
+                root.add(ModeInfo);
+                root.add(SignerInfo);
+                root.add(Fee);
+                root.add(AuthInfo);
+                root.add(Tx);
+
+                // Get the types
+                const TxType = root.lookupType("Tx");
+                const AnyType = root.lookupType("Any");
+                const TxBodyType = root.lookupType("TxBody");
+                const AuthInfoType = root.lookupType("AuthInfo");
+                const PubKeyType = root.lookupType("PubKey");
+
                 // Get the account from the signer
                 const accounts = await this.signer.getAccounts();
                 if (!accounts || accounts.length === 0) {
                     throw new Error('No accounts found in signer');
                 }
                 const account = accounts[0];
-                console.log('Using account:', account);
 
                 // Create the message Any
                 const messageAny = {
                     typeUrl: originalMessage.typeUrl,
                     value: txBytes
                 };
-                console.log('Creating message Any:', messageAny);
 
                 // Create the TxBody with the message
                 const txBody = {
@@ -387,13 +340,11 @@
                         : "Request attestations for withdrawal",
                     timeoutHeight: 0
                 };
-                console.log('Creating TxBody:', txBody);
 
                 // Create the public key
                 const pubKey = {
                     key: this.publicKey
                 };
-                console.log('Creating public key:', pubKey);
                 const encodedPubKey = PubKeyType.encode(pubKey).finish();
 
                 // Create the public key Any
@@ -401,7 +352,6 @@
                     typeUrl: "/cosmos.crypto.secp256k1.PubKey",
                     value: encodedPubKey
                 };
-                console.log('Creating public key Any:', pubKeyAny);
 
                 // Create the AuthInfo
                 const authInfo = {
@@ -421,7 +371,6 @@
                         granter: ""
                     }
                 };
-                console.log('Creating AuthInfo:', authInfo);
 
                 // Create the final transaction
                 const tx = {
@@ -429,29 +378,11 @@
                     authInfo: authInfo,
                     signatures: [this.signature]
                 };
-                console.log('Creating final transaction:', tx);
 
                 // Create and encode the final transaction
                 const txObj = TxType.create(tx);
                 const encodedTx = TxType.encode(txObj).finish();
-                console.log('Encoded final transaction:', encodedTx);
-
-                // Convert to base64
                 const base64Tx = btoa(String.fromCharCode.apply(null, encodedTx));
-
-                // Log the transaction details for debugging
-                console.log('Transaction details:', {
-                    messageAny,
-                    txBody,
-                    pubKey,
-                    pubKeyAny,
-                    authInfo,
-                    tx,
-                    base64Tx,
-                    encodedTxLength: encodedTx.length,
-                    encodedPubKeyLength: encodedPubKey.length,
-                    messageLength: txBytes.length
-                });
 
                 // Broadcast the transaction using the encoded bytes
                 const response = await fetch(`${this.rpcUrl}/cosmos/tx/v1beta1/txs`, {
@@ -466,13 +397,11 @@
                 });
 
                 const result = await response.json();
-                console.log('Broadcast result:', result);
 
                 if (result.tx_response?.code !== 0) {
                     console.error('Transaction error details:', {
                         code: result.tx_response?.code,
                         message: result.tx_response?.raw_log,
-                        tx_response: result.tx_response,
                         txHash: result.tx_response?.txhash,
                         height: result.tx_response?.height
                     });
@@ -481,15 +410,12 @@
 
                 // Poll for transaction status
                 const txHash = result.tx_response.txhash;
-                console.log('Polling for transaction status:', txHash);
-                
                 let attempts = 0;
                 const maxAttempts = 10;
                 const pollInterval = 2000; // 2 seconds
 
                 while (attempts < maxAttempts) {
                     attempts++;
-                    console.log(`Polling attempt ${attempts}/${maxAttempts}`);
                     
                     try {
                         const statusResponse = await fetch(`${this.rpcUrl}/cosmos/tx/v1beta1/txs/${txHash}`);
@@ -497,21 +423,18 @@
                         
                         if (statusResponse.ok && statusData.tx_response) {
                             const txResponse = statusData.tx_response;
-                            console.log('Transaction status:', txResponse);
                             
                             if (txResponse.height !== "0") {
                                 // Transaction has been included in a block
                                 if (txResponse.code === 0) {
-                                    console.log('Transaction successful:', txResponse);
                                     return txResponse;
                                 } else {
-                                    console.error('Transaction failed:', txResponse);
                                     throw new Error(txResponse.raw_log || 'Transaction failed');
                                 }
                             }
                         }
                     } catch (error) {
-                        console.log('Error polling transaction status:', error);
+                        console.error('Error polling transaction status:', error);
                     }
                     
                     // Wait before next attempt
@@ -519,7 +442,6 @@
                 }
 
                 // If we get here, the transaction hasn't been included in a block
-                console.log('Transaction broadcast successful but not yet included in a block');
                 return result.tx_response;
             } catch (error) {
                 console.error('Error encoding transaction:', error);
@@ -628,23 +550,14 @@
 
     async function withdrawFromLayer(amount, ethereumAddress, account) {
         try {
-            console.log('Starting withdrawal process...');
             const amountInMicroUnits = (parseFloat(amount) * 1000000).toString();
-            console.log('Withdrawing with params:', {
-                amount,
-                amountInMicroUnits,
-                ethereumAddress,
-                account
-            });
 
             const offlineSigner = window.getOfflineSigner('layertest-4');
-            console.log('Got offline signer');
 
             const client = await SigningStargateClient.connectWithSigner(
                 'https://node-palmito.tellorlayer.com/rpc',
                 offlineSigner
             );
-            console.log('Connected to signing client');
 
             // Create a fresh message each time
             const msg = {
@@ -658,14 +571,11 @@
                     }
                 }
             };
-            console.log('Created message:', msg);
 
             // Show pending popup
             showPendingPopup();
-            console.log('Showing pending popup');
 
             // Sign and broadcast the transaction
-            console.log('Attempting to sign and broadcast transaction...');
             const result = await client.signAndBroadcast(
                 account,
                 [msg],
@@ -676,7 +586,6 @@
                 'Withdraw TRB to Ethereum'
             );
 
-            console.log('Transaction result:', result);
             hidePendingPopup();
             showSuccessPopup();
             return result;
@@ -690,21 +599,12 @@
 
     async function requestAttestations(account, queryId, timestamp) {
         try {
-            console.log('Starting attestation request process...');
-            console.log('Requesting attestations with params:', {
-                account,
-                queryId,
-                timestamp
-            });
-
             const offlineSigner = window.getOfflineSigner('layertest-4');
-            console.log('Got offline signer');
 
             const client = await SigningStargateClient.connectWithSigner(
                 'https://node-palmito.tellorlayer.com/rpc',
                 offlineSigner
             );
-            console.log('Connected to signing client');
 
             // Create the message using the same pattern as withdrawal
             const msg = {
@@ -715,10 +615,8 @@
                     timestamp: timestamp.toString() // Ensure timestamp is a string
                 }
             };
-            console.log('Created message:', msg);
 
             // Sign and broadcast using the same pattern as withdrawal
-            console.log('Attempting to sign and broadcast transaction...');
             const result = await client.signAndBroadcast(
                 account,
                 [msg],
@@ -729,7 +627,6 @@
                 'Request attestations for withdrawal'
             );
 
-            console.log('Transaction result:', result);
             return result;
         } catch (error) {
             console.error('Transaction error:', error);
