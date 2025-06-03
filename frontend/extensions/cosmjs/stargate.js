@@ -1,0 +1,652 @@
+// @cosmjs/stargate v0.28.11
+(function(global, factory) {
+    typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
+    typeof define === 'function' && define.amd ? define(['exports'], factory) :
+    (global = global || self, factory(global.cosmjs = global.cosmjs || {}, global.cosmjs.stargate = {}));
+}(this, (function (exports) {
+    'use strict';
+
+    // Add registry for custom message types
+    const customTypes = [
+        ["/layer.bridge.MsgWithdrawTokens", {
+            encode: (message) => {
+                // Create a fresh message each time
+                const msg = {
+                    creator: message.creator,
+                    recipient: message.recipient.toLowerCase(),
+                    amount: {
+                        denom: message.amount.denom,
+                        amount: message.amount.amount.toString()
+                    }
+                };
+                return window.layerProto.bridge.MsgWithdrawTokens.encode(msg);
+            },
+            decode: (binary) => {
+                return window.layerProto.bridge.MsgWithdrawTokens.decode(binary);
+            }
+        }],
+        ["/layer.bridge.MsgRequestAttestations", {
+            encode: (message) => {
+                // Create a fresh message each time
+                const msg = {
+                    creator: message.creator,
+                    query_id: message.query_id,
+                    timestamp: message.timestamp.toString()
+                };
+                return window.layerProto.bridge.MsgRequestAttestations.encode(msg);
+            },
+            decode: (binary) => {
+                return window.layerProto.bridge.MsgRequestAttestations.decode(binary);
+            }
+        }]
+    ];
+
+    // Stargate client implementation
+    class SigningStargateClient {
+        constructor(rpcUrl, signer) {
+            // Remove any trailing slashes and ensure we don't have /rpc in the base URL
+            this.rpcUrl = (rpcUrl || "https://node-palmito.tellorlayer.com").replace(/\/+$/, '').replace(/\/rpc$/, '');
+            this.signer = signer;
+            this.registry = new Map(customTypes);
+        }
+
+        static async connectWithSigner(rpcUrl, signer) {
+            return new SigningStargateClient(rpcUrl, signer);
+        }
+
+        async getAccount(address) {
+            try {
+                // Use the correct REST API endpoint
+                const accountUrl = `${this.rpcUrl}/cosmos/auth/v1beta1/accounts/${address}`;
+                
+                const response = await fetch(accountUrl);
+
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        // If account is new, return default values
+                        return {
+                            account_number: "0",
+                            sequence: "0"
+                        };
+                    }
+                    const errorText = await response.text();
+                    console.error('Account fetch error:', errorText);
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (!data || !data.account) {
+                    console.error('Invalid account response format:', data);
+                    throw new Error('Invalid response format');
+                }
+
+                // Extract account number and sequence
+                return {
+                    account_number: data.account.account_number || "0",
+                    sequence: data.account.sequence || "0"
+                };
+            } catch (error) {
+                console.error('Error in getAccount:', error);
+                throw error;
+            }
+        }
+
+        async getBalance(address, searchDenom) {
+            try {
+                // Use the offline signer to get the account
+                const accounts = await this.signer.getAccounts();
+                const account = accounts.find(acc => acc.address === address);
+                
+                if (!account) {
+                    console.error('Account not found in signer');
+                    throw new Error('Account not found');
+                }
+
+                // Use the correct REST API endpoint
+                const baseUrl = 'https://node-palmito.tellorlayer.com';
+                const balanceUrl = `${baseUrl}/cosmos/bank/v1beta1/balances/${address}`;
+                
+                const response = await fetch(balanceUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        return {
+                            amount: "0",
+                            denom: searchDenom
+                        };
+                    }
+                    const errorText = await response.text();
+                    console.error('Balance fetch error:', errorText);
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (!data || !data.balances) {
+                    console.error('Invalid balance response format:', data);
+                    throw new Error('Invalid response format');
+                }
+
+                // Find the balance with the matching denom
+                const balance = data.balances.find(b => b.denom === searchDenom);
+                if (balance) {
+                    return balance;
+                }
+
+                // If no matching balance found, return default
+                return {
+                    amount: "0",
+                    denom: searchDenom
+                };
+            } catch (error) {
+                console.error('Error in getBalance:', error);
+                return {
+                    amount: "0",
+                    denom: searchDenom
+                };
+            }
+        }
+
+        async signAndBroadcast(signerAddress, messages, fee, memo = "") {
+            try {
+                // Get account info
+                const accountInfo = await this.getAccount(signerAddress);
+
+                if (!accountInfo) {
+                    throw new Error('Account not found');
+                }
+
+                // Create the transaction to sign
+                const txToSign = {
+                    chain_id: 'layertest-4',
+                    account_number: accountInfo.account_number,
+                    sequence: accountInfo.sequence,
+                    fee: {
+                        amount: fee.amount,
+                        gas: fee.gas
+                    },
+                    msgs: messages.map(msg => {
+                        // Only modify recipient for withdrawal messages
+                        if (msg.typeUrl === '/layer.bridge.MsgWithdrawTokens' && msg.value.recipient) {
+                            return {
+                                type: msg.typeUrl,
+                                value: {
+                                    ...msg.value,
+                                    recipient: msg.value.recipient.toLowerCase().replace('0x', '')
+                                }
+                            };
+                        }
+                        // For attestation requests, just pass through the message as is
+                        return {
+                            type: msg.typeUrl,
+                            value: msg.value
+                        };
+                    }),
+                    memo: memo
+                };
+
+                // Sign the transaction
+                const signResult = await this.signer.signAmino(signerAddress, txToSign);
+
+                // Store the signature and public key for broadcasting
+                this.signature = signResult.signature.signature;
+                this.publicKey = signResult.signature.pub_key.value;
+                this.sequence = accountInfo.sequence;
+
+                // Create a fresh message based on type
+                const messageToEncode = messages[0].typeUrl === '/layer.bridge.MsgWithdrawTokens' 
+                    ? {
+                        ...messages[0],
+                        value: {
+                            ...messages[0].value,
+                            recipient: messages[0].value.recipient.toLowerCase().replace('0x', '')
+                        }
+                    }
+                    : {
+                        ...messages[0],
+                        value: {
+                            creator: messages[0].value.creator,
+                            query_id: messages[0].value.query_id,
+                            timestamp: messages[0].value.timestamp.toString()
+                        }
+                    };
+
+                // Encode the message using the appropriate encoder
+                const encoder = this.registry.get(messageToEncode.typeUrl);
+                if (!encoder) {
+                    throw new Error(`No encoder found for message type: ${messageToEncode.typeUrl}`);
+                }
+                const encodedMessage = encoder.encode(messageToEncode.value);
+
+                // Broadcast the transaction
+                const result = await this.broadcastTransaction(encodedMessage, messages[0]);
+                return result;
+            } catch (error) {
+                console.error('Error in signAndBroadcast:', error);
+                throw error;
+            }
+        }
+
+        // Helper method to handle transaction broadcasting
+        async broadcastTransaction(txBytes, originalMessage, mode = "BROADCAST_MODE_SYNC") {
+            try {
+                // Create protobuf types
+                const root = new protobuf.Root();
+                
+                // Define Coin type
+                const Coin = new protobuf.Type("Coin")
+                    .add(new protobuf.Field("denom", 1, "string"))
+                    .add(new protobuf.Field("amount", 2, "string"));
+                
+                // Define Any type
+                const Any = new protobuf.Type("Any")
+                    .add(new protobuf.Field("typeUrl", 1, "string"))
+                    .add(new protobuf.Field("value", 2, "bytes"));
+                
+                // Define PubKey type for secp256k1
+                const PubKey = new protobuf.Type("PubKey")
+                    .add(new protobuf.Field("key", 1, "bytes"));
+                
+                // Define TxBody type
+                const TxBody = new protobuf.Type("TxBody")
+                    .add(new protobuf.Field("messages", 1, "Any", "repeated"))
+                    .add(new protobuf.Field("memo", 2, "string"))
+                    .add(new protobuf.Field("timeoutHeight", 3, "uint64"));
+                
+                // Define SignMode enum
+                const SignMode = new protobuf.Enum("SignMode")
+                    .add("SIGN_MODE_UNSPECIFIED", 0)
+                    .add("SIGN_MODE_DIRECT", 1)
+                    .add("SIGN_MODE_TEXTUAL", 2)
+                    .add("SIGN_MODE_LEGACY_AMINO_JSON", 127);
+                
+                // Define Single type
+                const Single = new protobuf.Type("Single")
+                    .add(new protobuf.Field("mode", 1, "SignMode"));
+                
+                // Define ModeInfo type
+                const ModeInfo = new protobuf.Type("ModeInfo")
+                    .add(new protobuf.Field("single", 1, "Single"));
+                
+                // Define SignerInfo type
+                const SignerInfo = new protobuf.Type("SignerInfo")
+                    .add(new protobuf.Field("publicKey", 1, "Any"))
+                    .add(new protobuf.Field("modeInfo", 2, "ModeInfo"))
+                    .add(new protobuf.Field("sequence", 3, "uint64"));
+                
+                // Define Fee type
+                const Fee = new protobuf.Type("Fee")
+                    .add(new protobuf.Field("amount", 1, "Coin", "repeated"))
+                    .add(new protobuf.Field("gasLimit", 2, "uint64"))
+                    .add(new protobuf.Field("payer", 3, "string"))
+                    .add(new protobuf.Field("granter", 4, "string"));
+                
+                // Define AuthInfo type
+                const AuthInfo = new protobuf.Type("AuthInfo")
+                    .add(new protobuf.Field("signerInfos", 1, "SignerInfo", "repeated"))
+                    .add(new protobuf.Field("fee", 2, "Fee"));
+                
+                // Define Tx type
+                const Tx = new protobuf.Type("Tx")
+                    .add(new protobuf.Field("body", 1, "TxBody"))
+                    .add(new protobuf.Field("authInfo", 2, "AuthInfo"))
+                    .add(new protobuf.Field("signatures", 3, "bytes", "repeated"));
+
+                // Add types to root
+                root.add(Coin);
+                root.add(Any);
+                root.add(PubKey);
+                root.add(TxBody);
+                root.add(SignMode);
+                root.add(Single);
+                root.add(ModeInfo);
+                root.add(SignerInfo);
+                root.add(Fee);
+                root.add(AuthInfo);
+                root.add(Tx);
+
+                // Get the types
+                const TxType = root.lookupType("Tx");
+                const AnyType = root.lookupType("Any");
+                const TxBodyType = root.lookupType("TxBody");
+                const AuthInfoType = root.lookupType("AuthInfo");
+                const PubKeyType = root.lookupType("PubKey");
+
+                // Get the account from the signer
+                const accounts = await this.signer.getAccounts();
+                if (!accounts || accounts.length === 0) {
+                    throw new Error('No accounts found in signer');
+                }
+                const account = accounts[0];
+
+                // Create the message Any
+                const messageAny = {
+                    typeUrl: originalMessage.typeUrl,
+                    value: txBytes
+                };
+
+                // Create the TxBody with the message
+                const txBody = {
+                    messages: [messageAny],
+                    memo: originalMessage.typeUrl === '/layer.bridge.MsgWithdrawTokens' 
+                        ? "Withdraw TRB to Ethereum"
+                        : "Request attestations for withdrawal",
+                    timeoutHeight: 0
+                };
+
+                // Create the public key
+                const pubKey = {
+                    key: this.publicKey
+                };
+                const encodedPubKey = PubKeyType.encode(pubKey).finish();
+
+                // Create the public key Any
+                const pubKeyAny = {
+                    typeUrl: "/cosmos.crypto.secp256k1.PubKey",
+                    value: encodedPubKey
+                };
+
+                // Create the AuthInfo
+                const authInfo = {
+                    signerInfos: [{
+                        publicKey: pubKeyAny,
+                        modeInfo: {
+                            single: {
+                                mode: 127 // SIGN_MODE_LEGACY_AMINO_JSON
+                            }
+                        },
+                        sequence: parseInt(this.sequence)
+                    }],
+                    fee: {
+                        amount: [{ denom: "loya", amount: "5000" }],
+                        gasLimit: parseInt("200000"),
+                        payer: "",
+                        granter: ""
+                    }
+                };
+
+                // Create the final transaction
+                const tx = {
+                    body: txBody,
+                    authInfo: authInfo,
+                    signatures: [this.signature]
+                };
+
+                // Create and encode the final transaction
+                const txObj = TxType.create(tx);
+                const encodedTx = TxType.encode(txObj).finish();
+                const base64Tx = btoa(String.fromCharCode.apply(null, encodedTx));
+
+                // Broadcast the transaction using the encoded bytes
+                const response = await fetch(`${this.rpcUrl}/cosmos/tx/v1beta1/txs`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        tx_bytes: base64Tx,
+                        mode: mode
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.tx_response?.code !== 0) {
+                    console.error('Transaction error details:', {
+                        code: result.tx_response?.code,
+                        message: result.tx_response?.raw_log,
+                        txHash: result.tx_response?.txhash,
+                        height: result.tx_response?.height
+                    });
+                    throw new Error(result.tx_response?.raw_log || 'Transaction failed');
+                }
+
+                // Poll for transaction status
+                const txHash = result.tx_response.txhash;
+                let attempts = 0;
+                const maxAttempts = 10;
+                const pollInterval = 2000; // 2 seconds
+
+                while (attempts < maxAttempts) {
+                    attempts++;
+                    
+                    try {
+                        const statusResponse = await fetch(`${this.rpcUrl}/cosmos/tx/v1beta1/txs/${txHash}`);
+                        const statusData = await statusResponse.json();
+                        
+                        if (statusResponse.ok && statusData.tx_response) {
+                            const txResponse = statusData.tx_response;
+                            
+                            if (txResponse.height !== "0") {
+                                // Transaction has been included in a block
+                                if (txResponse.code === 0) {
+                                    return txResponse;
+                                } else {
+                                    throw new Error(txResponse.raw_log || 'Transaction failed');
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error polling transaction status:', error);
+                    }
+                    
+                    // Wait before next attempt
+                    await new Promise(resolve => setTimeout(resolve, pollInterval));
+                }
+
+                // If we get here, the transaction hasn't been included in a block
+                return result.tx_response;
+            } catch (error) {
+                console.error('Error encoding transaction:', error);
+                throw error;
+            }
+        }
+    }
+
+    // Export to both module and global scope
+    exports.SigningStargateClient = SigningStargateClient;
+    
+    // Ensure cosmjs object exists
+    window.cosmjs = window.cosmjs || {};
+    window.cosmjs.stargate = window.cosmjs.stargate || {};
+    
+    // Export to both locations
+    window.cosmjs.stargate.SigningStargateClient = SigningStargateClient;
+    window.cosmjsStargate = {
+        SigningStargateClient: SigningStargateClient
+    };
+
+    async function pollTransactionStatus(txHash) {
+        try {
+            // Format the hash to match the expected format (remove '0x' if present and ensure uppercase)
+            const formattedHash = txHash.replace('0x', '').toUpperCase();
+            const baseUrl = 'https://node-palmito.tellorlayer.com';
+            
+            // Try both endpoints
+            const endpoints = [
+                `${baseUrl}/rpc/tx?hash=0x${formattedHash}&prove=false`,
+                `${baseUrl}/cosmos/tx/v1beta1/txs/${formattedHash}`
+            ];
+            
+            console.log('Polling transaction status from:', endpoints[0]);
+            
+            // Try the first endpoint
+            let response = await fetch(endpoints[0]);
+            let data;
+            
+            if (!response.ok) {
+                console.log('First endpoint failed, trying second endpoint...');
+                // Try the second endpoint
+                response = await fetch(endpoints[1]);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch transaction status: ${response.status}`);
+                }
+            }
+            
+            data = await response.json();
+            console.log('Transaction status:', data);
+            
+            // Handle both response formats
+            let txResult;
+            if (data.result && data.result.tx_result) {
+                // First endpoint format
+                txResult = data.result.tx_result;
+            } else if (data.tx_response) {
+                // Second endpoint format
+                txResult = data.tx_response;
+            } else {
+                throw new Error('Unexpected response format');
+            }
+            
+            // Check if transaction was successful
+            if (txResult.code === 0) {
+                console.log('Transaction successful!');
+                console.log('Gas used:', txResult.gas_used);
+                console.log('Gas wanted:', txResult.gas_wanted);
+                
+                // Look for the tokens_withdrawn event
+                const events = txResult.events || [];
+                const withdrawEvent = events.find(event => event.type === 'tokens_withdrawn');
+                if (withdrawEvent) {
+                    console.log('Withdrawal details:', {
+                        sender: withdrawEvent.attributes.find(attr => attr.key === 'sender')?.value,
+                        recipient: withdrawEvent.attributes.find(attr => attr.key === 'recipient_evm_address')?.value,
+                        amount: withdrawEvent.attributes.find(attr => attr.key === 'amount')?.value,
+                        withdrawId: withdrawEvent.attributes.find(attr => attr.key === 'withdraw_id')?.value
+                    });
+                }
+                
+                return {
+                    success: true,
+                    height: data.result?.height || data.tx_response?.height,
+                    gasUsed: txResult.gas_used,
+                    gasWanted: txResult.gas_wanted,
+                    events: events
+                };
+            } else {
+                console.error('Transaction failed:', txResult.log);
+                return {
+                    success: false,
+                    error: txResult.log
+                };
+            }
+        } catch (error) {
+            console.error('Error polling transaction status:', error);
+            // Don't throw the error, just return a failure status
+            return {
+                success: false,
+                error: error.message,
+                retryable: true // Indicate that this error might be temporary
+            };
+        }
+    }
+
+    async function withdrawFromLayer(amount, ethereumAddress, account) {
+        try {
+            const amountInMicroUnits = (parseFloat(amount) * 1000000).toString();
+
+            const offlineSigner = window.getOfflineSigner('layertest-4');
+
+            const client = await SigningStargateClient.connectWithSigner(
+                'https://node-palmito.tellorlayer.com/rpc',
+                offlineSigner
+            );
+
+            // Create a fresh message each time
+            const msg = {
+                typeUrl: '/layer.bridge.MsgWithdrawTokens',
+                value: {
+                    creator: account,
+                    recipient: ethereumAddress,
+                    amount: {
+                        amount: amountInMicroUnits,
+                        denom: 'loya'
+                    }
+                }
+            };
+
+            // Show pending popup
+            showPendingPopup();
+
+            // Sign and broadcast the transaction
+            const result = await client.signAndBroadcast(
+                account,
+                [msg],
+                {
+                    amount: [{ denom: 'loya', amount: '5000' }],
+                    gas: '200000'
+                },
+                'Withdraw TRB to Ethereum'
+            );
+
+            hidePendingPopup();
+            showSuccessPopup();
+            return result;
+        } catch (error) {
+            console.error('Transaction error:', error);
+            hidePendingPopup();
+            showErrorPopup(error.message);
+            throw error;
+        }
+    }
+
+    async function requestAttestations(account, queryId, timestamp) {
+        try {
+            const offlineSigner = window.getOfflineSigner('layertest-4');
+
+            const client = await SigningStargateClient.connectWithSigner(
+                'https://node-palmito.tellorlayer.com/rpc',
+                offlineSigner
+            );
+
+            // Create the message using the same pattern as withdrawal
+            const msg = {
+                typeUrl: '/layer.bridge.MsgRequestAttestations',
+                value: {
+                    creator: account,
+                    query_id: queryId,
+                    timestamp: timestamp.toString() // Ensure timestamp is a string
+                }
+            };
+
+            // Sign and broadcast using the same pattern as withdrawal
+            const result = await client.signAndBroadcast(
+                account,
+                [msg],
+                {
+                    amount: [{ denom: 'loya', amount: '5000' }],
+                    gas: '200000'
+                },
+                'Request attestations for withdrawal'
+            );
+
+            return result;
+        } catch (error) {
+            console.error('Transaction error:', error);
+            throw error;
+        }
+    }
+
+    // Export to both module and global scope
+    exports.SigningStargateClient = SigningStargateClient;
+    exports.requestAttestations = requestAttestations;
+
+    // Ensure cosmjs object exists
+    window.cosmjs = window.cosmjs || {};
+    window.cosmjs.stargate = window.cosmjs.stargate || {};
+
+    // Export to both locations
+    window.cosmjs.stargate.SigningStargateClient = SigningStargateClient;
+    window.cosmjs.stargate.requestAttestations = requestAttestations;
+    window.cosmjsStargate = {
+        SigningStargateClient: SigningStargateClient,
+        requestAttestations: requestAttestations
+    };
+}))); 

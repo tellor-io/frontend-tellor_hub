@@ -1,4 +1,13 @@
-var App = {
+import { ethers } from 'https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.esm.min.js';
+import { 
+    generateWithdrawalQueryId, 
+    generateDepositQueryId,
+    isWithdrawClaimed,
+    Deposit
+} from './js/bridgeContract.js';
+
+// Create the App object
+const App = {
   web3Provider: null,
   contracts: {},
   account: "0x0",
@@ -6,73 +15,443 @@ var App = {
   bridgeAddress: {},
   tokenAddress: {},
   web3: null,
+  ethers: null,  // Add ethers instance
   tokenDecimals: 0,
   depositLimit: null,
   depositId: 0,
   deposits: {},
   isProcessingAccountChange: false,
+  keplrProvider: null,
+  isKeplrConnected: false,
+  connectedWallet: null,
+  keplrAddress: null,
+  currentBridgeDirection: 'layer', // 'layer' or 'ethereum'
 
   _depositLimit: function() {
     return App.depositLimit;
   },
 
   init: function () {
-    return App.initWeb3().then(function() {
-        App.initInputValidation();
+    return new Promise((resolve, reject) => {
+      try {
+        // Initialize ethers
+        App.ethers = ethers;
+        
+        // Wait for CosmJS to be loaded
+        if (!window.cosmjsLoaded) {
+          throw new Error('CosmJS not loaded yet');
+        }
+
+        // Verify CosmJS is available
+        if (typeof window.cosmjs === 'undefined' || typeof window.cosmjs.stargate === 'undefined') {
+          throw new Error('CosmJS not properly loaded');
+        }
+
+        App.initWeb3()
+          .then(() => {
+            App.initInputValidation();
+            App.initBridgeDirectionUI(); // Initialize bridge direction UI
+            
+            // Remove any existing event listeners
+            const walletButton = document.getElementById('walletButton');
+            const metamaskButton = document.getElementById('metamaskButton');
+            const keplrButton = document.getElementById('keplrButton');
+
+            if (walletButton) {
+                const newWalletButton = walletButton.cloneNode(true);
+                walletButton.parentNode.replaceChild(newWalletButton, walletButton);
+                newWalletButton.addEventListener('click', async () => {
+                    try {
+                        if (App.isConnected) {
+                            await App.disconnectMetaMask();
+                        } else {
+                            await App.connectMetaMask();
+                        }
+                    } catch (error) {
+                        console.error('MetaMask operation failed:', error);
+                        App.handleError(error);
+                    }
+                });
+            }
+
+            if (metamaskButton) {
+                const newMetamaskButton = metamaskButton.cloneNode(true);
+                metamaskButton.parentNode.replaceChild(newMetamaskButton, metamaskButton);
+                newMetamaskButton.addEventListener('click', async () => {
+                    try {
+                        if (App.isConnected) {
+                            await App.disconnectMetaMask();
+                        } else {
+                            await App.connectMetaMask();
+                        }
+                    } catch (error) {
+                        console.error('MetaMask operation failed:', error);
+                        App.handleError(error);
+                    }
+                });
+            }
+
+            if (keplrButton) {
+                const newKeplrButton = keplrButton.cloneNode(true);
+                keplrButton.parentNode.replaceChild(newKeplrButton, keplrButton);
+                newKeplrButton.addEventListener('click', async () => {
+                    try {
+                        if (App.isKeplrConnected) {
+                            await App.disconnectKeplr();
+                        } else {
+                            await App.connectKeplr();
+                        }
+                    } catch (error) {
+                        console.error('Keplr operation failed:', error);
+                        App.handleError(error);
+                    }
+                });
+            }
+
+            resolve();
+          })
+          .catch(error => {
+            console.error("Error initializing app:", error);
+            reject(error);
+          });
+      } catch (error) {
+        console.error("Initialization error:", error);
+        reject(error);
+      }
     });
   },
 
   initWeb3: function () {
     return new Promise((resolve, reject) => {
-        if (typeof window.ethereum !== 'undefined') {
-            // Define event handlers before adding listeners
-            const handleDisconnect = () => {
-                console.log('MetaMask disconnected');
-                App.disconnectWallet();
-            };
+      try {
+        // Check for both MetaMask and Keplr
+        const hasMetaMask = typeof window.ethereum !== 'undefined';
+        const hasKeplr = typeof window.keplr !== 'undefined';
+        
+        // Handle MetaMask if available
+        if (hasMetaMask) {
+          App.web3Provider = window.ethereum;
+          App.web3 = new Web3(window.ethereum);
+          
+          // Set up event listeners
+          const handleDisconnect = () => {
+            App.disconnectMetaMask();
+          };
 
-            const handleChainChanged = () => {
-                window.location.reload();
-            };
+          const handleChainChanged = () => {
+            window.location.reload();
+          };
 
-            const handleAccountsChanged = (accounts) => {
-                App.handleAccountsChanged(accounts);
-            };
+          const handleAccountsChanged = (accounts) => {
+            App.handleAccountsChanged(accounts);
+          };
 
-            // Remove existing listeners if any
-            if(App.web3Provider) {
-                window.ethereum.removeListener('disconnect', handleDisconnect);
-                window.ethereum.removeListener('chainChanged', handleChainChanged);
-                window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-            }
-            
-            App.web3Provider = window.ethereum;
-            App.web3 = new Web3(window.ethereum);
-            
-            // Add listeners with defined handlers
-            window.ethereum.on('disconnect', handleDisconnect);
-            window.ethereum.on('chainChanged', handleChainChanged);
-            window.ethereum.on('accountsChanged', handleAccountsChanged);
+          // Remove existing listeners if any
+          if(App.web3Provider) {
+            window.ethereum.removeListener('disconnect', handleDisconnect);
+            window.ethereum.removeListener('chainChanged', handleChainChanged);
+            window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+          }
+          
+          // Add new listeners
+          window.ethereum.on('disconnect', handleDisconnect);
+          window.ethereum.on('chainChanged', handleChainChanged);
+          window.ethereum.on('accountsChanged', handleAccountsChanged);
 
-            resolve();
-        } else {
-            reject(new Error("No Web3 provider detected"));
+          // Enable MetaMask buttons
+          const walletButton = document.getElementById("walletButton");
+          const metamaskButton = document.getElementById("metamaskButton");
+          if (walletButton) walletButton.disabled = false;
+          if (metamaskButton) metamaskButton.disabled = false;
         }
+        
+        // Handle Keplr if available
+        if (hasKeplr) {
+          App.keplrProvider = window.keplr;
+          // Enable Keplr button
+          const keplrButton = document.getElementById("keplrButton");
+          if (keplrButton) {
+            keplrButton.disabled = false;
+          }
+        }
+        
+        resolve();
+      } catch (error) {
+        console.error("Error in initWeb3:", error);
+        resolve();
+      }
     });
   },
 
-  connectWallet: async function() {
-    if (typeof window.ethereum !== 'undefined') {
-      try {
-        // Request account access
+  connectMetaMask: async function() {
+    try {
+        if (!window.ethereum) {
+            throw new Error('MetaMask not installed');
+        }
+
         const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        App.handleAccountsChanged(accounts);
-      } catch (error) {
-        console.error("User denied account access")
-      }
-    } else {
-      console.log('No Ethereum browser detected');
-      alert('Please install MetaMask or use a Web3-enabled browser');
+        
+        if (!accounts || accounts.length === 0) {
+            throw new Error('No accounts found');
+        }
+        
+        // Initialize Web3
+        App.web3Provider = window.ethereum;
+        App.web3 = new Web3(window.ethereum);
+        
+        // Get chain ID and check if it's supported
+        const chainId = await App.web3.eth.getChainId();
+        App.chainId = chainId;
+        
+        // Validate chain ID
+        try {
+            validateChainId(chainId);
+        } catch (error) {
+            console.error('Chain validation error:', error);
+            alert('Please connect to Sepolia (chain ID: 11155111). Mainnet support coming soon.');
+            throw error;
+        }
+        
+        // Set account and connection state
+        App.account = accounts[0];
+        App.isConnected = true;
+        
+        // Initialize contracts
+        await App.initBridgeContract();
+        await App.initTokenContract();
+        
+        // Update both MetaMask buttons regardless of current direction
+        const truncatedAddress = `${App.account.substring(0, 6)}...${App.account.substring(App.account.length - 4)}`;
+        const walletButton = document.getElementById('walletButton');
+        const metamaskButton = document.getElementById('metamaskButton');
+        
+        if (walletButton) {
+            walletButton.innerHTML = `Disconnect MetaMask <span class="truncated-address">(${truncatedAddress})</span>`;
+        }
+        if (metamaskButton) {
+            metamaskButton.innerHTML = `Disconnect MetaMask <span class="truncated-address">(${truncatedAddress})</span>`;
+        }
+        
+        // Update balances and limits
+        await Promise.all([
+            App.updateBalance(),
+            App.fetchDepositLimit()
+        ]);
+        
+        App.setPageParams();
+    } catch (error) {
+        console.error("Error connecting MetaMask:", error);
+        App.handleError(error);
+        throw error;
+    }
+  },
+
+  connectKeplr: async function() {
+    try {
+        if (!window.keplr) {
+            throw new Error('Keplr not installed');
+        }
+        
+        // First try to disable any existing connection
+        try {
+            if (typeof window.keplr.disable === 'function') {
+                await window.keplr.disable('layertest-4');
+            }
+        } catch (error) {
+            console.warn('Could not disable existing chain connection:', error);
+        }
+
+        // Suggest the chain to the user
+        await window.keplr.experimentalSuggestChain({
+            chainId: "layertest-4",
+            chainName: "Layer",
+            rpc: "https://node-palmito.tellorlayer.com/rpc",
+            rest: "https://node-palmito.tellorlayer.com/rpc",
+            bip44: {
+                coinType: 118
+            },
+            bech32Config: {
+                bech32PrefixAccAddr: "tellor",
+                bech32PrefixAccPub: "tellorpub",
+                bech32PrefixValAddr: "tellorvaloper",
+                bech32PrefixValPub: "tellorvaloperpub",
+                bech32PrefixConsAddr: "tellorvalcons",
+                bech32PrefixConsPub: "tellorvalconspub",
+            },
+            currencies: [
+                {
+                    coinDenom: "TRB",
+                    coinMinimalDenom: "loya",
+                    coinDecimals: 6,
+                },
+            ],
+            feeCurrencies: [
+                {
+                    coinDenom: "TRB",
+                    coinMinimalDenom: "loya",
+                    coinDecimals: 6,
+                    gasPriceStep: {
+                        low: 0.01,
+                        average: 0.025,
+                        high: 0.04,
+                    }
+                },
+            ],
+            stakeCurrency: {
+                coinDenom: "TRB",
+                coinMinimalDenom: "loya",
+                coinDecimals: 6,
+            },
+        });
+
+        // Enable the chain
+        await window.keplr.enable('layertest-4');
+        
+        // Get the offline signer
+        const offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+        const accounts = await offlineSigner.getAccounts();
+        
+        if (!accounts || accounts.length === 0) {
+            throw new Error('No accounts found in Keplr');
+        }
+        
+        // Set Keplr state
+        App.keplrAddress = accounts[0].address;
+        App.isKeplrConnected = true;
+        
+        // Update button text
+        const truncatedAddress = `${App.keplrAddress.substring(0, 6)}...${App.keplrAddress.substring(App.keplrAddress.length - 4)}`;
+        const keplrButton = document.getElementById('keplrButton');
+        if (keplrButton) {
+            keplrButton.innerHTML = `Disconnect Keplr <span class="truncated-address">(${truncatedAddress})</span>`;
+        }
+        
+        // Update balance immediately after connection
+        await App.updateKeplrBalance();
+        
+        // Enable withdraw button if in Ethereum section
+        if (App.currentBridgeDirection === 'ethereum') {
+            const withdrawButton = document.getElementById('withdrawButton');
+            if (withdrawButton) {
+                withdrawButton.disabled = false;
+            }
+        }
+        
+        App.setPageParams();
+    } catch (error) {
+        // Clear connection state on error
+        App.keplrAddress = null;
+        App.isKeplrConnected = false;
+        App.keplrProvider = null;
+        
+        console.error("Error connecting Keplr:", error);
+        App.handleError(error);
+        throw error;
+    }
+  },
+
+  disconnectMetaMask: async function() {
+    try {
+        if (!App.isConnected) {
+            return;
+        }
+
+        // Clear MetaMask state
+        App.account = '0x0';
+        App.isConnected = false;
+        App.web3 = null;
+        App.web3Provider = null;
+        
+        // Update both wallet buttons (main and MetaMask-specific)
+        const walletButton = document.getElementById('walletButton');
+        const metamaskButton = document.getElementById('metamaskButton');
+        
+        if (walletButton) {
+            walletButton.innerHTML = 'Connect MetaMask';
+        }
+        
+        if (metamaskButton) {
+            metamaskButton.innerHTML = 'Connect MetaMask';
+        }
+
+        // Update balances
+        const currentBalance = document.getElementById('currentBalance');
+        const ethMetaMaskBalance = document.getElementById('ethMetaMaskBalance');
+        
+        if (currentBalance) {
+            currentBalance.textContent = '0 TRB';
+        }
+        if (ethMetaMaskBalance) {
+            ethMetaMaskBalance.textContent = '0 TRB';
+        }
+
+        // Disable action buttons
+        const approveButton = document.getElementById('approveButton');
+        const depositButton = document.getElementById('depositButton');
+        
+        if (approveButton) approveButton.disabled = true;
+        if (depositButton) depositButton.disabled = true;
+
+        // Update page parameters
+        App.setPageParams();
+        console.log('MetaMask disconnected successfully');
+    } catch (error) {
+        console.error('Error disconnecting MetaMask:', error);
+        App.handleError(error);
+    }
+  },
+
+  disconnectKeplr: async function() {
+    try {
+        console.log('Disconnecting Keplr...');
+        if (!App.isKeplrConnected) {
+            console.log('Keplr already disconnected');
+            return;
+        }
+
+        // Try to disable the chain in Keplr
+        try {
+            if (window.keplr && typeof window.keplr.disable === 'function') {
+                await window.keplr.disable('layertest-4');
+            }
+        } catch (error) {
+            console.warn('Could not disable chain in Keplr:', error);
+            // Continue with disconnection even if disable fails
+        }
+
+        // Clear Keplr state
+        App.keplrAddress = null;
+        App.isKeplrConnected = false;
+        App.keplrProvider = null;
+
+        // Update Keplr button
+        const keplrButton = document.getElementById('keplrButton');
+        if (keplrButton) {
+            keplrButton.innerHTML = 'Connect Keplr';
+            console.log('Updated Keplr button');
+        }
+
+        // Update balances
+        const ethKeplrBalance = document.getElementById('ethKeplrBalance');
+        if (ethKeplrBalance) {
+            ethKeplrBalance.textContent = '0 TRB';
+        }
+
+        // Disable withdraw button
+        const withdrawButton = document.getElementById('withdrawButton');
+        if (withdrawButton) {
+            withdrawButton.disabled = true;
+        }
+
+        // Update withdrawal history to reflect Keplr disconnection
+        await this.updateWithdrawalHistory();
+
+        // Update page parameters
+        App.setPageParams();
+        console.log('Keplr disconnected successfully');
+    } catch (error) {
+        console.error('Error disconnecting Keplr:', error);
+        App.handleError(error);
     }
   },
 
@@ -110,8 +489,16 @@ var App = {
         }
         
         App.isConnected = true;
-        document.getElementById('walletButton').innerHTML = `Disconnect Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
+        
+        // Update the appropriate wallet button based on current direction
+        if (this.currentBridgeDirection === 'layer') {
+            document.getElementById('walletButton').innerHTML = `Disconnect MetaMask <span class="truncated-address">(${truncatedAddress})</span>`;
+        } else {
+            document.getElementById('metamaskButton').innerHTML = `Disconnect MetaMask <span class="truncated-address">(${truncatedAddress})</span>`;
+        }
+        
         App.setPageParams();
+        this.updateUIForCurrentDirection();
     } catch (error) {
         console.error('Error in handleAccountsChanged:', error);
         App.handleError(error);
@@ -128,7 +515,9 @@ var App = {
         // Atomic state update
         const updates = {
             account: '0x0',
+            keplrAddress: null,
             isConnected: false,
+            isKeplrConnected: false,
             balance: '0',
             chainId: null
         };
@@ -160,7 +549,7 @@ var App = {
   },
 
   showNetworkAlert: function() {
-    alert("Please connect to the Sepolia network. Mainnet coming soon.");
+    alert("Please connect to Sepolia (chain ID: 11155111). Mainnet support coming soon.");
   },
 
   handleError: function(error) {
@@ -170,6 +559,15 @@ var App = {
 
   initBridgeContract: async function () {
     try {
+        // Only initialize bridge contract if we have Web3 and we're not in a Keplr-only state
+        if (!App.web3 || !App.web3Provider) {
+            if (App.isKeplrConnected && !App.isConnected) {
+                // If we're only using Keplr, we don't need the bridge contract
+                return true;
+            }
+            throw new Error('Web3 not properly initialized');
+        }
+
         const response = await fetch("./abis/TokenBridge.json");
         if (!response.ok) {
             throw new Error(`Failed to load ABI: ${response.statusText}`);
@@ -185,8 +583,18 @@ var App = {
         App.contracts.Bridge = new App.web3.eth.Contract(abi);
         
         const contractAddresses = {
-            11155111: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",
-            421613: "0xb2CB696fE5244fB9004877e58dcB680cB86Ba444"
+            11155111: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2", // Sepolia
+            421613: "0xb2CB696fE5244fB9004877e58dcB680cB86Ba444",   // Arbitrum Goerli
+            1: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",        // Mainnet
+            137: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",      // Polygon
+            80001: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",    // Mumbai
+            100: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",      // Gnosis
+            10200: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",    // Chiado
+            10: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",       // Optimism
+            420: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",      // Optimism Goerli
+            42161: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",    // Arbitrum
+            421613: "0xb2CB696fE5244fB9004877e58dcB680cB86Ba444",   // Arbitrum Goerli
+            3141: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2"      // Filecoin
         };
 
         const address = contractAddresses[App.chainId];
@@ -198,6 +606,11 @@ var App = {
         return true;
     } catch (error) {
         console.error("Bridge contract initialization error:", error);
+        console.error("Error details:", {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+        });
         throw error;
     }
   },
@@ -210,39 +623,28 @@ var App = {
           // Make sure we're using the ABI array
           const abi = Array.isArray(data) ? data : data.abi;
           App.contracts.Token = new App.web3.eth.Contract(abi);
-          if (App.chainId === 11155111) {
-            App.contracts.Token.options.address = "0x80fc34a2f9FfE86F41580F47368289C402DEc660"
-          } 
-          if (App.chainId === 1)  {
-            App.contracts.Token.options.address = "0x88dF592F8eb5D7Bd38bFeF7dEb0fBc02cf3778a0"
-          } 
-          if (App.chainId === 137)  {
-            App.contracts.Token.options.address = "0xE3322702BEdaaEd36CdDAb233360B939775ae5f1"
+          
+          const tokenAddresses = {
+            11155111: "0x80fc34a2f9FfE86F41580F47368289C402DEc660", // Sepolia
+            421613: "0x8d1bB5eDdFce08B92dD47c9871d1805211C3Eb3C",   // Arbitrum Goerli
+            1: "0x88dF592F8eb5D7Bd38bFeF7dEb0fBc02cf3778a0",        // Mainnet
+            137: "0xE3322702BEdaaEd36CdDAb233360B939775ae5f1",      // Polygon
+            80001: "0xce4e32fe9d894f8185271aa990d2db425df3e6be",    // Mumbai
+            100: "0xAAd66432d27737ecf6ED183160Adc5eF36aB99f2",      // Gnosis
+            10200: "0xe7147C5Ed14F545B4B17251992D1DB2bdfa26B6d",    // Chiado
+            10: "0xaf8cA653Fa2772d58f4368B0a71980e9E3cEB888",       // Optimism
+            420: "0x3251838bd813fdf6a97D32781e011cce8D225d59",      // Optimism Goerli
+            42161: "0xd58D345Fd9c82262E087d2D0607624B410D88242",    // Arbitrum
+            421613: "0x8d1bB5eDdFce08B92dD47c9871d1805211C3Eb3C",   // Arbitrum Goerli
+            3141: "0xe7147C5Ed14F545B4B17251992D1DB2bdfa26B6d"      // Filecoin
+          };
+
+          const address = tokenAddresses[App.chainId];
+          if (!address) {
+            throw new Error(`No token address for chainId: ${App.chainId}`);
           }
-          if (App.chainId === 80001)  {
-            App.contracts.Token.options.address = "0xce4e32fe9d894f8185271aa990d2db425df3e6be"
-          } 
-          if (App.chainId === 100)  {
-            App.contracts.Token.options.address = "0xAAd66432d27737ecf6ED183160Adc5eF36aB99f2"
-          } 
-          if (App.chainId === 10200)  {
-            App.contracts.Token.options.address = "0xe7147C5Ed14F545B4B17251992D1DB2bdfa26B6d"
-          }
-          if (App.chainId === 10)  {
-            App.contracts.Token.options.address = "0xaf8cA653Fa2772d58f4368B0a71980e9E3cEB888"
-          }
-          if (App.chainId === 420)  {
-            App.contracts.Token.options.address = "0x3251838bd813fdf6a97D32781e011cce8D225d59"
-          }
-          if (App.chainId === 42161)  {
-            App.contracts.Token.options.address = "0xd58D345Fd9c82262E087d2D0607624B410D88242"
-          }
-          if (App.chainId === 421613)  {
-            App.contracts.Token.options.address = "0x8d1bB5eDdFce08B92dD47c9871d1805211C3Eb3C"
-          }
-          if (App.chainId === 3141)  {
-            App.contracts.Token.options.address = "0xe7147C5Ed14F545B4B17251992D1DB2bdfa26B6d"
-          }
+
+          App.contracts.Token.options.address = address;
           resolve();
         } catch (error) {
           console.error("Token contract initialization error:", error);
@@ -284,29 +686,101 @@ var App = {
     }
   },
 
-  setPageParams: function () {
+  setPageParams: function() {
+    // Update connected address in UI
+    const connectedAddressElement = document.getElementById("connectedAddress");
+    if (connectedAddressElement) {
+      connectedAddressElement.textContent = App.account;
+    }
+
+    // Update balances and limits based on current direction and wallet type
+    if (App.currentBridgeDirection === 'layer') {
+      // For Layer section
+      if (App.contracts.Bridge && App.contracts.Token) {
+        document.getElementById('approveButton').disabled = false;
+        document.getElementById('depositButton').disabled = false;
+        // Always fetch deposit limit in Layer section
+        App.fetchDepositLimit().catch(error => {
+          console.error("Error fetching deposit limit:", error);
+        });
+      }
+      // Update MetaMask balance if connected
+      if (App.isConnected) {
+        App.updateBalance().catch(error => {
+          console.error("Error updating MetaMask balance:", error);
+        });
+      }
+    } else {
+      // For Ethereum section
+      if (App.isConnected) {
+        // Update MetaMask balance
+        App.updateBalance().catch(error => {
+          console.error("Error updating MetaMask balance:", error);
+        });
+      }
+      if (App.isKeplrConnected) {
+        // Update Keplr balance
+        App.updateKeplrBalance().catch(error => {
+          console.error("Error updating Keplr balance:", error);
+        });
+        document.getElementById('withdrawButton').disabled = false;
+      }
+    }
+
+    // Add withdrawal history if either wallet is connected
+    if (App.isConnected || App.isKeplrConnected) {
+      App.addWithdrawalHistory();
+    }
+  },
+
+  updateKeplrBalance: async function() {
     try {
-        // Check if element exists before trying to access it
-        const connectedAddressElement = document.getElementById('connectedAddress');
-        if (connectedAddressElement) {
-            connectedAddressElement.innerHTML = App.account || 'Not Connected';
-        } else {
-            console.log('Note: connectedAddress element not found');
+        if (!App.isKeplrConnected || !App.keplrAddress) {
+            return;
         }
 
-        if (App.contracts.Bridge && App.contracts.Bridge.options) {
+        const offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+        const signingClient = await window.cosmjs.stargate.SigningStargateClient.connectWithSigner(
+            'https://node-palmito.tellorlayer.com/rpc',
+            offlineSigner
+        );
+
+        const balance = await signingClient.getBalance(App.keplrAddress, "loya");
+
+        if (!balance || !balance.amount) {
+            throw new Error('Invalid balance response from chain');
+        }
+
+        const balanceAmount = parseInt(balance.amount);
+        // Format balance to 6 decimal places consistently
+        const readableBalance = (balanceAmount / 1000000).toFixed(6);
+
+        // Update the appropriate balance element based on current direction
+        if (App.currentBridgeDirection === 'layer') {
+            const balanceElement = document.getElementById("currentBalance");
+            if (balanceElement) {
+                balanceElement.textContent = `${readableBalance} TRB`;
+            }
         } else {
-            console.error('Contest contract not properly initialized in setPageParams');
+            // In Ethereum section, update Keplr balance
+            const keplrBalanceElement = document.getElementById("ethKeplrBalance");
+            if (keplrBalanceElement) {
+                keplrBalanceElement.textContent = `${readableBalance} TRB`;
+            }
         }
     } catch (error) {
-        console.error('Error in setPageParams:', error);
+        console.error("Error fetching Keplr balance:", error);
+        const balanceElement = document.getElementById(App.currentBridgeDirection === 'layer' ? "currentBalance" : "ethKeplrBalance");
+        if (balanceElement) {
+            balanceElement.textContent = "0.000000 TRB";
+        }
     }
   },
 
   uintTob32: function (n) {
     let vars = App.web3.utils.toBN(n).toString('hex');
     vars = vars.padStart(64, '0');
-    return  vars;
+    return vars;
   },
   
   reportValue: function () {
@@ -314,16 +788,12 @@ var App = {
     value = document.getElementById("_value").value;
     nonce = document.getElementById("_nonce").value;
     queryData = document.getElementById("_queryData").value;
-    console.log("_queryId: " + queryId);
-    console.log("_value: "  + value.padStart(64, '0'));
-    console.log("_nonce: " + nonce);
-    console.log("_queryData: " + queryData);
-    console.log("Attempting to interact with contract at address:", App.contracts.Bridge.options.address);
+    
     App.contracts.Bridge.methods
       .submitValue(queryId, value, nonce, queryData)
       .send({ from: App.account })
       .then(function (result) {
-        console.log(result);
+        // Handle result silently
       });
   },
 
@@ -356,7 +826,7 @@ var App = {
     popup.style.left = '50%';
     popup.style.transform = 'translate(-50%, -50%)';
     popup.style.padding = '50px';
-    popup.style.backgroundColor = '#C4EDEB';
+    popup.style.backgroundColor = '#d4d8e3';
     popup.style.color = '#083b44';
     popup.style.borderRadius = '10px';
     popup.style.zIndex = '1000';
@@ -405,18 +875,15 @@ var App = {
 
         const amountToSend = App.web3.utils.toWei(amount, 'ether');
         
-        // Add debug logging for balance check
         const balance = await App.contracts.Token.methods.balanceOf(App.account).call();
 
         const balanceBN = new App.web3.utils.BN(balance);
         const amountBN = new App.web3.utils.BN(amountToSend);
 
-
         if (balanceBN.lt(amountBN)) {
             const errorMsg = `Insufficient token balance. You have ${App.web3.utils.fromWei(balance, 'ether')} TRB but trying to deposit ${amount} TRB`;
-            console.log('Showing error:', errorMsg);
             alert(errorMsg);
-            return; // Make sure to return here to prevent the transaction
+            return;
         }
 
         // Only reach here if balance is sufficient
@@ -438,25 +905,20 @@ var App = {
   initInputValidation: function() {
     const depositButton = document.getElementById('depositButton');
     const stakeAmountInput = document.getElementById('stakeAmount');
+    const ethStakeAmountInput = document.getElementById('ethStakeAmount');
     
-    // Preserve the original input width
+    // Preserve the original input widths
     const originalWidth = stakeAmountInput.offsetWidth;
-    stakeAmountInput.style.width = originalWidth + 'px'; // Lock the width to prevent stretching
+    stakeAmountInput.style.width = originalWidth + 'px';
+    if (ethStakeAmountInput) {
+        ethStakeAmountInput.style.width = originalWidth + 'px';
+    }
     
-    // Create tooltip element with relative positioning container
-    const tooltipContainer = document.createElement('div');
-    tooltipContainer.style.position = 'relative'; // Create a positioning context
-    tooltipContainer.style.display = 'inline-block'; // Keep it inline with input
-    tooltipContainer.style.verticalAlign = 'middle'; // Align with other elements
-    
-    // Move the input into our new container
-    stakeAmountInput.parentNode.insertBefore(tooltipContainer, stakeAmountInput);
-    tooltipContainer.appendChild(stakeAmountInput);
-    
+    // Create tooltip element
     const tooltip = document.createElement('div');
     tooltip.style.display = 'none';
-    tooltip.style.position = 'absolute';
-    tooltip.style.backgroundColor = '#C4EDEB';
+    tooltip.style.position = 'fixed';
+    tooltip.style.backgroundColor = '#d4d8e3';
     tooltip.style.padding = '5px 10px';
     tooltip.style.borderRadius = '5px';
     tooltip.style.border = '1px solid black';
@@ -464,55 +926,114 @@ var App = {
     tooltip.style.color = '#083b44';
     tooltip.style.fontFamily = "'PPNeueMontreal-Book', Arial, sans-serif";
     tooltip.style.zIndex = '1000';
-    tooltip.style.whiteSpace = 'nowrap'; // Prevent wrapping
-    tooltipContainer.appendChild(tooltip);
+    tooltip.style.whiteSpace = 'nowrap';
+    document.body.appendChild(tooltip);
 
-    // Position tooltip to the right of the input with more space
+    // Position tooltip relative to the active input field
     function positionTooltip() {
-      tooltip.style.right = ''; // Clear the right property
-      tooltip.style.left = '100%'; // Position to the right of the input
-      tooltip.style.top = '60%'; // Align with middle of input
-      tooltip.style.transform = 'translateY(-50%)'; // Center vertically
-      tooltip.style.marginLeft = '10px'; // Gap between tooltip and input
+        const activeInput = App.currentBridgeDirection === 'layer' ? stakeAmountInput : ethStakeAmountInput;
+        if (!activeInput) return;
+
+        const inputRect = activeInput.getBoundingClientRect();
+        tooltip.style.left = (inputRect.right + 10) + 'px';
+        tooltip.style.top = (inputRect.top + (inputRect.height / 2)) + 'px';
+        tooltip.style.transform = 'translateY(-50%)';
     }
 
     let trbPrice = 0;
     // Fetch TRB price from CoinGecko API
     async function updateTrbPrice() {
       try {
-        const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=tellor&vs_currencies=usd');
+        const response = await fetch('https://node-palmito.tellorlayer.com/tellor-io/layer/oracle/get_current_aggregate_report/5c13cd9c97dbb98f2429c101a2a8150e6c7a0ddaff6124ee176a3a411067ded0', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const data = await response.json();
-        trbPrice = data.tellor.usd;
+        // The aggregate_value is in hex format, convert it to decimal
+        const hexValue = data.aggregate.aggregate_value;
+        const decimalValue = BigInt('0x' + hexValue);
+        
+        // Convert to USD (divide by 1e18 since the value is in wei)
+        trbPrice = Number(decimalValue) / 1e18;
       } catch (error) {
-        console.error('Error fetching TRB price:', error);
+        console.warn('Error fetching TRB price from Tellor Layer:', error);
+        trbPrice = 0.5; // Default value in USD
       }
     }
 
     // Update tooltip with USD value
-    async function updateTooltip() {
-      const amount = parseFloat(stakeAmountInput.value) || 0;
-      if (amount > 0) {
-        if (trbPrice === 0) {
-          await updateTrbPrice();
+    async function updateTooltip(event) {
+        const activeInput = App.currentBridgeDirection === 'layer' ? stakeAmountInput : ethStakeAmountInput;
+        if (!activeInput) return;
+
+        const amount = parseFloat(activeInput.value) || 0;
+        if (amount > 0) {
+            if (trbPrice === 0) {
+                await updateTrbPrice();
+            }
+            if (trbPrice > 0) {
+                const usdValue = (amount * trbPrice).toFixed(2);
+                tooltip.textContent = `≈ $${usdValue} USD`;
+            } else {
+                tooltip.textContent = 'Price data unavailable';
+            }
+            tooltip.style.display = 'block';
+            requestAnimationFrame(positionTooltip);
+        } else {
+            tooltip.style.display = 'none';
         }
-        const usdValue = (amount * trbPrice).toFixed(2);
-        tooltip.textContent = `≈ $${usdValue} USD`;
-        tooltip.style.display = 'block';
-        // Call positionTooltip after making the tooltip visible
-        requestAnimationFrame(positionTooltip);
-      } else {
-        tooltip.style.display = 'none';
-      }
     }
 
-    // Update price every 60 seconds
-    setInterval(updateTrbPrice, 60000);
-    // Initial price fetch
+    // Update price every 60 seconds, but only if the page is visible
+    let priceUpdateInterval;
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        clearInterval(priceUpdateInterval);
+      } else {
     updateTrbPrice();
+        priceUpdateInterval = setInterval(updateTrbPrice, 60000);
+      }
+    });
 
+    // Initial price fetch
+    updateTrbPrice().catch(error => {
+      console.warn('Initial TRB price fetch failed:', error);
+    });
+    priceUpdateInterval = setInterval(updateTrbPrice, 60000);
+
+    // Add event listeners to both input fields
     stakeAmountInput.addEventListener('input', updateTooltip);
-    window.addEventListener('resize', positionTooltip);
     stakeAmountInput.addEventListener('focus', updateTooltip);
+    if (ethStakeAmountInput) {
+        ethStakeAmountInput.addEventListener('input', updateTooltip);
+        ethStakeAmountInput.addEventListener('focus', updateTooltip);
+    }
+    window.addEventListener('resize', positionTooltip);
+
+    // Add event listener for bridge direction changes
+    const bridgeToLayerBtn = document.getElementById('bridgeToLayerBtn');
+    const bridgeToEthBtn = document.getElementById('bridgeToEthBtn');
+    if (bridgeToLayerBtn && bridgeToEthBtn) {
+        const handleDirectionChange = () => {
+            // Hide tooltip when switching directions
+            tooltip.style.display = 'none';
+            // Update tooltip for the new active input
+            const activeInput = App.currentBridgeDirection === 'layer' ? stakeAmountInput : ethStakeAmountInput;
+            if (activeInput && activeInput.value) {
+                updateTooltip();
+            }
+        };
+        bridgeToLayerBtn.addEventListener('click', handleDirectionChange);
+        bridgeToEthBtn.addEventListener('click', handleDirectionChange);
+    }
   },
 
   showPendingPopup: function(message) {
@@ -523,7 +1044,7 @@ var App = {
     popup.style.left = '50%';
     popup.style.transform = 'translate(-50%, -50%)';
     popup.style.padding = '50px';
-    popup.style.backgroundColor = '#C4EDEB';
+    popup.style.backgroundColor = '#d4d8e3';
     popup.style.color = '#083b44';
     popup.style.borderRadius = '10px';
     popup.style.zIndex = '1000';
@@ -567,6 +1088,11 @@ var App = {
   },
 
   getAllowance: async function() {
+    // Skip allowance check for Keplr
+    if (App.isKeplrConnected) {
+      return '0';
+    }
+
     if (!App.account || !App.contracts.Token || !App.contracts.Bridge) {
       console.error('Wallet not connected or contracts not initialized');
       return '0';
@@ -590,20 +1116,1386 @@ var App = {
     try {
         const balance = await App.contracts.Token.methods.balanceOf(App.account).call();
         const readableBalance = App.web3.utils.fromWei(balance, 'ether');
+        const formattedBalance = parseFloat(readableBalance).toFixed(6);
         
-        const balanceElement = document.getElementById("currentBalance");
-        if (balanceElement) {
-            balanceElement.textContent = `${readableBalance} TRB`;
+        // Update both balance displays regardless of current direction
+        const layerBalanceElement = document.getElementById("currentBalance");
+        const ethBalanceElement = document.getElementById("ethMetaMaskBalance");
+        
+        if (layerBalanceElement) {
+            layerBalanceElement.textContent = `${formattedBalance} TRB`;
+        }
+        if (ethBalanceElement) {
+            ethBalanceElement.textContent = `${formattedBalance} TRB`;
         }
     } catch (error) {
         console.error("Error fetching balance:", error);
+        // Set both balances to 0 on error
+        const layerBalanceElement = document.getElementById("currentBalance");
+        const ethBalanceElement = document.getElementById("ethMetaMaskBalance");
+        
+        if (layerBalanceElement) layerBalanceElement.textContent = "0.000000 TRB";
+        if (ethBalanceElement) ethBalanceElement.textContent = "0.000000 TRB";
     }
-  }
+  },
+
+  withdrawFromLayer: async function() {
+    try {
+        if (!App.isKeplrConnected) {
+            alert('Please connect your Keplr wallet first');
+            return;
+        }
+
+        const amount = document.getElementById('ethStakeAmount').value;
+        const ethereumAddress = document.getElementById('ethQueryId').value;
+
+        if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+            alert('Please enter a valid amount');
+            return;
+        }
+
+        if (!ethereumAddress || !ethereumAddress.startsWith('0x')) {
+            alert('Please enter a valid Ethereum address');
+            return;
+        }
+
+        // Convert amount to micro units (1 TRB = 1,000,000 micro units)
+        const amountInMicroUnits = Math.floor(parseFloat(amount) * 1000000).toString();
+
+        // Get offline signer from Keplr
+        const offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+
+        // Get account info first - use keplrAddress instead of account
+        const accountUrl = `https://node-palmito.tellorlayer.com/cosmos/auth/v1beta1/accounts/${App.keplrAddress}`;
+        const accountResponse = await fetch(accountUrl);
+        const accountData = await accountResponse.json();
+        
+        const accountInfo = {
+            account_number: accountData.account?.account_number || "0",
+            sequence: accountData.account?.sequence || "0"
+        };
+
+        // Create the message data for signing - use keplrAddress as creator
+        const msgData = {
+            creator: App.keplrAddress,
+            recipient: ethereumAddress.toLowerCase().replace('0x', ''), // Remove 0x prefix for chain
+            amount: {
+                denom: "loya",
+                amount: amountInMicroUnits
+            }
+        };
+
+        // Create the transaction to sign
+        const txToSign = {
+            chain_id: 'layertest-4',
+            account_number: accountInfo.account_number,
+            sequence: accountInfo.sequence,
+            fee: {
+                amount: [{ denom: "loya", amount: "5000" }],
+                gas: "200000"
+            },
+            msgs: [{
+                type: "/layer.bridge.MsgWithdrawTokens",
+                value: msgData
+            }],
+            memo: "Withdraw TRB to Ethereum"
+        };
+
+        // Sign the transaction
+        const signResult = await offlineSigner.signAmino(App.keplrAddress, txToSign);
+
+        const signature = signResult.signature.signature;
+        const publicKey = signResult.signature.pub_key.value;
+
+        // Create protobuf types for transaction
+        const root = new protobuf.Root();
+        
+        // Define all necessary types
+        const Coin = new protobuf.Type("Coin")
+            .add(new protobuf.Field("denom", 1, "string"))
+            .add(new protobuf.Field("amount", 2, "string"));
+
+        const MsgWithdrawTokens = new protobuf.Type("MsgWithdrawTokens")
+            .add(new protobuf.Field("creator", 1, "string"))
+            .add(new protobuf.Field("recipient", 2, "string"))
+            .add(new protobuf.Field("amount", 3, "Coin"));
+
+        const Any = new protobuf.Type("Any")
+            .add(new protobuf.Field("typeUrl", 1, "string"))
+            .add(new protobuf.Field("value", 2, "bytes"));
+
+        const TxBody = new protobuf.Type("TxBody")
+            .add(new protobuf.Field("messages", 1, "Any", "repeated"))
+            .add(new protobuf.Field("memo", 2, "string"));
+
+        const PubKey = new protobuf.Type("PubKey")
+            .add(new protobuf.Field("key", 1, "bytes"));
+
+        const Single = new protobuf.Type("Single")
+            .add(new protobuf.Field("mode", 1, "uint32"));
+
+        const ModeInfo = new protobuf.Type("ModeInfo")
+            .add(new protobuf.Field("single", 1, "Single"));
+
+        const SignerInfo = new protobuf.Type("SignerInfo")
+            .add(new protobuf.Field("publicKey", 1, "Any"))
+            .add(new protobuf.Field("modeInfo", 2, "ModeInfo"))
+            .add(new protobuf.Field("sequence", 3, "uint64"));
+
+        const Fee = new protobuf.Type("Fee")
+            .add(new protobuf.Field("amount", 1, "Coin", "repeated"))
+            .add(new protobuf.Field("gasLimit", 2, "uint64"));
+
+        const AuthInfo = new protobuf.Type("AuthInfo")
+            .add(new protobuf.Field("signerInfos", 1, "SignerInfo", "repeated"))
+            .add(new protobuf.Field("fee", 2, "Fee"));
+
+        const Tx = new protobuf.Type("Tx")
+            .add(new protobuf.Field("body", 1, "TxBody"))
+            .add(new protobuf.Field("authInfo", 2, "AuthInfo"))
+            .add(new protobuf.Field("signatures", 3, "bytes", "repeated"));
+
+        // Add all types to root
+        root.add(Coin);
+        root.add(MsgWithdrawTokens);
+        root.add(Any);
+        root.add(TxBody);
+        root.add(PubKey);
+        root.add(Single);
+        root.add(ModeInfo);
+        root.add(SignerInfo);
+        root.add(Fee);
+        root.add(AuthInfo);
+        root.add(Tx);
+
+        // Encode the message
+        const MsgType = root.lookupType("MsgWithdrawTokens");
+        const msg = MsgType.create(msgData);
+        const encodedMessage = MsgType.encode(msg).finish();
+
+        // Create the public key Any
+        const pubKeyAny = {
+            typeUrl: "/cosmos.crypto.secp256k1.PubKey",
+            value: PubKey.encode({ key: publicKey }).finish()
+        };
+
+        // Create the message Any
+        const messageAny = {
+            typeUrl: "/layer.bridge.MsgWithdrawTokens",
+            value: encodedMessage
+        };
+
+        // Create the final transaction
+        const tx = {
+            body: {
+                messages: [messageAny],
+                memo: "Withdraw TRB to Ethereum"
+            },
+            authInfo: {
+                signerInfos: [{
+                    publicKey: pubKeyAny,
+                    modeInfo: {
+                        single: {
+                            mode: 127 // SIGN_MODE_LEGACY_AMINO_JSON
+                        }
+                    },
+                    sequence: parseInt(accountInfo.sequence)
+                }],
+                fee: {
+                    amount: [{ denom: "loya", amount: "5000" }],
+                    gasLimit: 200000
+                }
+            },
+            signatures: [signature]
+        };
+
+        console.log('Final transaction:', tx);
+
+        // Encode and broadcast the transaction
+        const txObj = Tx.create(tx);
+        const encodedTx = Tx.encode(txObj).finish();
+        const base64Tx = btoa(String.fromCharCode.apply(null, encodedTx));
+
+        App.showPendingPopup("Withdrawal transaction pending...");
+
+        // Broadcast the transaction
+        const response = await fetch('https://node-palmito.tellorlayer.com/cosmos/tx/v1beta1/txs', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                tx_bytes: base64Tx,
+                mode: "BROADCAST_MODE_SYNC"
+            })
+        });
+
+        const result = await response.json();
+        console.log('Transaction result:', result);
+
+        if (result.tx_response?.code !== 0) {
+            throw new Error(result.tx_response?.raw_log || 'Transaction failed');
+        }
+
+        // Poll for transaction status
+        const txHash = result.tx_response.txhash;
+        let attempts = 0;
+        const maxAttempts = 10;
+        const pollInterval = 2000;
+
+        while (attempts < maxAttempts) {
+            attempts++;
+            const statusResponse = await fetch(`https://node-palmito.tellorlayer.com/cosmos/tx/v1beta1/txs/${txHash}`);
+            const statusData = await statusResponse.json();
+            
+            if (statusResponse.ok && statusData.tx_response) {
+                const txResponse = statusData.tx_response;
+                if (txResponse.height !== "0") {
+                    if (txResponse.code === 0) {
+                        App.hidePendingPopup();
+                        App.showSuccessPopup("Withdrawal successful! You will need to wait 12 hours before you can claim your tokens on Ethereum.");
+                        await App.updateKeplrBalance();
+                        return txResponse;
+                    } else {
+                        throw new Error(txResponse.raw_log || 'Transaction failed');
+                    }
+                }
+            }
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
+        }
+
+        // If we get here, the transaction hasn't been included in a block
+        App.hidePendingPopup();
+        return result.tx_response;
+
+    } catch (error) {
+        App.hidePendingPopup();
+        console.error("Error in withdrawal:", error);
+        console.error("Error details:", {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+        });
+        alert(error.message || "Error in withdrawal. Please try again.");
+    }
+  },
+
+  // Add withdrawal history functions
+  addWithdrawalHistory: async function() {
+    const transactionsContainer = document.querySelector('.transactions-container');
+
+    // Check if withdrawal history already exists
+    const existingHistory = document.querySelector('#withdrawal-history');
+    if (existingHistory) {
+        await this.updateWithdrawalHistory();
+        return;
+    }
+
+    // No need to create the container structure as it's now in the HTML
+    await this.updateWithdrawalHistory();
+  },
+
+  // Function to fetch withdrawal history
+  getWithdrawalHistory: async function() {
+    try {
+        let address;
+        let isEvmWallet = false;
+
+        if (App.isKeplrConnected) {
+            address = App.keplrAddress;
+        } else if (App.isConnected && App.account) {
+            address = App.account;
+            isEvmWallet = true;
+        } else {
+            return [];
+        }
+
+        if (!address) {
+            return [];
+        }
+
+        // Clean the connected address
+        const cleanAddress = address.toLowerCase().trim();
+
+        // Use the correct API endpoint
+        const baseEndpoint = 'https://node-palmito.tellorlayer.com';
+        
+        // Get last withdrawal ID with proper error handling
+        const response = await fetch(`${baseEndpoint}/layer/bridge/get_last_withdrawal_id`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            console.error('Failed to fetch last withdrawal ID:', response.status);
+            return [];
+        }
+
+        const data = await response.json();
+        const lastWithdrawalId = Number(data.withdrawal_id);
+
+        if (!lastWithdrawalId || lastWithdrawalId <= 0) {
+            return [];
+        }
+
+        // Create arrays for withdrawal data and claim status promises
+        const withdrawalPromises = [];
+        const claimStatusPromises = [];
+
+        // Create promises for all withdrawals
+        for (let id = 1; id <= lastWithdrawalId; id++) {
+            const queryId = generateWithdrawalQueryId(id);
+            withdrawalPromises.push(this.fetchWithdrawalData(queryId));
+            // Use contract's withdrawClaimed function instead of API endpoint
+            claimStatusPromises.push(
+                App.contracts.Bridge.methods.withdrawClaimed(id).call()
+                    .then(claimed => ({ claimed }))
+                    .catch(() => ({ claimed: false }))
+            );
+        }
+
+        // Process all withdrawals in parallel
+        const [withdrawalResults, claimStatuses] = await Promise.all([
+            Promise.all(withdrawalPromises),
+            Promise.all(claimStatusPromises)
+        ]);
+
+        // Filter and process valid withdrawals
+        const withdrawals = withdrawalResults
+            .map((withdrawalData, index) => {
+                if (!withdrawalData?.parsed) {
+                    return null;
+                }
+
+                const id = index + 1;
+                const parsedData = withdrawalData.parsed;
+
+                // Clean up addresses - handle both EVM and Cosmos addresses
+                const cleanRecipient = parsedData.recipient
+                    ? parsedData.recipient.toLowerCase().trim()
+                    : '';
+                
+                const cleanSender = parsedData.sender
+                    ? parsedData.sender.toLowerCase().trim()
+                    : '';
+
+                // For EVM wallet, match sender address. For Keplr, match recipient address
+                if ((isEvmWallet && cleanSender === cleanAddress) ||
+                    (!isEvmWallet && cleanRecipient === cleanAddress)) {
+                    return {
+                        id,
+                        sender: parsedData.sender,
+                        recipient: parsedData.recipient,
+                        amount: parsedData.amount.toString(),
+                        timestamp: withdrawalData.raw.timestamp,
+                        claimed: claimStatuses[index]?.claimed || false
+                    };
+                }
+                return null;
+            })
+            .filter(withdrawal => withdrawal !== null)
+            .sort((a, b) => b.id - a.id); // Sort by ID in descending order
+
+        return withdrawals;
+    } catch (error) {
+        console.error('Error in getWithdrawalHistory:', error);
+        return [];
+    }
+  },
+
+  fetchWithdrawalData: async function(queryId, retryCount = 0) {
+    try {
+        const endpoint = `https://node-palmito.tellorlayer.com/tellor-io/layer/oracle/get_current_aggregate_report/${queryId}`;
+        
+        const response = await fetch(endpoint);
+        
+        // Check if response is HTML instead of JSON
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('text/html')) {
+            throw new Error('Server returned HTML instead of JSON. The API endpoint may be down.');
+        }
+        
+        if (!response.ok) {
+            if (response.status === 400) {
+                return null;
+            }
+            // Retry on server errors (5xx) or network errors
+            if ((response.status >= 500 || response.status === 0) && retryCount < 3) {
+                await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
+                return this.fetchWithdrawalData(queryId, retryCount + 1);
+            }
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (!data || !data.aggregate || !data.aggregate.aggregate_value) {
+            return null;
+        }
+
+        // Return both the raw data and the parsed data
+        return {
+            raw: data,
+            parsed: this.parseWithdrawalData(data.aggregate.aggregate_value)
+        };
+    } catch (error) {
+        console.error('Error in fetchWithdrawalData:', error);
+        // Retry on network errors or if we haven't exceeded retry limit
+        if (retryCount < 3 && (error.message.includes('NetworkError') || error.message.includes('Failed to fetch'))) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
+            return this.fetchWithdrawalData(queryId, retryCount + 1);
+        }
+        return null;
+    }
+  },
+
+  parseWithdrawalData: function(data) {
+    try {
+        // Add 0x prefix if not present
+        const hexData = data.startsWith('0x') ? data : '0x' + data;
+        
+        // Convert to bytes
+        const bytes = ethers.utils.arrayify(hexData);
+        
+        // Define the ABI types for decoding
+        const abiCoder = new ethers.utils.AbiCoder();
+        const types = ['address', 'string', 'uint256', 'uint256'];
+        
+        // Decode the bytes
+        const [sender, recipient, amount, tip] = abiCoder.decode(types, bytes);
+
+        return {
+            sender,
+            recipient,
+            amount,
+            tip
+        };
+    } catch (error) {
+        console.error('Error parsing withdrawal data:', error);
+        return null;
+    }
+  },
+
+  // Function to update withdrawal history UI
+  updateWithdrawalHistory: async function() {
+    try {
+        const transactions = await this.getWithdrawalHistory();
+
+        const tableBody = document.querySelector('#withdrawal-history tbody');
+        if (!tableBody) {
+            console.error('Transaction history table body not found');
+            return;
+        }
+
+        // Add table styles
+        const style = document.createElement('style');
+        style.textContent = `
+            #withdrawal-history {
+                border-collapse: collapse;
+                width: 100%;
+            }
+            #withdrawal-history th {
+                background-color: #f8f9fa;
+                padding: 12px;
+                text-align: left;
+                border-bottom: 2px solid #e2e8f0;
+                font-weight: 600;
+                color: #2d3748;
+            }
+            #withdrawal-history td {
+                padding: 12px;
+                border-bottom: 1px solid #e2e8f0;
+                vertical-align: middle;
+            }
+            #withdrawal-history tr:last-child td {
+                border-bottom: none;
+            }
+            #withdrawal-history tr:hover {
+                background-color: #f8f9fa;
+            }
+            .amount-column {
+                text-align: right;
+            }
+            .address-cell {
+                font-family: monospace;
+                color: #4a5568;
+            }
+            .status-true {
+                color: #38a169;
+                font-weight: 500;
+            }
+            .status-false {
+                color: #e53e3e;
+                font-weight: 500;
+            }
+            .attest-button, .claim-button {
+                margin: 0 4px;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-size: 14px;
+                transition: opacity 0.2s;
+            }
+            .attest-button:hover, .claim-button:hover {
+                opacity: 0.9;
+            }
+            .attest-button:disabled, .claim-button:disabled {
+                background-color: #cbd5e0 !important;
+                cursor: not-allowed;
+                opacity: 0.7;
+            }
+            .attest-button.disconnected {
+                background-color: #cbd5e0 !important;
+                cursor: not-allowed;
+                opacity: 0.7;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Clear existing content
+        tableBody.innerHTML = '';
+
+        // Check if MetaMask is connected
+        if (!App.isConnected) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="padding: 40px 20px; text-align: center; border: none;">
+                        <div style="background-color: #f8f9fa; border-radius: 8px; padding: 30px; margin: 20px 0;">
+                            <h4 style="margin: 0 0 15px 0; color: #2d3748; font-size: 18px;">
+                                Connect MetaMask to View Withdrawals
+                            </h4>
+                            <p style="margin: 0 0 10px 0; color: #4a5568; font-size: 16px;">
+                                Please connect your MetaMask wallet to view and manage your withdrawal transactions.
+                            </p>
+                            <p style="margin: 0; color: #718096; font-size: 14px;">
+                                Note: You need MetaMask connected to claim your withdrawals on Ethereum.
+                            </p>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        if (!transactions || transactions.length === 0) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="padding: 40px 20px; text-align: center; border: none;">
+                        <div style="background-color: #f8f9fa; border-radius: 8px; padding: 30px; margin: 20px 0;">
+                            <h4 style="margin: 0 0 15px 0; color: #2d3748; font-size: 18px;">
+                                No Withdrawal Transactions Found
+                            </h4>
+                            <p style="margin: 0 0 10px 0; color: #4a5568; font-size: 16px;">
+                                No withdrawal transactions found for your connected wallet.
+                            </p>
+                            <p style="margin: 0; color: #718096; font-size: 14px;">
+                                If you've made withdrawals from Tellor Layer, they will appear here once processed.
+                            </p>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        // Create and append transaction rows
+        for (const tx of transactions) {
+            if (!tx || !tx.amount) {
+                continue;
+            }
+
+            try {
+                // Convert amount from micro units to TRB (divide by 1e6)
+                const amount = Number(tx.amount) / 1e6;
+                // Convert timestamp to milliseconds if it's in seconds
+                const timestamp = tx.timestamp * (tx.timestamp < 1e12 ? 1000 : 1);
+                const date = new Date(timestamp).toLocaleString();
+                
+                const row = document.createElement('tr');
+                
+                // Determine button states based on connection status
+                const attestButtonDisabled = !App.isKeplrConnected;
+                const attestButtonClass = attestButtonDisabled ? 'attest-button disconnected' : 'attest-button';
+                const attestButtonStyle = attestButtonDisabled ? 
+                    'background-color: #cbd5e0; color: #718096; border: none;' : 
+                    'background-color: #003734; color: #eefffb; border: none;';
+                
+                row.innerHTML = `
+                    <td style="white-space: normal;">
+                        ${!tx.claimed ? 
+                            `<button class="${attestButtonClass}" onclick="App.requestAttestation(${tx.id})" 
+                                style="${attestButtonStyle}" ${attestButtonDisabled ? 'disabled' : ''}>
+                                <span>2. Request</span><span>Attestation</span>
+                            </button>
+                            <button class="claim-button" onclick="App.claimWithdrawal(${tx.id})" 
+                                style="background-color: #38a169; color: #eefffb; border: none;">
+                                <span>3. Claim</span><span>Withdrawal</span>
+                            </button>` 
+                            : ''}
+                    </td>
+                    <td style="font-weight: 500;">${tx.id}</td>
+                    <td class="address-cell" title="${tx.sender}">${this.formatAddress(tx.sender)}</td>
+                    <td class="address-cell" title="${tx.recipient}">${this.formatAddress(tx.recipient)}</td>
+                    <td class="amount-column">${amount.toFixed(2)} TRB</td>
+                    <td>${date}</td>
+                    <td class="status-${tx.claimed}">${tx.claimed ? 'Claimed' : 'Pending'}</td>
+                `;
+                tableBody.appendChild(row);
+            } catch (error) {
+                console.error('Error formatting transaction:', tx, error);
+            }
+        }
+    } catch (error) {
+        console.error('Error updating transaction history:', error);
+        const tableBody = document.querySelector('#withdrawal-history tbody');
+        if (tableBody) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="error-message">
+                        Error loading transaction history. Please try again later.
+                        <small>${error.message}</small>
+                    </td>
+                </tr>
+            `;
+        }
+    }
+  },
+
+  formatAddress: function(address) {
+    if (!address) return 'N/A';
+    if (address.startsWith('tellor')) {
+        return `${address.slice(0, 8)}...${address.slice(-4)}`;
+    }
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  },
+
+  formatAmount: function(amount) {
+    const amountInTRB = Number(amount) / 1000000;
+    return amountInTRB.toLocaleString('en-US', {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1
+    });
+  },
+
+  showBalanceErrorPopup: function(message) {
+    const popup = document.createElement('div');
+    popup.id = 'balanceErrorPopup';
+    popup.className = 'balance-error-popup';
+    popup.textContent = message;
+    
+    document.body.appendChild(popup);
+    
+    // Remove the popup after 3 seconds
+    setTimeout(() => {
+      const popup = document.getElementById('balanceErrorPopup');
+      if (popup) {
+        popup.remove();
+      }
+    }, 3000);
+  },
+
+  hideBalanceErrorPopup: function() {
+    const popup = document.getElementById('balanceErrorPopup');
+    if (popup) {
+      popup.remove();
+    }
+  },
+
+  // Add new function to handle attestation requests
+  requestAttestation: async function(withdrawalId) {
+    try {
+        if (!App.isKeplrConnected || !window.keplr) {
+            alert('Please connect your Keplr wallet first');
+            return;
+        }
+
+        // Verify Keplr is still enabled for the chain
+        try {
+            await window.keplr.enable('layertest-4');
+        } catch (error) {
+            console.error('Keplr not enabled for chain:', error);
+            App.isKeplrConnected = false;
+            App.keplrAddress = null;
+            const keplrButton = document.getElementById('keplrButton');
+            if (keplrButton) {
+                keplrButton.innerHTML = 'Connect Keplr';
+            }
+            alert('Please reconnect your Keplr wallet');
+            return;
+        }
+
+        const attestButton = document.querySelector(`button[onclick="App.requestAttestation(${withdrawalId})"]`);
+        const claimButton = document.querySelector(`button[onclick="App.claimWithdrawal(${withdrawalId})"]`);
+        
+        if (attestButton) {
+            attestButton.disabled = true;
+            attestButton.innerHTML = '<span>Requesting</span><span>...</span>';
+        }
+
+        App.showPendingPopup("Requesting attestation...");
+
+        // Generate the query ID for the withdrawal
+        const queryId = generateWithdrawalQueryId(withdrawalId);
+
+        // Fetch the withdrawal data to get the correct timestamp
+        const response = await fetch(`https://node-palmito.tellorlayer.com/tellor-io/layer/oracle/get_current_aggregate_report/${queryId}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch withdrawal data from oracle');
+        }
+
+        const data = await response.json();
+
+        if (!data || !data.timestamp) {
+            throw new Error('Could not find withdrawal data in oracle. The withdrawal may not be ready for attestation yet.');
+        }
+
+        // Use the timestamp from the oracle response
+        const timestamp = data.timestamp;
+
+        // Get the Layer account from Keplr
+        const offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+        const accounts = await offlineSigner.getAccounts();
+        const layerAccount = accounts[0].address;
+
+        // Create and send the attestation request using the simpler approach
+        const result = await window.cosmjs.stargate.requestAttestations(
+            layerAccount,
+            queryId,
+            timestamp
+        );
+
+        App.hidePendingPopup();
+        
+        if (result && result.code === 0) {
+            App.showSuccessPopup("Attestation requested successfully!");
+            // Enable the claim button and remove the waiting class
+            if (claimButton) {
+                claimButton.disabled = false;
+                claimButton.classList.remove('waiting-for-attestation');
+            }
+            // Refresh the withdrawal history
+            await this.updateWithdrawalHistory();
+        } else {
+            throw new Error(result?.rawLog || "Transaction failed");
+        }
+    } catch (error) {
+        console.error('Error requesting attestation:', error);
+        App.hidePendingPopup();
+        App.showErrorPopup(error.message || "Error requesting attestation. Please try again.");
+        
+        // Re-enable the attest button if there was an error
+        const attestButton = document.querySelector(`button[onclick="App.requestAttestation(${withdrawalId})"]`);
+        if (attestButton) {
+            attestButton.disabled = false;
+            attestButton.innerHTML = '<span>Request</span><span>Attestation</span>';
+        }
+    }
+  },
+
+  // Add validation helper functions
+  validateWithdrawalData: async function(withdrawalId, attestData, valset, sigs) {
+        try {
+            // Validate validator set
+            if (!valset || !Array.isArray(valset)) {
+                throw new Error('Invalid validator set: must be an array');
+            }
+
+            // Check each validator
+            for (let i = 0; i < valset.length; i++) {
+                const validator = valset[i];
+                
+                // Check if validator has required fields
+                if (!validator.addr || !validator.power) {
+                    console.error('Invalid validator structure:', validator);
+                    throw new Error(`Invalid validator at index ${i}: missing required fields`);
+                }
+
+                // Validate address format
+                try {
+                    ethers.utils.getAddress(validator.addr);
+                } catch (e) {
+                    console.error('Invalid validator address:', validator.addr);
+                    throw new Error(`Invalid validator at index ${i}: invalid address format`);
+                }
+
+                // Validate power is a positive number
+                if (!ethers.BigNumber.from(validator.power).gt(0)) {
+                    console.error('Invalid validator power:', validator.power);
+                    throw new Error(`Invalid validator at index ${i}: power must be positive`);
+                }
+            }
+
+            // Validate signatures
+            if (!sigs || !Array.isArray(sigs)) {
+                throw new Error('Invalid signatures: must be an array');
+            }
+
+            // Check each signature
+            for (let i = 0; i < sigs.length; i++) {
+                const sig = sigs[i];
+
+                // For blank attestations, v should be 0 and r/s should be zero bytes
+                if (sig.v === 0) {
+                    const zeroBytes = '0x0000000000000000000000000000000000000000000000000000000000000000';
+                    const rHex = typeof sig.r === 'string' ? sig.r : '0x' + sig.r.toString('hex');
+                    const sHex = typeof sig.s === 'string' ? sig.s : '0x' + sig.s.toString('hex');
+                    
+                    if (rHex !== zeroBytes || sHex !== zeroBytes) {
+                        throw new Error(`Invalid signature at index ${i}: zero signature must have zero r and s`);
+                    }
+                } else if (sig.v !== 27 && sig.v !== 28) {
+                    throw new Error(`Invalid signature at index ${i}: v must be 0, 27, or 28`);
+                }
+            }
+
+            // Check bridge state
+            const bridgeState = await App.contracts.Bridge.methods.bridgeState().call();
+            if (bridgeState !== '0') { // Assuming 0 is the active state
+                throw new Error(`Bridge is not active. Current state: ${bridgeState}`);
+            }
+        } catch (error) {
+            console.error('Validation error:', error);
+            throw error;
+        }
+    },
+
+  // Modify the claimWithdrawal function to include validation
+  claimWithdrawal: async function(withdrawalId) {
+    let txHash = null;
+    try {
+        if (!App.isConnected) {
+            alert('Please connect your MetaMask wallet first');
+            return;
+        }
+
+        // Check if withdrawal is already claimed
+        const isClaimed = await App.contracts.Bridge.methods.withdrawClaimed(withdrawalId).call();
+        if (isClaimed) {
+            alert('This withdrawal has already been claimed');
+            return;
+        }
+
+        App.showPendingPopup("Validating withdrawal data...");
+
+        // Fetch withdrawal data
+        const withdrawalData = await this.fetchWithdrawalData(generateWithdrawalQueryId(withdrawalId));
+        if (!withdrawalData) {
+            throw new Error('Could not fetch withdrawal data');
+        }
+
+        // Get the timestamp from the withdrawal data
+        const withdrawalTimestamp = withdrawalData.raw.timestamp;
+        console.log('Withdrawal timestamp:', withdrawalTimestamp);
+
+        // Fetch attestation data with the withdrawal timestamp
+        const attestationData = await this.fetchAttestationData(
+            generateWithdrawalQueryId(withdrawalId),
+            withdrawalTimestamp
+        );
+        if (!attestationData) {
+            throw new Error('Could not fetch attestation data');
+        }
+
+        // Format the data for the contract call
+        const txData = await this.formatWithdrawalData(withdrawalId, withdrawalData, attestationData);
+        
+        // Validate the data before sending to contract
+        try {
+            await this.validateWithdrawalData(withdrawalId, txData.attestData, txData.valset, txData.sigs);
+        } catch (error) {
+            throw new Error('The attestation data is not valid. Please try requesting attestation again to get the latest validator set.');
+        }
+
+        // Make the contract call
+        const tx = await App.contracts.Bridge.methods.withdrawFromLayer(
+            txData.attestData,
+            txData.valset,
+            txData.sigs,
+            txData.depositId
+        ).send({ from: App.account });
+
+        txHash = tx.transactionHash;
+        console.log('Withdrawal claim transaction:', tx);
+        App.showSuccessPopup("Withdrawal claimed successfully!");
+        await this.updateWithdrawalHistory();
+        return tx;
+
+    } catch (error) {
+        console.error('Error claiming withdrawal:', error);
+        // Get transaction hash from error if available
+        if (error.transactionHash) {
+            txHash = error.transactionHash;
+        } else if (error.receipt && error.receipt.transactionHash) {
+            txHash = error.receipt.transactionHash;
+        }
+        
+        let errorMessage = "Claim Withdrawal failed. Try requesting attestation again for updated validator set.";
+        if (txHash) {
+            const etherscanUrl = `https://sepolia.etherscan.io/tx/${txHash}`;
+            errorMessage += ` <a href="${etherscanUrl}" target="_blank" style="color: #DC2626; text-decoration: underline;">View on Etherscan</a>`;
+        }
+        
+        App.showErrorPopup(errorMessage);
+    } finally {
+        App.hidePendingPopup();
+    }
+  },
+
+  // Helper function to fetch attestation data
+  fetchAttestationData: async function(queryId, timestamp) {
+    try {
+        // Remove 0x prefix for API calls if present
+        const apiQueryId = queryId.startsWith('0x') ? queryId.slice(2) : queryId;
+        const baseEndpoint = 'https://node-palmito.tellorlayer.com';
+        
+        // Step 1: Get snapshots for this report
+        const snapshotsResponse = await fetch(
+            `${baseEndpoint}/layer/bridge/get_snapshots_by_report/${apiQueryId}/${timestamp}`
+        );
+
+        if (!snapshotsResponse.ok) {
+            const errorText = await snapshotsResponse.text();
+            console.error('Snapshots response error:', { status: snapshotsResponse.status, text: errorText });
+            throw new Error(`Failed to fetch snapshots: ${errorText}`);
+        }
+
+        const snapshotsData = await snapshotsResponse.json();
+        
+        if (!snapshotsData?.snapshots?.length) {
+            throw new Error('Invalid snapshots data: missing snapshots array');
+        }
+
+        const lastSnapshot = snapshotsData.snapshots[snapshotsData.snapshots.length - 1];
+
+        // Step 2: Get attestation data using the snapshot
+        const attestationDataResponse = await fetch(
+            `${baseEndpoint}/layer/bridge/get_attestation_data_by_snapshot/${lastSnapshot}`
+        );
+
+        if (!attestationDataResponse.ok) {
+            throw new Error(`Failed to fetch attestation data: ${attestationDataResponse.statusText}`);
+        }
+
+        const rawAttestationData = await attestationDataResponse.json();
+
+        // First get the current validator set timestamp
+        const validatorSetTimestampResponse = await fetch(
+            `${baseEndpoint}/layer/bridge/get_current_validator_set_timestamp`
+        );
+
+        if (!validatorSetTimestampResponse.ok) {
+            throw new Error(`Failed to fetch current validator set timestamp: ${validatorSetTimestampResponse.statusText}`);
+        }
+
+        const validatorSetTimestampData = await validatorSetTimestampResponse.json();
+        const currentValidatorSetTimestamp = validatorSetTimestampData.timestamp;
+
+        // Get validator set for the current timestamp
+        const validatorsResponse = await fetch(
+            `${baseEndpoint}/layer/bridge/get_valset_by_timestamp/${currentValidatorSetTimestamp}`
+        );
+
+        if (!validatorsResponse.ok) {
+            const errorText = await validatorsResponse.text();
+            console.error('Validator response error:', { 
+                status: validatorsResponse.status, 
+                text: errorText,
+                currentTimestamp: currentValidatorSetTimestamp,
+                reportTimestamp: rawAttestationData.timestamp,
+                attestationTimestamp: rawAttestationData.attestation_timestamp
+            });
+            throw new Error(`Failed to fetch validator set: ${validatorsResponse.statusText}`);
+        }
+
+        const validatorsData = await validatorsResponse.json();
+
+        // Get power threshold for this timestamp
+        const checkpointParamsResponse = await fetch(
+            `${baseEndpoint}/layer/bridge/get_validator_checkpoint_params/${currentValidatorSetTimestamp}`
+        );
+
+        if (!checkpointParamsResponse.ok) {
+            throw new Error(`Failed to fetch checkpoint params: ${checkpointParamsResponse.statusText}`);
+        }
+
+        const checkpointParams = await checkpointParamsResponse.json();
+        const powerThreshold = checkpointParams.power_threshold;
+
+        // Get attestations
+        const attestationsResponse = await fetch(
+            `${baseEndpoint}/layer/bridge/get_attestations_by_snapshot/${lastSnapshot}`
+        );
+
+        if (!attestationsResponse.ok) {
+            throw new Error(`Failed to fetch attestations: ${attestationsResponse.statusText}`);
+        }
+
+        const attestationsResult = await attestationsResponse.json();
+
+        // Process attestations
+        const validatorSet = validatorsData.bridge_validator_set;
+
+        // Create a map of validator addresses to their indices
+        const validatorMap = new Map();
+        validatorSet.forEach((validator, index) => {
+            const address = validator.ethereumAddress.toLowerCase();
+            validatorMap.set(address, index);
+        });
+
+        // Process each attestation
+        const signatureMap = new Map();
+        // Ensure checkpoint has 0x prefix before arrayifying
+        const checkpointWithPrefix = rawAttestationData.checkpoint.startsWith('0x') ? 
+            rawAttestationData.checkpoint : 
+            '0x' + rawAttestationData.checkpoint;
+        const messageHash = ethers.utils.sha256(ethers.utils.arrayify(checkpointWithPrefix));
+
+        // Process each attestation
+        for (let i = 0; i < attestationsResult.attestations.length; i++) {
+            const attestation = attestationsResult.attestations[i];
+            if (!attestation || attestation.length === 0) {
+                // Add zero signature for validators who didn't sign
+                signatureMap.set(i, {
+                    v: 0,
+                    r: "0x0000000000000000000000000000000000000000000000000000000000000000",
+                    s: "0x0000000000000000000000000000000000000000000000000000000000000000"
+                });
+                continue;
+            }
+
+            // Try both v values (27 and 28)
+            for (const v of [27, 28]) {
+                const recoveredAddress = ethers.utils.recoverAddress(
+                    messageHash,
+                    ethers.utils.joinSignature({
+                        r: '0x' + attestation.slice(0, 64),
+                        s: '0x' + attestation.slice(64, 128),
+                        v: v
+                    })
+                ).toLowerCase();
+
+                const validatorIndex = validatorMap.get(recoveredAddress);
+                if (validatorIndex !== undefined) {
+                    signatureMap.set(validatorIndex, {
+                        v: v,
+                        r: '0x' + attestation.slice(0, 64),
+                        s: '0x' + attestation.slice(64, 128)
+                    });
+                    break;
+                }
+            }
+        }
+
+        // Convert signature map to array
+        const signatures = Array(validatorSet.length).fill(null).map((_, i) => {
+            const sig = signatureMap.get(i);
+            if (!sig) {
+                return {
+                    v: 0,
+                    r: "0x0000000000000000000000000000000000000000000000000000000000000000",
+                    s: "0x0000000000000000000000000000000000000000000000000000000000000000"
+                };
+            }
+            return sig;
+        });
+
+        // Process attestations using deriveSignatures with lastSnapshot as checkpoint
+        const derivedSignatures = this.deriveSignatures(
+            attestationsResult.attestations,
+            validatorSet,
+            lastSnapshot  // Use lastSnapshot instead of rawAttestationData.checkpoint
+        );
+
+        // Format the attestation data according to the contract's expected structure
+        const formattedAttestationData = {
+            queryId: ethers.utils.arrayify(this.ensureHexPrefix(rawAttestationData.query_id)),
+            report: {
+                value: ethers.utils.arrayify(this.ensureHexPrefix(rawAttestationData.aggregate_value)),
+                timestamp: parseInt(rawAttestationData.timestamp),
+                aggregatePower: parseInt(rawAttestationData.aggregate_power),
+                previousTimestamp: parseInt(rawAttestationData.previous_report_timestamp),
+                nextTimestamp: parseInt(rawAttestationData.next_report_timestamp),
+                lastConsensusTimestamp: parseInt(rawAttestationData.last_consensus_timestamp)
+            },
+            attestationTimestamp: parseInt(rawAttestationData.attestation_timestamp)
+        };
+
+        // Format the validator set according to the contract's expected structure
+        const formattedValidatorSet = validatorSet.map(validator => ({
+            addr: validator.ethereumAddress,
+            power: parseInt(validator.power)
+        }));
+
+        return {
+            attestationData: formattedAttestationData,
+            validatorSet: formattedValidatorSet,
+            signatures: derivedSignatures,
+            powerThreshold: powerThreshold,
+            checkpoint: rawAttestationData.checkpoint,
+            rawAttestationData: rawAttestationData  // Include raw data for debugging
+        };
+    } catch (error) {
+        console.error('Error in fetchAttestationData:', error);
+        throw error;
+    }
+  },
+
+  deriveSignatures: function(signatures, validatorSet, checkpoint) {
+    console.log("Deriving signatures with:", {
+        signatureCount: signatures.length,
+        validatorCount: validatorSet.length,
+        checkpoint
+    });
+
+    const derivedSignatures = [];
+    // Ensure checkpoint has 0x prefix
+    const checkpointHex = checkpoint.startsWith('0x') ? checkpoint : '0x' + checkpoint;
+    
+    // Get message hash using ethers - this matches Python's sha256(data).digest()
+    const messageHash = ethers.utils.sha256(ethers.utils.arrayify(checkpointHex));
+    console.log('Message hash for signature recovery:', messageHash);
+    
+    const zeroBytes = '0x0000000000000000000000000000000000000000000000000000000000000000';
+    
+    // Create a map of validator addresses to their indices for faster lookup
+    const validatorMap = new Map();
+    validatorSet.forEach((validator, index) => {
+        validatorMap.set(validator.ethereumAddress.toLowerCase(), index);
+    });
+    
+    for (let i = 0; i < signatures.length; i++) {
+        const signature = signatures[i];
+        const validator = validatorSet[i];
+        
+        if (!signature || signature.length === 0) {
+            derivedSignatures.push({
+                v: 0,
+                r: zeroBytes,
+                s: zeroBytes
+            });
+            continue;
+        }
+
+        if (signature.length !== 128) {
+            console.error(`Invalid signature length at index ${i}:`, signature.length);
+            derivedSignatures.push({
+                v: 0,
+                r: zeroBytes,
+                s: zeroBytes
+            });
+            continue;
+        }
+
+        const r = '0x' + signature.slice(0, 64);
+        const s = '0x' + signature.slice(64, 128);
+        let foundValidSignature = false;
+        
+        // Try both v values (27 and 28)
+        for (const v of [27, 28]) {
+            try {
+                const recoveredAddress = ethers.utils.recoverAddress(
+                    messageHash,
+                    { r, s, v }
+                ).toLowerCase();
+
+                if (recoveredAddress === validator.ethereumAddress.toLowerCase()) {
+                    derivedSignatures.push({ v, r, s });
+                    foundValidSignature = true;
+                    break;
+                }
+            } catch (error) {
+                console.error(`Error recovering address for v=${v}:`, error);
+            }
+        }
+
+        if (!foundValidSignature) {
+            derivedSignatures.push({
+                v: 0,
+                r: zeroBytes,
+                s: zeroBytes
+            });
+        }
+    }
+    
+    return derivedSignatures;
+  },
+
+  showErrorPopup: function(message) {
+    const popup = document.createElement('div');
+    popup.id = 'errorPopup';
+    popup.style.position = 'fixed';
+    popup.style.top = '50%';
+    popup.style.left = '50%';
+    popup.style.transform = 'translate(-50%, -50%)';
+    popup.style.padding = '20px';
+    popup.style.backgroundColor = '#FEE2E2';
+    popup.style.color = '#991B1B';
+    popup.style.borderRadius = '10px';
+    popup.style.zIndex = '1000';
+    popup.style.border = '2px solid #DC2626';
+    popup.style.fontFamily = "'PPNeueMontreal-Book', Arial, sans-serif";
+    popup.style.fontSize = "15px";
+    popup.style.width = '300px';
+    popup.style.textAlign = 'center';
+    popup.style.lineHeight = '1.4';
+  
+    // Use innerHTML to allow for the Etherscan link
+    popup.innerHTML = message;
+  
+    document.body.appendChild(popup);
+  
+    // Remove the popup after 5 seconds
+    setTimeout(() => {
+      const popup = document.getElementById('errorPopup');
+      if (popup) {
+        popup.remove();
+      }
+    }, 5000);
+  },
+
+  // Add helper function before formatWithdrawalData
+  ensureHexPrefix: function(value) {
+    if (!value) return value;
+    return value.startsWith('0x') ? value : '0x' + value;
+  },
+
+  formatWithdrawalData: function(withdrawalId, withdrawalData, attestationData) {
+        if (!attestationData) {
+            throw new Error('Missing attestation data');
+        }
+
+        // The attestation data is already formatted in fetchAttestationData
+        const { attestationData: formattedAttestationData, validatorSet, signatures } = attestationData;
+
+        if (!formattedAttestationData || !validatorSet || !signatures) {
+            throw new Error('Invalid attestation data structure');
+        }
+
+        return {
+            attestData: formattedAttestationData,
+            valset: validatorSet,
+            sigs: signatures,
+            depositId: withdrawalId
+        };
+    },
+
+  initBridgeDirectionUI: function() {
+    const bridgeToLayerBtn = document.getElementById('bridgeToLayerBtn');
+    const bridgeToEthBtn = document.getElementById('bridgeToEthBtn');
+    const bridgeToLayerSection = document.getElementById('bridgeToLayerSection');
+    const bridgeToEthSection = document.getElementById('bridgeToEthSection');
+    const transactionsContainer = document.getElementById('bridgeTransactionsContainer');
+
+    if (!bridgeToLayerBtn || !bridgeToEthBtn || !bridgeToLayerSection || !bridgeToEthSection) {
+        console.error('Bridge direction UI elements not found');
+        return;
+    }
+
+    // Set initial state
+    this.currentBridgeDirection = 'layer';
+    bridgeToLayerBtn.classList.add('active');
+    bridgeToLayerSection.classList.add('active');
+    bridgeToEthSection.classList.remove('active');
+
+    // Initially hide transactions container
+    if (transactionsContainer) {
+        transactionsContainer.classList.remove('active');
+    }
+
+    // Add click event listeners
+    bridgeToLayerBtn.addEventListener('click', () => {
+        if (this.currentBridgeDirection !== 'layer') {
+            this.switchBridgeDirection('layer');
+        }
+    });
+
+    bridgeToEthBtn.addEventListener('click', () => {
+        if (this.currentBridgeDirection !== 'ethereum') {
+            this.switchBridgeDirection('ethereum');
+        }
+    });
+  },
+
+  switchBridgeDirection: function(direction) {
+    if (direction !== 'layer' && direction !== 'ethereum') {
+        console.error('Invalid bridge direction:', direction);
+        return;
+    }
+
+    const bridgeToLayerBtn = document.getElementById('bridgeToLayerBtn');
+    const bridgeToEthBtn = document.getElementById('bridgeToEthBtn');
+    const bridgeToLayerSection = document.getElementById('bridgeToLayerSection');
+    const bridgeToEthSection = document.getElementById('bridgeToEthSection');
+    const transactionsContainer = document.getElementById('bridgeTransactionsContainer');
+    const boxWrapper = document.querySelector('.box-wrapper');
+
+    if (!bridgeToLayerBtn || !bridgeToEthBtn || !bridgeToLayerSection || !bridgeToEthSection) {
+        console.error('Bridge direction UI elements not found');
+        return;
+    }
+
+    // Update active states
+    bridgeToLayerBtn.classList.toggle('active', direction === 'layer');
+    bridgeToEthBtn.classList.toggle('active', direction === 'ethereum');
+    bridgeToLayerSection.classList.toggle('active', direction === 'layer');
+    bridgeToEthSection.classList.toggle('active', direction === 'ethereum');
+    
+    // Update box wrapper classes for animation
+    if (boxWrapper) {
+        boxWrapper.classList.remove('layer-direction', 'ethereum-direction');
+        boxWrapper.classList.add(direction === 'layer' ? 'layer-direction' : 'ethereum-direction');
+    }
+    
+    // Show/hide transactions container based on direction only
+    if (transactionsContainer) {
+        transactionsContainer.classList.toggle('active', direction === 'ethereum');
+    }
+
+    // Store the new direction
+    this.currentBridgeDirection = direction;
+
+    // Update UI for the new direction
+    this.updateUIForCurrentDirection();
+  },
+
+  updateUIForCurrentDirection: function() {
+    if (this.currentBridgeDirection === 'layer') {
+        // Update Layer section UI
+        const approveButton = document.getElementById('approveButton');
+        const depositButton = document.getElementById('depositButton');
+        
+        if (App.contracts.Bridge && App.contracts.Token) {
+            if (approveButton) approveButton.disabled = false;
+            if (depositButton) depositButton.disabled = false;
+        }
+    } else {
+        // Update Ethereum section UI
+        const withdrawButton = document.getElementById('withdrawButton');
+        
+        if (App.isKeplrConnected) {
+            if (withdrawButton) withdrawButton.disabled = false;
+        }
+    }
+
+    // Only show transactions table in ethereum direction
+    const transactionsContainer = document.getElementById('bridgeTransactionsContainer');
+    if (transactionsContainer) {
+        transactionsContainer.classList.toggle('active', this.currentBridgeDirection === 'ethereum');
+    }
+  },
 };
 
+// Export App to window object for global access
+window.App = App;
+window.App.claimWithdrawal = App.claimWithdrawal;  // Explicitly expose claimWithdrawal
+window.App.requestAttestation = App.requestAttestation;  // Also explicitly expose requestAttestation
+
+// Export App as default for module usage
+export default App;
+
 function checkWalletConnection() {
-    console.log("Checking wallet connection. Is connected:", App.isConnected);
-    console.log("Current account:", App.account);
     if (!App.isConnected) {
         alert("Please connect your wallet first");
         return false;
@@ -614,65 +2506,29 @@ function checkWalletConnection() {
 $(function () {
     $(window).load(function () {
         try {
-            if(!window.ethereum) {
-                throw new Error('No Web3 provider detected');
-            }
-            
-            document.getElementById("walletButton").disabled = false;
+            // Initialize app
             App.init().catch(error => {
                 console.error('Failed to initialize app:', error);
                 App.handleError(error);
             });
-
-            // Add event listener with proper error boundaries
-            document.getElementById('walletButton').addEventListener('click', async function() {
-                try {
-                    if (!App.isConnected) {
-                        await App.connectWallet();
-                    } else {
-                        await App.disconnectWallet();
-                    }
-                } catch (error) {
-                    console.error('Wallet operation failed:', error);
-                    App.handleError(error);
-                }
-            });
         } catch (error) {
             console.error('App initialization failed:', error);
-            // Show user-friendly error message
-            document.getElementById("walletButton").textContent = 'Web3 Not Available';
-            document.getElementById("walletButton").disabled = true;
+            // Show user-friendly error message but keep button enabled
+            const walletButton = document.getElementById("walletButton");
+            if (walletButton) {
+                walletButton.textContent = 'Connect Wallet';
+                walletButton.disabled = false;
+            }
         }
     });
 });
 
 $(document).ready(function() {
-    document.getElementById('depositButton').disabled = true;
-});
-
-function showBalanceErrorPopup(message) {
-  const popup = document.createElement('div');
-  popup.id = 'balanceErrorPopup';
-  popup.className = 'balance-error-popup';
-  popup.textContent = message;
-  
-  document.body.appendChild(popup);
-  
-  // Remove the popup after 3 seconds
-  setTimeout(() => {
-    const popup = document.getElementById('balanceErrorPopup');
-    if (popup) {
-      popup.remove();
+    const depositButton = document.getElementById('depositButton');
+    if (depositButton) {
+        depositButton.disabled = true;
     }
-  }, 3000);
-}
-
-function hideBalanceErrorPopup() {
-  const popup = document.getElementById('balanceErrorPopup');
-  if (popup) {
-    popup.remove();
-  }
-}
+});
 
 async function checkBalance(amount) {
   if (!App.contracts.Token || !App.account) return true;
@@ -683,7 +2539,7 @@ async function checkBalance(amount) {
     
     if (App.web3.utils.toBN(amountWei).gt(App.web3.utils.toBN(balance))) {
       const readableBalance = App.web3.utils.fromWei(balance, 'ether');
-      showBalanceErrorPopup(`Insufficient balance. You have ${readableBalance} TRB but trying to deposit ${amount} TRB`);
+      App.showBalanceErrorPopup(`Insufficient balance. You have ${readableBalance} TRB but trying to deposit ${amount} TRB`);
       return false;
     }
     return true;
@@ -694,12 +2550,12 @@ async function checkBalance(amount) {
 }
 
 const SUPPORTED_CHAIN_IDS = {
-    11155111: 'Sepolia'
+    11155111: 'Sepolia'  // Only Sepolia is supported for now
 };
 
 function validateChainId(chainId) {
     if (!chainId || !SUPPORTED_CHAIN_IDS[chainId]) {
-        throw new Error(`Unsupported network. Please connect to ${Object.values(SUPPORTED_CHAIN_IDS).join(' or ')}`);
+        throw new Error(`Please connect to Sepolia (chain ID: 11155111). Mainnet support coming soon.`);
     }
     return true;
 }

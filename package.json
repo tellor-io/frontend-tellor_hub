@@ -1,0 +1,21 @@
+{
+  "name": "tellor-layer-bridge",
+  "version": "1.0.0",
+  "description": "Tellor Layer Bridge with Keplr support",
+  "main": "frontend/app.js",
+  "dependencies": {
+    "@cosmjs/proto-signing": "^0.31.0",
+    "@cosmjs/stargate": "^0.31.0",
+    "ethers": "^5.7.2",
+    "protobufjs": "^7.5.1",
+    "web3": "^1.7.4"
+  },
+  "scripts": {
+    "start": "http-server . -p 8080 --cors -P http://localhost:8080?",
+    "compile-proto": "pbjs -t static-module -w commonjs -o frontend/proto/layer_proto.js frontend/proto/bridge/tx.proto && pbts -o frontend/proto/layer_proto.d.ts frontend/proto/layer_proto.js"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "protobufjs-cli": "^1.1.3"
+  }
+}

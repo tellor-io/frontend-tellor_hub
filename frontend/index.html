@@ -8,6 +8,9 @@
     <link rel="stylesheet" href="main.css" />
     <link rel="icon" type="image/x-icon" href="/drkgrnswsh.png">
 
+    <!-- Load protobuf.js first -->
+    <script src="https://cdn.jsdelivr.net/npm/protobufjs@7.2.4/dist/protobuf.min.js"></script>
+
     <script>
       if (typeof crypto.randomUUID !== 'function') {
         crypto.randomUUID = function() {
@@ -17,50 +20,120 @@
         };
       }
     </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js" type="application/javascript"></script>
   </head>
 
   <body>
     <header>
       <div class="top-right">
       </div>
-      <h1 style="display: grid; grid-template-columns: auto auto; gap: 5px; align-items: center; justify-content: center; margin: 0; padding: 20px 0 0 0;">
-        <img src="circle_logo.png" alt="Circle Logo" style="width: 40px; height: 40px; object-fit: contain; display: block;">
-        <span style="display: block;">TRB Bridge To Tellor Layer</span>
+      <h1 style="display: flex; align-items: center; justify-content: center; margin: 0; padding: 32px 0 0 0;">
+        <img src="bridge-title.png" alt="Bridge Title" style="max-width:600px;width:100%;height:auto;display:block;margin:0 auto;">
       </h1>
       <div class="disclaimer">*Sepolia Test Network Only*</div>
     </header>
     <div class="box-wrapper">
-      <w3m-button></w3m-button>
-      <button id="walletButton" class="button-style-2" disabled>Connect Wallet</button>
-      <div class="balance-info">
-        <p class="info-text">(Current Balance: <span id="currentBalance">0 TRB</span>)</p>
-        <p class="info-text">(Deposit limit: <span id="depositLimit"></span>)</p>
-      </div>          
-        <div class="input-button-container">
-          <div class="input-with-label">
-            <span class="input-label">TRB</span>
-            <input class="input" type="text" id="stakeAmount" placeholder="0" />
+      <div class="main-content">
+        <div class="bridge-buttons-container">
+          <div class="bridge-direction-selector">
+            <button id="bridgeToLayerBtn" class="bridge-direction-btn active">Bridge to Layer</button>
+            <button id="bridgeToEthBtn" class="bridge-direction-btn">Bridge to Ethereum</button>
           </div>
-        </div>
 
-        <div class="input-button-container">
-          <div class="input-with-label">
-            <input class= "input-address" type="text" id="_queryId" placeholder="To address (e.g. tellor1py3fs...)"/>
-            <span class="info-icon" data-tooltip="Don't have a tellor prefix address? Click <a href='https://docs.tellor.io/layer-docs/public-testnet/run-a-layer-node' target='_blank'>here</a> to learn how to create one">ⓘ</span>
-          </div>
-        </div>
+          <!-- Bridge to Layer Section -->
+          <div id="bridgeToLayerSection" class="bridge-section active">
+            <w3m-button></w3m-button>
+            <button id="walletButton" class="button-style-2" disabled>Connect MetaMask</button>
+            <div class="balance-info">
+              <p class="info-text">(Current Balance: <span id="currentBalance">0 TRB</span>)</p>
+              <p class="info-text">(Deposit limit: <span id="depositLimit"></span>)</p>
+            
+              <div class="input-button-container">
+                <div class="input-with-label">
+                  <span class="input-label">TRB</span>
+                  <input class="input" type="text" id="stakeAmount" placeholder="0" />
+                </div>
+              </div>
 
-        <div class="input-fields">
-          <div class="step-label">
-            <button id="approveButton" class="button-style-1" onclick="console.log('Button clicked'); App.approveDeposit();">Approve Deposit</button>
-          </div>
-          <div class="step-label">
-            <button id="depositButton" class="button-style-3" onclick="App.depositToLayer()">Bridge to Layer</button>
-          </div>
-        </div>
+              <div class="input-button-container">
+                <div class="input-with-label">
+                  <input class="input-address" type="text" id="_queryId" placeholder="To address (e.g. tellor1py3fs...)" />
+                  <span class="info-icon" data-tooltip="Don't have a tellor prefix address? <a href='https://docs.tellor.io/layer-docs/running-tellor-layer/node-setup' target='_blank'>Click here</a> to learn how to create one">ⓘ</span>
+                </div>
+              </div>
 
-        <a  target="_blank" href="https://github.com/tellor-io/frontend-layerbridgebutton">Front-End code</a>
-        <w3m-button></w3m-button>
+              <div class="bridge-direction">
+                <button id="approveButton" class="button-style-1" onclick="App.approveDeposit()">Approve Deposit</button>
+                <button id="depositButton" class="button-style-3" onclick="App.depositToLayer()">Bridge to Layer</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bridge to Ethereum Section -->
+          <div id="bridgeToEthSection" class="bridge-section">
+            <div class="wallet-disclaimer">*Please connect both wallets to bridge to Ethereum*</div>
+            <div class="wallet-connection-container">
+                <div class="wallet-button-group">
+                    <button id="metamaskButton" class="button-style-2" disabled>Connect MetaMask</button>
+                    <p class="info-text">(Balance: <span id="ethMetaMaskBalance">0 TRB</span>)</p>
+                </div>
+                <div class="wallet-button-group">
+                    <button id="keplrButton" class="button-style-2" disabled>Connect Keplr</button>
+                    <p class="info-text">(Balance: <span id="ethKeplrBalance">0 TRB</span>)</p>
+                </div>
+            </div>
+            <div class="balance-info">
+                <div class="input-button-container">
+                    <div class="input-with-label">
+                        <span class="input-label">TRB</span>
+                        <input class="input" type="text" id="ethStakeAmount" placeholder="0" />
+                    </div>
+                </div>
+
+                <div class="input-button-container">
+                    <div class="input-with-label">
+                        <input class="input-address" type="text" id="ethQueryId" placeholder="To address (e.g. 0x...)" />
+                        <span class="info-icon" data-tooltip="Enter your Ethereum address (0x...)">ⓘ</span>
+                    </div>
+                </div>
+
+                <div class="bridge-direction">
+                    <button id="withdrawButton" class="button-style-3" onclick="App.withdrawFromLayer()">1. Request Withdrawal</button>
+                </div>
+            </div>
+          </div>
+          <a target="_blank" href="https://github.com/tellor-io/frontend-layerbridgebutton">Front-End code</a>
+        </div>
+      </div>
+      <div id="bridgeTransactionsContainer" class="transactions-container">
+        <div class="history-header">
+          <h3>Withdrawal Transactions</h3>
+          <div class="history-subtitle">View & Claim your withdrawal requests and their status</div>
+        </div>
+        <div class="withdrawal-table-container">
+          <table id="withdrawal-history" class="withdrawal-table">
+            <thead>
+              <tr>
+                <th>Actions</th>
+                <th>ID</th>
+                <th>Sender</th>
+                <th>Recipient</th>
+                <th class="amount-column">Amount (TRB)</th>
+                <th>Time</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="7" class="loading-message">Waiting for wallet connections...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
     <p style= "text-align: center"></p>
       <footer>
@@ -69,48 +142,259 @@
     </div>
     <script src="./extensions/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.7.4/web3.min.js"></script>
-    <script src="app.js"></script>
+    <!-- Load app.js as a module only once -->
+    <script type="module">
+      // Define a global variable to track CosmJS loading
+      window.cosmjsLoaded = false;
+      
+      // Function to load a single script
+      function loadScript(src, type = 'text/javascript') {
+        return new Promise((resolve, reject) => {
+          // Skip if app.js is already loaded
+          if (src === 'app.js' && document.querySelector('script[src="app.js"]')) {
+            resolve();
+            return;
+          }
+          const script = document.createElement('script');
+          script.src = src;
+          script.type = type;
+          script.onload = () => {
+            // For app.js, wait a tick to ensure App is defined
+            if (src === 'app.js') {
+              setTimeout(resolve, 0);
+            } else {
+              resolve();
+            }
+          };
+          script.onerror = () => reject(new Error(`Failed to load ${src}`));
+          document.head.appendChild(script);
+        });
+      }
+      
+      // Function to load CosmJS scripts
+      async function loadCosmJS() {
+        try {
+          const scripts = [
+            './extensions/cosmjs/encoding.js',
+            './extensions/cosmjs/math.js',
+            './extensions/cosmjs/proto.js',
+            './extensions/cosmjs/proto-signing.js',
+            './extensions/cosmjs/stargate.js'
+          ];
 
+          // Load scripts sequentially
+          for (const src of scripts) {
+            await loadScript(src);
+          }
+
+          // Verify CosmJS is loaded
+          if (typeof window.cosmjs === 'undefined' || typeof window.cosmjs.stargate === 'undefined') {
+            throw new Error('CosmJS failed to initialize properly');
+          }
+
+          window.cosmjsLoaded = true;
+          return true;
+        } catch (error) {
+          console.error('Error loading CosmJS:', error);
+          return false;
+        }
+      }
+
+      // Load CosmJS and then initialize the app
+      loadCosmJS()
+        .then(success => {
+          if (!success) {
+            throw new Error('Failed to load CosmJS');
+          }
+          
+          // Load app.js as a module
+          return loadScript('app.js', 'module');
+        })
+        .then(() => {
+          // Wait for App to be defined
+          return new Promise((resolve) => {
+            const checkApp = () => {
+              if (typeof window.App !== 'undefined') {
+                resolve();
+              } else {
+                setTimeout(checkApp, 100);
+              }
+            };
+            checkApp();
+          });
+        })
+        .then(() => {
+          // Initialize the app after everything is loaded
+          return window.App.init();
+        })
+        .catch(error => {
+          console.error('Initialization error:', error);
+          const walletButton = document.getElementById('walletButton');
+          if (walletButton) {
+            walletButton.textContent = 'Error: Please refresh page';
+            walletButton.disabled = true;
+          }
+        });
+    </script>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
         const infoIcons = document.querySelectorAll('.info-icon');
         let tooltipTimer;
         
-        infoIcons.forEach(icon => {
-          const tooltip = document.createElement('div');
-          tooltip.className = 'tooltip';
-          tooltip.innerHTML = icon.getAttribute('data-tooltip');
-          icon.appendChild(tooltip);
-          
-          icon.addEventListener('click', function(e) {
-            e.stopPropagation();
-            
-            // Clear any existing timer
+        // Function to hide all tooltips
+        function hideAllTooltips() {
             clearTimeout(tooltipTimer);
-            
-            // Toggle tooltip visibility
-            if (tooltip.style.display === 'block') {
-              tooltip.style.display = 'none';
-            } else {
-              // Hide all other tooltips
-              document.querySelectorAll('.tooltip').forEach(t => t.style.display = 'none');
-              
-              // Show this tooltip
-              tooltip.style.display = 'block';
-              
-              // Set timer to hide tooltip after 3 seconds
-              tooltipTimer = setTimeout(() => {
+            document.querySelectorAll('.tooltip').forEach(tooltip => {
                 tooltip.style.display = 'none';
-              }, 3000);
+            });
+        }
+        
+        // Add tab switch handlers
+        const bridgeToLayerBtn = document.getElementById('bridgeToLayerBtn');
+        const bridgeToEthBtn = document.getElementById('bridgeToEthBtn');
+        
+        bridgeToLayerBtn.addEventListener('click', hideAllTooltips);
+        bridgeToEthBtn.addEventListener('click', hideAllTooltips);
+        
+        infoIcons.forEach(icon => {
+            // Only add tooltip functionality to the icon in the Bridge to Layer section
+            if (icon.closest('#bridgeToLayerSection')) {
+                const tooltip = document.createElement('div');
+                tooltip.className = 'tooltip';
+                tooltip.innerHTML = icon.getAttribute('data-tooltip');
+                document.body.appendChild(tooltip);
+                
+                // Show tooltip on hover
+                icon.addEventListener('mouseenter', function(e) {
+                    // Only show tooltip if we're in the Bridge to Layer section
+                    if (!document.getElementById('bridgeToLayerSection').classList.contains('active')) {
+                        return;
+                    }
+                    
+                    e.stopPropagation();
+                    clearTimeout(tooltipTimer);
+                    
+                    // Hide all other tooltips
+                    hideAllTooltips();
+                    
+                    // Calculate position
+                    const iconRect = icon.getBoundingClientRect();
+                    const tooltipRect = tooltip.getBoundingClientRect();
+                    
+                    // Position tooltip to the right of the icon
+                    let left = iconRect.right + 10;
+                    let top = iconRect.top + (iconRect.height / 2) - (tooltipRect.height / 2);
+                    
+                    // Ensure tooltip stays within viewport
+                    if (left + tooltipRect.width > window.innerWidth) {
+                        left = iconRect.left - tooltipRect.width - 10;
+                    }
+                    if (top + tooltipRect.height > window.innerHeight) {
+                        top = window.innerHeight - tooltipRect.height - 10;
+                    }
+                    if (top < 10) {
+                        top = 10;
+                    }
+                    
+                    // Apply position
+                    tooltip.style.left = left + 'px';
+                    tooltip.style.top = top + 'px';
+                    tooltip.style.display = 'block';
+                });
+                
+                // Hide tooltip when mouse leaves
+                icon.addEventListener('mouseleave', function(e) {
+                    e.stopPropagation();
+                    tooltipTimer = setTimeout(() => {
+                        tooltip.style.display = 'none';
+                    }, 500);
+                });
+                
+                // Also handle click for mobile devices
+                icon.addEventListener('click', function(e) {
+                    // Only show tooltip if we're in the Bridge to Layer section
+                    if (!document.getElementById('bridgeToLayerSection').classList.contains('active')) {
+                        return;
+                    }
+                    
+                    e.stopPropagation();
+                    clearTimeout(tooltipTimer);
+                    
+                    // Calculate position for click
+                    const iconRect = icon.getBoundingClientRect();
+                    const tooltipRect = tooltip.getBoundingClientRect();
+                    
+                    let left = iconRect.right + 10;
+                    let top = iconRect.top + (iconRect.height / 2) - (tooltipRect.height / 2);
+                    
+                    // Ensure tooltip stays within viewport
+                    if (left + tooltipRect.width > window.innerWidth) {
+                        left = iconRect.left - tooltipRect.width - 10;
+                    }
+                    if (top + tooltipRect.height > window.innerHeight) {
+                        top = window.innerHeight - tooltipRect.height - 10;
+                    }
+                    if (top < 10) {
+                        top = 10;
+                    }
+                    
+                    // Toggle tooltip visibility
+                    if (tooltip.style.display === 'block') {
+                        tooltip.style.display = 'none';
+                    } else {
+                        // Hide all other tooltips
+                        hideAllTooltips();
+                        
+                        // Show this tooltip
+                        tooltip.style.left = left + 'px';
+                        tooltip.style.top = top + 'px';
+                        tooltip.style.display = 'block';
+                        
+                        // Set timer to hide tooltip after 3 seconds on mobile
+                        tooltipTimer = setTimeout(() => {
+                            tooltip.style.display = 'none';
+                        }, 3000);
+                    }
+                });
             }
-          });
         });
         
-        document.addEventListener('click', function() {
-          clearTimeout(tooltipTimer);
-          document.querySelectorAll('.tooltip').forEach(tooltip => {
-            tooltip.style.display = 'none';
-          });
+        // Hide tooltips when clicking anywhere else
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.info-icon') && !e.target.closest('.tooltip')) {
+                hideAllTooltips();
+            }
+        });
+
+        // Update tooltip position on window resize
+        window.addEventListener('resize', function() {
+            document.querySelectorAll('.tooltip').forEach(tooltip => {
+                if (tooltip.style.display === 'block') {
+                    const icon = document.querySelector('.info-icon[data-tooltip="' + tooltip.innerHTML + '"]');
+                    if (icon && document.getElementById('bridgeToLayerSection').classList.contains('active')) {
+                        const iconRect = icon.getBoundingClientRect();
+                        const tooltipRect = tooltip.getBoundingClientRect();
+                        
+                        let left = iconRect.right + 10;
+                        let top = iconRect.top + (iconRect.height / 2) - (tooltipRect.height / 2);
+                        
+                        if (left + tooltipRect.width > window.innerWidth) {
+                            left = iconRect.left - tooltipRect.width - 10;
+                        }
+                        if (top + tooltipRect.height > window.innerHeight) {
+                            top = window.innerHeight - tooltipRect.height - 10;
+                        }
+                        if (top < 10) {
+                            top = 10;
+                        }
+                        
+                        tooltip.style.left = left + 'px';
+                        tooltip.style.top = top + 'px';
+                    } else {
+                        tooltip.style.display = 'none';
+                    }
+                }
+            });
         });
 
         // Add event listeners for input fields
@@ -137,22 +421,25 @@
         async function checkAllowance() {
           const approveButton = document.getElementById('approveButton');
           const depositButton = document.getElementById('depositButton');
+          const withdrawButton = document.getElementById('withdrawButton');
           const stakeAmount = parseFloat(stakeAmountInput.value) || 0;
 
           if (isNaN(stakeAmount) || stakeAmount <= 0) {
             approveButton.disabled = true;
             depositButton.disabled = true;
+            withdrawButton.disabled = true;
             return;
           }
 
-          // Check balance first
-          const hasBalance = await checkBalance(stakeAmount);
-          if (!hasBalance) {
-            approveButton.disabled = true;
-            depositButton.disabled = true;
+          // Handle Keplr wallet
+          if (App.isKeplrConnected) {
+            approveButton.style.display = 'none';
+            depositButton.style.display = 'none';
+            withdrawButton.disabled = false;
             return;
           }
 
+          // Handle MetaMask wallet
           try {
             const allowance = await App.getAllowance();
             const stakeAmountWei = App.web3.utils.toWei(stakeAmount.toString(), 'ether');
