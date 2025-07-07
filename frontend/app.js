@@ -189,6 +189,7 @@ const App = {
             throw new Error('MetaMask not installed');
         }
 
+        // Request account access first
         const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
         
         if (!accounts || accounts.length === 0) {
@@ -199,15 +200,91 @@ const App = {
         App.web3Provider = window.ethereum;
         App.web3 = new Web3(window.ethereum);
         
-        // Get chain ID and check if it's supported
-        const chainId = await App.web3.eth.getChainId();
+        // Get current chain ID using multiple methods for compatibility
+        let chainId;
+        try {
+            // Try the newer method first
+            chainId = await window.ethereum.request({ method: 'eth_chainId' });
+            // Convert hex to decimal if needed
+            if (typeof chainId === 'string' && chainId.startsWith('0x')) {
+                chainId = parseInt(chainId, 16);
+            }
+        } catch (error) {
+            // Fallback to Web3 method
+            chainId = await App.web3.eth.getChainId();
+        }
+        
         App.chainId = chainId;
+        console.log('Current chain ID:', chainId);
+        
+        // If not on Sepolia, try to switch to it
+        if (chainId !== 11155111) {
+            console.log('Not on Sepolia, attempting to switch...');
+            try {
+                // Try to switch to Sepolia
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: '0xaa36a7' }], // 11155111 in hex
+                });
+                
+                // Verify the switch worked
+                chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                if (typeof chainId === 'string' && chainId.startsWith('0x')) {
+                    chainId = parseInt(chainId, 16);
+                }
+                App.chainId = chainId;
+                console.log('Switched to chain ID:', chainId);
+                
+            } catch (switchError) {
+                console.log('Switch error:', switchError);
+                
+                // If the network doesn't exist (error code 4902), add it
+                if (switchError.code === 4902) {
+                    try {
+                        console.log('Adding Sepolia network...');
+                        await window.ethereum.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [{
+                                chainId: '0xaa36a7', // 11155111 in hex
+                                chainName: 'Sepolia',
+                                nativeCurrency: {
+                                    name: 'Sepolia Ether',
+                                    symbol: 'ETH',
+                                    decimals: 18
+                                },
+                                rpcUrls: ['https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161'],
+                                blockExplorerUrls: ['https://sepolia.etherscan.io']
+                            }]
+                        });
+                        
+                        // Verify the add worked
+                        chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                        if (typeof chainId === 'string' && chainId.startsWith('0x')) {
+                            chainId = parseInt(chainId, 16);
+                        }
+                        App.chainId = chainId;
+                        console.log('Added and switched to chain ID:', chainId);
+                        
+                    } catch (addError) {
+                        console.error('Failed to add Sepolia network:', addError);
+                        alert('Please manually add Sepolia testnet to MetaMask and try again.');
+                        throw new Error('Failed to add Sepolia network to MetaMask');
+                    }
+                } else {
+                    console.error('Failed to switch to Sepolia:', switchError);
+                    alert('Please manually switch to Sepolia testnet in MetaMask and try again.');
+                    throw new Error('Failed to switch to Sepolia network');
+                }
+            }
+        }
         
         // Validate chain ID
         try {
             validateChainId(chainId);
         } catch (error) {
             console.error('Chain validation error:', error);
+            console.error('Current chain ID:', chainId, 'Type:', typeof chainId);
+            console.error('Supported chain IDs:', Object.keys(SUPPORTED_CHAIN_IDS));
             alert('Please connect to Sepolia (chain ID: 11155111). Mainnet support coming soon.');
             throw error;
         }
@@ -1800,6 +1877,94 @@ const App = {
     const popup = document.getElementById('balanceErrorPopup');
     if (popup) {
       popup.remove();
+    }
+  },
+
+  // Add new function to handle delegation
+  delegateTokens: async function() {
+    try {
+        if (!App.isKeplrConnected || !window.keplr) {
+            alert('Please connect your Keplr wallet first');
+            return;
+        }
+
+        // Verify Keplr is still enabled for the chain
+        try {
+            await window.keplr.enable('layertest-4');
+        } catch (error) {
+            console.error('Keplr not enabled for chain:', error);
+            App.isKeplrConnected = false;
+            App.keplrAddress = null;
+            const keplrButton = document.getElementById('keplrButton');
+            if (keplrButton) {
+                keplrButton.innerHTML = 'Connect Keplr';
+            }
+            alert('Please reconnect your Keplr wallet');
+            return;
+        }
+
+        // Get input values
+        const amount = document.getElementById('ethStakeAmount').value;
+        const validatorAddress = document.getElementById('validatorAddress').value;
+
+        // Validate inputs
+        if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+            alert('Please enter a valid amount');
+            return;
+        }
+
+        if (!validatorAddress || !validatorAddress.trim()) {
+            alert('Please enter a validator address');
+            return;
+        }
+
+        // Validate validator address format (should start with tellorvaloper)
+        if (!validatorAddress.startsWith('tellorvaloper')) {
+            alert('Please enter a valid validator address (should start with tellorvaloper)');
+            return;
+        }
+
+        const delegateButton = document.getElementById('delegateButton');
+        if (delegateButton) {
+            delegateButton.disabled = true;
+            delegateButton.innerHTML = '<span>Delegating</span><span>...</span>';
+        }
+
+        App.showPendingPopup("Delegating tokens...");
+
+        // Get the Layer account from Keplr
+        const offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+        const accounts = await offlineSigner.getAccounts();
+        const layerAccount = accounts[0].address;
+
+        // Call the delegation function
+        const result = await window.cosmjs.stargate.delegateTokens(
+            layerAccount,
+            validatorAddress,
+            amount
+        );
+
+        App.hidePendingPopup();
+        
+        if (result && result.code === 0) {
+            App.showSuccessPopup("Delegation successful!");
+            // Clear the input fields
+            document.getElementById('ethStakeAmount').value = '';
+            document.getElementById('validatorAddress').value = '';
+        } else {
+            throw new Error(result?.rawLog || "Delegation failed");
+        }
+    } catch (error) {
+        console.error('Error delegating tokens:', error);
+        App.hidePendingPopup();
+        App.showErrorPopup(error.message || "Error delegating tokens. Please try again.");
+        
+        // Re-enable the delegate button if there was an error
+        const delegateButton = document.getElementById('delegateButton');
+        if (delegateButton) {
+            delegateButton.disabled = false;
+            delegateButton.innerHTML = '<span>2. Delegate</span><span>Tokens</span>';
+        }
     }
   },
 

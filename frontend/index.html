@@ -100,8 +100,16 @@
                     </div>
                 </div>
 
+                <div class="input-button-container">
+                    <div class="input-with-label">
+                        <input class="input-address" type="text" id="validatorAddress" placeholder="Validator address (e.g. tellorvaloper1...)" />
+                        <span class="info-icon" data-tooltip="Enter the validator address you want to delegate to">ⓘ</span>
+                    </div>
+                </div>
+
                 <div class="bridge-direction">
                     <button id="withdrawButton" class="button-style-3" onclick="App.withdrawFromLayer()">1. Request Withdrawal</button>
+                    <button id="delegateButton" class="button-style-3" onclick="App.delegateTokens()">2. Delegate Tokens</button>
                 </div>
             </div>
           </div>
@@ -141,7 +149,7 @@
       </footer>
     </div>
     <script src="./extensions/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.7.4/web3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.10.0/web3.min.js"></script>
     <!-- Load app.js as a module only once -->
     <script type="module">
       // Define a global variable to track CosmJS loading
