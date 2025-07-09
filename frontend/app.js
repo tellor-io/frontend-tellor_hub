@@ -108,6 +108,25 @@ const App = {
                 });
             }
 
+            // Handle delegate Keplr button
+            const delegateKeplrButton = document.getElementById('delegateKeplrButton');
+            if (delegateKeplrButton) {
+                const newDelegateKeplrButton = delegateKeplrButton.cloneNode(true);
+                delegateKeplrButton.parentNode.replaceChild(newDelegateKeplrButton, delegateKeplrButton);
+                newDelegateKeplrButton.addEventListener('click', async () => {
+                    try {
+                        if (App.isKeplrConnected) {
+                            await App.disconnectKeplr();
+                        } else {
+                            await App.connectKeplr();
+                        }
+                    } catch (error) {
+                        console.error('Keplr operation failed:', error);
+                        App.handleError(error);
+                    }
+                });
+            }
+
             resolve();
           })
           .catch(error => {
@@ -168,10 +187,14 @@ const App = {
         // Handle Keplr if available
         if (hasKeplr) {
           App.keplrProvider = window.keplr;
-          // Enable Keplr button
+          // Enable Keplr buttons
           const keplrButton = document.getElementById("keplrButton");
+          const delegateKeplrButton = document.getElementById("delegateKeplrButton");
           if (keplrButton) {
             keplrButton.disabled = false;
+          }
+          if (delegateKeplrButton) {
+            delegateKeplrButton.disabled = false;
           }
         }
         
@@ -399,18 +422,27 @@ const App = {
         // Update button text
         const truncatedAddress = `${App.keplrAddress.substring(0, 6)}...${App.keplrAddress.substring(App.keplrAddress.length - 4)}`;
         const keplrButton = document.getElementById('keplrButton');
+        const delegateKeplrButton = document.getElementById('delegateKeplrButton');
         if (keplrButton) {
             keplrButton.innerHTML = `Disconnect Keplr <span class="truncated-address">(${truncatedAddress})</span>`;
+        }
+        if (delegateKeplrButton) {
+            delegateKeplrButton.innerHTML = `Disconnect Keplr <span class="truncated-address">(${truncatedAddress})</span>`;
         }
         
         // Update balance immediately after connection
         await App.updateKeplrBalance();
         
-        // Enable withdraw button if in Ethereum section
+        // Enable action buttons based on current section
         if (App.currentBridgeDirection === 'ethereum') {
             const withdrawButton = document.getElementById('withdrawButton');
             if (withdrawButton) {
                 withdrawButton.disabled = false;
+            }
+        } else if (App.currentBridgeDirection === 'delegate') {
+            const delegateButton = document.getElementById('delegateButton');
+            if (delegateButton) {
+                delegateButton.disabled = false;
             }
         }
         
@@ -501,23 +533,36 @@ const App = {
         App.isKeplrConnected = false;
         App.keplrProvider = null;
 
-        // Update Keplr button
+        // Update Keplr buttons
         const keplrButton = document.getElementById('keplrButton');
+        const delegateKeplrButton = document.getElementById('delegateKeplrButton');
         if (keplrButton) {
             keplrButton.innerHTML = 'Connect Keplr';
             console.log('Updated Keplr button');
         }
+        if (delegateKeplrButton) {
+            delegateKeplrButton.innerHTML = 'Connect Keplr';
+            console.log('Updated delegate Keplr button');
+        }
 
         // Update balances
         const ethKeplrBalance = document.getElementById('ethKeplrBalance');
+        const delegateKeplrBalance = document.getElementById('delegateKeplrBalance');
         if (ethKeplrBalance) {
             ethKeplrBalance.textContent = '0 TRB';
         }
+        if (delegateKeplrBalance) {
+            delegateKeplrBalance.textContent = '0 TRB';
+        }
 
-        // Disable withdraw button
+        // Disable action buttons
         const withdrawButton = document.getElementById('withdrawButton');
+        const delegateButton = document.getElementById('delegateButton');
         if (withdrawButton) {
             withdrawButton.disabled = true;
+        }
+        if (delegateButton) {
+            delegateButton.disabled = true;
         }
 
         // Update withdrawal history to reflect Keplr disconnection
@@ -832,25 +877,25 @@ const App = {
         // Format balance to 6 decimal places consistently
         const readableBalance = (balanceAmount / 1000000).toFixed(6);
 
-        // Update the appropriate balance element based on current direction
-        if (App.currentBridgeDirection === 'layer') {
-            const balanceElement = document.getElementById("currentBalance");
-            if (balanceElement) {
-                balanceElement.textContent = `${readableBalance} TRB`;
-            }
-        } else {
-            // In Ethereum section, update Keplr balance
-            const keplrBalanceElement = document.getElementById("ethKeplrBalance");
-            if (keplrBalanceElement) {
-                keplrBalanceElement.textContent = `${readableBalance} TRB`;
-            }
+        // Update Keplr balance displays for Ethereum and Delegate sections only
+        // (currentBalance in Bridge to Tellor section is for MetaMask only)
+        const ethKeplrBalanceElement = document.getElementById("ethKeplrBalance");
+        const delegateKeplrBalanceElement = document.getElementById("delegateKeplrBalance");
+        
+        if (ethKeplrBalanceElement) {
+            ethKeplrBalanceElement.textContent = `${readableBalance} TRB`;
+        }
+        if (delegateKeplrBalanceElement) {
+            delegateKeplrBalanceElement.textContent = `${readableBalance} TRB`;
         }
     } catch (error) {
         console.error("Error fetching Keplr balance:", error);
-        const balanceElement = document.getElementById(App.currentBridgeDirection === 'layer' ? "currentBalance" : "ethKeplrBalance");
-        if (balanceElement) {
-            balanceElement.textContent = "0.000000 TRB";
-        }
+        // Set Keplr balances to 0 on error (excluding currentBalance which is for MetaMask)
+        const ethKeplrBalanceElement = document.getElementById("ethKeplrBalance");
+        const delegateKeplrBalanceElement = document.getElementById("delegateKeplrBalance");
+        
+        if (ethKeplrBalanceElement) ethKeplrBalanceElement.textContent = "0.000000 TRB";
+        if (delegateKeplrBalanceElement) delegateKeplrBalanceElement.textContent = "0.000000 TRB";
     }
   },
 
@@ -895,7 +940,7 @@ const App = {
       });
   },
 
-  showSuccessPopup: function(message) {
+  showSuccessPopup: function(message, txHash = null, chainType = 'ethereum') {
     const popup = document.createElement('div');
     popup.id = 'successPopup';
     popup.style.position = 'fixed';
@@ -910,12 +955,39 @@ const App = {
     popup.style.border = '3px solid black';
     popup.style.fontFamily = "'PPNeueMontreal-Book', Arial, sans-serif";
     popup.style.fontSize = "15px";
-    popup.style.width = '250px'; // Set a fixed width
+    popup.style.width = '300px'; // Increased width to accommodate link
     popup.style.textAlign = 'center'; // Center the text
   
     const messageSpan = document.createElement('span');
     messageSpan.textContent = message;
     popup.appendChild(messageSpan);
+  
+    // Add block explorer link if transaction hash is provided
+    if (txHash) {
+      const linkContainer = document.createElement('div');
+      linkContainer.style.marginTop = '15px';
+      
+      let explorerUrl;
+      if (chainType === 'ethereum') {
+        explorerUrl = `https://sepolia.etherscan.io/tx/${txHash}`;
+      } else if (chainType === 'cosmos') {
+        explorerUrl = `https://explorer.tellor.io/txs/${txHash}`;
+      }
+      
+      if (explorerUrl) {
+        const link = document.createElement('a');
+        link.href = explorerUrl;
+        link.target = '_blank';
+        link.textContent = 'View on Block Explorer';
+        link.style.color = '#083b44';
+        link.style.textDecoration = 'underline';
+        link.style.fontSize = '13px';
+        link.style.fontFamily = "'PPNeueMontreal-Book', Arial, sans-serif";
+        
+        linkContainer.appendChild(link);
+        popup.appendChild(linkContainer);
+      }
+    }
   
     document.body.appendChild(popup);
   
@@ -966,12 +1038,13 @@ const App = {
         // Only reach here if balance is sufficient
         App.showPendingPopup("Deposit transaction pending...");
         const tipToSend = App.web3.utils.toWei(tip, 'ether');
-        await App.contracts.Bridge.methods.depositToLayer(amountToSend, tipToSend, recipient)
+        const tx = await App.contracts.Bridge.methods.depositToLayer(amountToSend, tipToSend, recipient)
             .send({ from: App.account });
         
         App.hidePendingPopup();
         await App.updateBalance();
-        App.showSuccessPopup("Deposit to layer successful! You will need to wait 12 hours before you can claim your tokens on Tellor Layer.");
+        const txHash = tx.transactionHash;
+        App.showSuccessPopup("Deposit to layer successful! You will need to wait 12 hours before you can claim your tokens on Tellor Layer.", txHash, 'ethereum');
     } catch (error) {
         App.hidePendingPopup();
         console.error("Error in depositing to layer:", error);
@@ -1430,7 +1503,7 @@ const App = {
                 if (txResponse.height !== "0") {
                     if (txResponse.code === 0) {
                         App.hidePendingPopup();
-                        App.showSuccessPopup("Withdrawal successful! You will need to wait 12 hours before you can claim your tokens on Ethereum.");
+                        App.showSuccessPopup("Withdrawal successful! You will need to wait 12 hours before you can claim your tokens on Ethereum.", txHash, 'cosmos');
                         await App.updateKeplrBalance();
                         return txResponse;
                     } else {
@@ -1904,8 +1977,8 @@ const App = {
         }
 
         // Get input values
-        const amount = document.getElementById('ethStakeAmount').value;
-        const validatorAddress = document.getElementById('validatorAddress').value;
+        const amount = document.getElementById('delegateStakeAmount').value;
+        const validatorAddress = document.getElementById('delegateValidatorAddress').value;
 
         // Validate inputs
         if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
@@ -1914,13 +1987,13 @@ const App = {
         }
 
         if (!validatorAddress || !validatorAddress.trim()) {
-            alert('Please enter a validator address');
+            alert('Please select a validator from the dropdown');
             return;
         }
 
         // Validate validator address format (should start with tellorvaloper)
         if (!validatorAddress.startsWith('tellorvaloper')) {
-            alert('Please enter a valid validator address (should start with tellorvaloper)');
+            alert('Please select a valid validator from the dropdown');
             return;
         }
 
@@ -1947,10 +2020,13 @@ const App = {
         App.hidePendingPopup();
         
         if (result && result.code === 0) {
-            App.showSuccessPopup("Delegation successful!");
+            // Get transaction hash from the result
+            const txHash = result.txhash || result.tx_response?.txhash;
+            App.showSuccessPopup("Delegation successful!", txHash, 'cosmos');
             // Clear the input fields
-            document.getElementById('ethStakeAmount').value = '';
-            document.getElementById('validatorAddress').value = '';
+            document.getElementById('delegateStakeAmount').value = '';
+            document.getElementById('delegateValidatorAddress').value = '';
+            document.getElementById('delegateValidatorDropdown').value = '';
         } else {
             throw new Error(result?.rawLog || "Delegation failed");
         }
@@ -1963,7 +2039,7 @@ const App = {
         const delegateButton = document.getElementById('delegateButton');
         if (delegateButton) {
             delegateButton.disabled = false;
-            delegateButton.innerHTML = '<span>2. Delegate</span><span>Tokens</span>';
+            delegateButton.innerHTML = '<span>Delegate</span><span>Tokens</span>';
         }
     }
   },
@@ -2034,7 +2110,9 @@ const App = {
         App.hidePendingPopup();
         
         if (result && result.code === 0) {
-            App.showSuccessPopup("Attestation requested successfully!");
+            // Get transaction hash from the result
+            const txHash = result.txhash || result.tx_response?.txhash;
+            App.showSuccessPopup("Attestation requested successfully!", txHash, 'cosmos');
             // Enable the claim button and remove the waiting class
             if (claimButton) {
                 claimButton.disabled = false;
@@ -2183,7 +2261,7 @@ const App = {
 
         txHash = tx.transactionHash;
         console.log('Withdrawal claim transaction:', tx);
-        App.showSuccessPopup("Withdrawal claimed successfully!");
+        App.showSuccessPopup("Withdrawal claimed successfully!", txHash, 'ethereum');
         await this.updateWithdrawalHistory();
         return tx;
 
@@ -2196,7 +2274,7 @@ const App = {
             txHash = error.receipt.transactionHash;
         }
         
-        let errorMessage = "Claim Withdrawal failed. Try requesting attestation again for updated validator set.";
+        let errorMessage = "Claim Withdrawal failed. Make sure you have waited the full 12 hrs have passed since you requested withdrawal & then try requesting attestation again for updated validator set.";
         if (txHash) {
             const etherscanUrl = `https://sepolia.etherscan.io/tx/${txHash}`;
             errorMessage += ` <a href="${etherscanUrl}" target="_blank" style="color: #DC2626; text-decoration: underline;">View on Etherscan</a>`;
@@ -2549,11 +2627,13 @@ const App = {
   initBridgeDirectionUI: function() {
     const bridgeToLayerBtn = document.getElementById('bridgeToLayerBtn');
     const bridgeToEthBtn = document.getElementById('bridgeToEthBtn');
+    const delegateBtn = document.getElementById('delegateBtn');
     const bridgeToLayerSection = document.getElementById('bridgeToLayerSection');
     const bridgeToEthSection = document.getElementById('bridgeToEthSection');
+    const delegateSection = document.getElementById('delegateSection');
     const transactionsContainer = document.getElementById('bridgeTransactionsContainer');
 
-    if (!bridgeToLayerBtn || !bridgeToEthBtn || !bridgeToLayerSection || !bridgeToEthSection) {
+    if (!bridgeToLayerBtn || !bridgeToEthBtn || !delegateBtn || !bridgeToLayerSection || !bridgeToEthSection || !delegateSection) {
         console.error('Bridge direction UI elements not found');
         return;
     }
@@ -2563,6 +2643,7 @@ const App = {
     bridgeToLayerBtn.classList.add('active');
     bridgeToLayerSection.classList.add('active');
     bridgeToEthSection.classList.remove('active');
+    delegateSection.classList.remove('active');
 
     // Initially hide transactions container
     if (transactionsContainer) {
@@ -2581,22 +2662,30 @@ const App = {
             this.switchBridgeDirection('ethereum');
         }
     });
+
+    delegateBtn.addEventListener('click', () => {
+        if (this.currentBridgeDirection !== 'delegate') {
+            this.switchBridgeDirection('delegate');
+        }
+    });
   },
 
   switchBridgeDirection: function(direction) {
-    if (direction !== 'layer' && direction !== 'ethereum') {
+    if (direction !== 'layer' && direction !== 'ethereum' && direction !== 'delegate') {
         console.error('Invalid bridge direction:', direction);
         return;
     }
 
     const bridgeToLayerBtn = document.getElementById('bridgeToLayerBtn');
     const bridgeToEthBtn = document.getElementById('bridgeToEthBtn');
+    const delegateBtn = document.getElementById('delegateBtn');
     const bridgeToLayerSection = document.getElementById('bridgeToLayerSection');
     const bridgeToEthSection = document.getElementById('bridgeToEthSection');
+    const delegateSection = document.getElementById('delegateSection');
     const transactionsContainer = document.getElementById('bridgeTransactionsContainer');
     const boxWrapper = document.querySelector('.box-wrapper');
 
-    if (!bridgeToLayerBtn || !bridgeToEthBtn || !bridgeToLayerSection || !bridgeToEthSection) {
+    if (!bridgeToLayerBtn || !bridgeToEthBtn || !delegateBtn || !bridgeToLayerSection || !bridgeToEthSection || !delegateSection) {
         console.error('Bridge direction UI elements not found');
         return;
     }
@@ -2604,13 +2693,21 @@ const App = {
     // Update active states
     bridgeToLayerBtn.classList.toggle('active', direction === 'layer');
     bridgeToEthBtn.classList.toggle('active', direction === 'ethereum');
+    delegateBtn.classList.toggle('active', direction === 'delegate');
     bridgeToLayerSection.classList.toggle('active', direction === 'layer');
     bridgeToEthSection.classList.toggle('active', direction === 'ethereum');
+    delegateSection.classList.toggle('active', direction === 'delegate');
     
     // Update box wrapper classes for animation
     if (boxWrapper) {
-        boxWrapper.classList.remove('layer-direction', 'ethereum-direction');
-        boxWrapper.classList.add(direction === 'layer' ? 'layer-direction' : 'ethereum-direction');
+        boxWrapper.classList.remove('layer-direction', 'ethereum-direction', 'delegate-direction');
+        if (direction === 'layer') {
+            boxWrapper.classList.add('layer-direction');
+        } else if (direction === 'ethereum') {
+            boxWrapper.classList.add('ethereum-direction');
+        } else if (direction === 'delegate') {
+            boxWrapper.classList.add('delegate-direction');
+        }
     }
     
     // Show/hide transactions container based on direction only
@@ -2623,6 +2720,23 @@ const App = {
 
     // Update UI for the new direction
     this.updateUIForCurrentDirection();
+    
+    // Update balances when switching directions
+    if (App.isConnected) {
+        App.updateBalance().catch(error => {
+            console.error("Error updating MetaMask balance:", error);
+        });
+    }
+    if (App.isKeplrConnected) {
+        App.updateKeplrBalance().catch(error => {
+            console.error("Error updating Keplr balance:", error);
+        });
+    }
+    
+    // Populate validator dropdown when switching to delegate section
+    if (direction === 'delegate') {
+        this.populateValidatorDropdown();
+    }
   },
 
   updateUIForCurrentDirection: function() {
@@ -2635,12 +2749,19 @@ const App = {
             if (approveButton) approveButton.disabled = false;
             if (depositButton) depositButton.disabled = false;
         }
-    } else {
+    } else if (this.currentBridgeDirection === 'ethereum') {
         // Update Ethereum section UI
         const withdrawButton = document.getElementById('withdrawButton');
         
         if (App.isKeplrConnected) {
             if (withdrawButton) withdrawButton.disabled = false;
+        }
+    } else if (this.currentBridgeDirection === 'delegate') {
+        // Update Delegate section UI
+        const delegateButton = document.getElementById('delegateButton');
+        
+        if (App.isKeplrConnected) {
+            if (delegateButton) delegateButton.disabled = false;
         }
     }
 
@@ -2648,6 +2769,115 @@ const App = {
     const transactionsContainer = document.getElementById('bridgeTransactionsContainer');
     if (transactionsContainer) {
         transactionsContainer.classList.toggle('active', this.currentBridgeDirection === 'ethereum');
+    }
+  },
+
+  // Add new function to fetch validators from Layer network
+  fetchValidators: async function() {
+    try {
+      const response = await fetch('https://node-palmito.tellorlayer.com/cosmos/staking/v1beta1/validators?status=BOND_STATUS_BONDED&pagination.limit=1000');
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch validators: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.validators || !Array.isArray(data.validators)) {
+        throw new Error('Invalid validators response format');
+      }
+      
+      // Sort validators by voting power (descending)
+      const sortedValidators = data.validators.sort((a, b) => {
+        const powerA = parseInt(a.tokens || '0');
+        const powerB = parseInt(b.tokens || '0');
+        return powerB - powerA;
+      });
+      
+      return sortedValidators.map(validator => ({
+        address: validator.operator_address,
+        moniker: validator.description?.moniker || 'Unknown Validator',
+        votingPower: validator.tokens || '0',
+        commission: validator.commission?.commission_rates?.rate || '0',
+        jailed: validator.jailed || false
+      }));
+    } catch (error) {
+      console.error('Error fetching validators:', error);
+      throw error;
+    }
+  },
+
+  // Add function to populate validator dropdown
+  populateValidatorDropdown: async function() {
+    try {
+      const dropdown = document.getElementById('delegateValidatorDropdown');
+      if (!dropdown) {
+        console.error('Validator dropdown not found');
+        return;
+      }
+      
+      // Show loading state
+      dropdown.innerHTML = '<option value="">Loading validators...</option>';
+      dropdown.disabled = true;
+      
+      const validators = await this.fetchValidators();
+      
+      // Clear loading state and populate dropdown
+      dropdown.innerHTML = '<option value="">Select a validator...</option>';
+      
+                      validators.forEach(validator => {
+                    if (!validator.jailed) { // Only show non-jailed validators
+                        const votingPower = (parseInt(validator.votingPower) / 1000000).toFixed(2);
+                        const commission = (parseFloat(validator.commission) * 100).toFixed(2);
+                        
+                        // Truncate moniker if it's too long
+                        let displayMoniker = validator.moniker;
+                        if (displayMoniker.length > 20) {
+                            displayMoniker = displayMoniker.substring(0, 17) + '...';
+                        }
+                        
+                        const option = document.createElement('option');
+                        option.value = validator.address;
+                        option.textContent = `${displayMoniker} (${votingPower} TRB, ${commission}%)`;
+                        option.title = `${validator.moniker} (${votingPower} TRB, ${commission}% commission)`; // Full name in tooltip
+                        dropdown.appendChild(option);
+                    }
+                });
+      
+      dropdown.disabled = false;
+      
+      // Add change event listener to update the hidden input
+      dropdown.addEventListener('change', function() {
+        const hiddenInput = document.getElementById('delegateValidatorAddress');
+        if (hiddenInput) {
+          hiddenInput.value = this.value;
+        }
+      });
+      
+      // Add refresh button event listener
+      const refreshBtn = document.getElementById('refreshValidatorsBtn');
+      if (refreshBtn) {
+        refreshBtn.addEventListener('click', async function() {
+          this.disabled = true;
+          this.textContent = '⟳';
+          try {
+            await App.populateValidatorDropdown();
+          } catch (error) {
+            console.error('Error refreshing validators:', error);
+          } finally {
+            this.disabled = false;
+            this.textContent = '↻';
+          }
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error populating validator dropdown:', error);
+      const dropdown = document.getElementById('delegateValidatorDropdown');
+      if (dropdown) {
+        dropdown.innerHTML = '<option value="">Error loading validators</option>';
+        dropdown.disabled = true;
+      }
     }
   },
 };

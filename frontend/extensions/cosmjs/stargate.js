@@ -6,48 +6,12 @@
 }(this, (function (exports) {
     'use strict';
 
-    // Add registry for custom message types
-    const customTypes = [
-        ["/layer.bridge.MsgWithdrawTokens", {
-            encode: (message) => {
-                // Create a fresh message each time
-                const msg = {
-                    creator: message.creator,
-                    recipient: message.recipient.toLowerCase(),
-                    amount: {
-                        denom: message.amount.denom,
-                        amount: message.amount.amount.toString()
-                    }
-                };
-                return window.layerProto.bridge.MsgWithdrawTokens.encode(msg);
-            },
-            decode: (binary) => {
-                return window.layerProto.bridge.MsgWithdrawTokens.decode(binary);
-            }
-        }],
-        ["/layer.bridge.MsgRequestAttestations", {
-            encode: (message) => {
-                // Create a fresh message each time
-                const msg = {
-                    creator: message.creator,
-                    query_id: message.query_id,
-                    timestamp: message.timestamp.toString()
-                };
-                return window.layerProto.bridge.MsgRequestAttestations.encode(msg);
-            },
-            decode: (binary) => {
-                return window.layerProto.bridge.MsgRequestAttestations.decode(binary);
-            }
-        }]
-    ];
-
     // Stargate client implementation
     class SigningStargateClient {
         constructor(rpcUrl, signer) {
             // Remove any trailing slashes and ensure we don't have /rpc in the base URL
             this.rpcUrl = (rpcUrl || "https://node-palmito.tellorlayer.com").replace(/\/+$/, '').replace(/\/rpc$/, '');
             this.signer = signer;
-            this.registry = new Map(customTypes);
         }
 
         static async connectWithSigner(rpcUrl, signer) {
@@ -154,7 +118,8 @@
             }
         }
 
-        async signAndBroadcast(signerAddress, messages, fee, memo = "") {
+        // Unified direct signing method for all message types
+        async signAndBroadcastDirect(signerAddress, messages, fee, memo = "") {
             try {
                 // Get account info
                 const accountInfo = await this.getAccount(signerAddress);
@@ -163,86 +128,16 @@
                     throw new Error('Account not found');
                 }
 
-                // Create the transaction to sign
-                const txToSign = {
-                    chain_id: 'layertest-4',
-                    account_number: accountInfo.account_number,
-                    sequence: accountInfo.sequence,
-                    fee: {
-                        amount: fee.amount,
-                        gas: fee.gas
-                    },
-                    msgs: messages.map(msg => {
-                        // Only modify recipient for withdrawal messages
-                        if (msg.typeUrl === '/layer.bridge.MsgWithdrawTokens' && msg.value.recipient) {
-                            return {
-                                type: msg.typeUrl,
-                                value: {
-                                    ...msg.value,
-                                    recipient: msg.value.recipient.toLowerCase().replace('0x', '')
-                                }
-                            };
-                        }
-                        // For attestation requests, just pass through the message as is
-                        return {
-                            type: msg.typeUrl,
-                            value: msg.value
-                        };
-                    }),
-                    memo: memo
-                };
-
-                // Sign the transaction
-                const signResult = await this.signer.signAmino(signerAddress, txToSign);
-
-                // Store the signature and public key for broadcasting
-                this.signature = signResult.signature.signature;
-                this.publicKey = signResult.signature.pub_key.value;
-                this.sequence = accountInfo.sequence;
-
-                // Create a fresh message based on type
-                let messageToEncode;
-            if (messages[0].typeUrl === '/layer.bridge.MsgWithdrawTokens') {
-                messageToEncode = {
-                    ...messages[0],
-                    value: {
-                        ...messages[0].value,
-                        recipient: messages[0].value.recipient.toLowerCase().replace('0x', '')
-                    }
-                };
-            } else if (messages[0].typeUrl === '/layer.bridge.MsgRequestAttestations') {
-                messageToEncode = {
-                    ...messages[0],
-                    value: {
-                        creator: messages[0].value.creator,
-                        query_id: messages[0].value.query_id,
-                        timestamp: messages[0].value.timestamp.toString()
-                    }
-                };
-            } else {
-                // For standard messages, just use the value as-is
-                messageToEncode = messages[0];
-            }
-
-                // Encode the message using the appropriate encoder
-                const encoder = this.registry.get(messageToEncode.typeUrl);
-                if (!encoder) {
-                    throw new Error(`No encoder found for message type: ${messageToEncode.typeUrl}`);
+                // Get the appropriate signer for direct signing
+                let offlineSigner;
+                if (window.getOfflineSignerAuto) {
+                    offlineSigner = await window.getOfflineSignerAuto('layertest-4');
+                } else if (window.getOfflineSignerDirect) {
+                    offlineSigner = window.getOfflineSignerDirect('layertest-4');
+                } else {
+                    offlineSigner = window.getOfflineSigner('layertest-4');
                 }
-                const encodedMessage = encoder.encode(messageToEncode.value);
 
-                // Broadcast the transaction
-                const result = await this.broadcastTransaction(encodedMessage, messages[0]);
-                return result;
-            } catch (error) {
-                console.error('Error in signAndBroadcast:', error);
-                throw error;
-            }
-        }
-
-        // Helper method to handle transaction broadcasting
-        async broadcastTransaction(txBytes, originalMessage, mode = "BROADCAST_MODE_SYNC") {
-            try {
                 // Create protobuf types
                 const root = new protobuf.Root();
                 
@@ -264,7 +159,9 @@
                 const TxBody = new protobuf.Type("TxBody")
                     .add(new protobuf.Field("messages", 1, "Any", "repeated"))
                     .add(new protobuf.Field("memo", 2, "string"))
-                    .add(new protobuf.Field("timeoutHeight", 3, "uint64"));
+                    .add(new protobuf.Field("timeoutHeight", 3, "uint64"))
+                    .add(new protobuf.Field("extensionOptions", 1023, "Any", "repeated"))
+                    .add(new protobuf.Field("nonCriticalExtensionOptions", 2047, "Any", "repeated"));
                 
                 // Define SignMode enum
                 const SignMode = new protobuf.Enum("SignMode")
@@ -325,72 +222,128 @@
                 const AuthInfoType = root.lookupType("AuthInfo");
                 const PubKeyType = root.lookupType("PubKey");
 
-                // Get the account from the signer
-                const accounts = await this.signer.getAccounts();
+                // Encode messages based on their type
+                const encodedMessages = [];
+                for (const message of messages) {
+                    let encodedMessage;
+                    
+                    if (message.typeUrl === '/layer.bridge.MsgWithdrawTokens') {
+                        // Encode withdrawal message
+                        const msg = {
+                            creator: message.value.creator,
+                            recipient: message.value.recipient.toLowerCase().replace('0x', ''),
+                            amount: {
+                                denom: message.value.amount.denom,
+                                amount: message.value.amount.amount.toString()
+                            }
+                        };
+                        encodedMessage = window.layerProto.bridge.MsgWithdrawTokens.encode(msg);
+                    } else if (message.typeUrl === '/layer.bridge.MsgRequestAttestations') {
+                        // Encode attestation request message
+                        const msg = {
+                            creator: message.value.creator,
+                            query_id: message.value.query_id,
+                            timestamp: message.value.timestamp.toString()
+                        };
+                        encodedMessage = window.layerProto.bridge.MsgRequestAttestations.encode(msg);
+                    } else if (message.typeUrl === '/cosmos.staking.v1beta1.MsgDelegate') {
+                        // Encode delegation message
+                        const MsgDelegate = new protobuf.Type("MsgDelegate")
+                            .add(new protobuf.Field("delegatorAddress", 1, "string"))
+                            .add(new protobuf.Field("validatorAddress", 2, "string"))
+                            .add(new protobuf.Field("amount", 3, "Coin"));
+                        
+                        root.add(MsgDelegate);
+                        const MsgType = root.lookupType("MsgDelegate");
+                        const msgValue = {
+                            delegatorAddress: message.value.delegatorAddress,
+                            validatorAddress: message.value.validatorAddress,
+                            amount: {
+                                denom: message.value.amount.denom,
+                                amount: message.value.amount.amount.toString()
+                            }
+                        };
+                        encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
+                    } else {
+                        throw new Error(`Unsupported message type: ${message.typeUrl}`);
+                    }
+
+                    // Create message Any
+                    const messageAny = {
+                        typeUrl: message.typeUrl,
+                        value: encodedMessage
+                    };
+                    encodedMessages.push(messageAny);
+                }
+
+                // Create the TxBody
+                const txBody = {
+                    messages: encodedMessages,
+                    memo: memo,
+                    timeoutHeight: 0,
+                    extensionOptions: [],
+                    nonCriticalExtensionOptions: []
+                };
+
+                // Encode TxBody
+                const encodedTxBody = TxBodyType.encode(TxBodyType.create(txBody)).finish();
+
+                // Get accounts from signer
+                const accounts = await offlineSigner.getAccounts();
                 if (!accounts || accounts.length === 0) {
                     throw new Error('No accounts found in signer');
                 }
-                const account = accounts[0];
-
-                // Create the message Any
-                const messageAny = {
-                    typeUrl: originalMessage.typeUrl,
-                    value: txBytes
-                };
-
-                // Create the TxBody with the message
-                const txBody = {
-                    messages: [messageAny],
-                    memo: originalMessage.typeUrl === '/layer.bridge.MsgWithdrawTokens' 
-                        ? "Withdraw TRB to Ethereum"
-                        : "Request attestations for withdrawal",
-                    timeoutHeight: 0
-                };
-
-                // Create the public key
-                const pubKey = {
-                    key: this.publicKey
-                };
-                const encodedPubKey = PubKeyType.encode(pubKey).finish();
-
-                // Create the public key Any
-                const pubKeyAny = {
-                    typeUrl: "/cosmos.crypto.secp256k1.PubKey",
-                    value: encodedPubKey
-                };
+                const signerAccount = accounts[0];
 
                 // Create the AuthInfo
                 const authInfo = {
                     signerInfos: [{
-                        publicKey: pubKeyAny,
+                        publicKey: {
+                            typeUrl: "/cosmos.crypto.secp256k1.PubKey",
+                            value: PubKeyType.encode({ key: signerAccount.pubkey }).finish()
+                        },
                         modeInfo: {
                             single: {
-                                mode: 127 // SIGN_MODE_LEGACY_AMINO_JSON
+                                mode: 1 // SIGN_MODE_DIRECT
                             }
                         },
-                        sequence: parseInt(this.sequence)
+                        sequence: parseInt(accountInfo.sequence)
                     }],
                     fee: {
-                        amount: [{ denom: "loya", amount: "5000" }],
-                        gasLimit: parseInt("200000"),
+                        amount: fee.amount,
+                        gasLimit: parseInt(fee.gas),
                         payer: "",
                         granter: ""
                     }
                 };
 
-                // Create the final transaction
-                const tx = {
-                    body: txBody,
-                    authInfo: authInfo,
-                    signatures: [this.signature]
+                // Encode AuthInfo
+                const encodedAuthInfo = AuthInfoType.encode(AuthInfoType.create(authInfo)).finish();
+
+                // Create the sign doc for direct signing
+                const signDoc = {
+                    bodyBytes: encodedTxBody,
+                    authInfoBytes: encodedAuthInfo,
+                    chainId: 'layertest-4',
+                    accountNumber: parseInt(accountInfo.account_number)
                 };
 
-                // Create and encode the final transaction
-                const txObj = TxType.create(tx);
+                // Sign the transaction using signDirect
+                const signResult = await offlineSigner.signDirect(signerAddress, signDoc);
+
+                // Create the final transaction
+                const finalTx = {
+                    body: TxBodyType.decode(signResult.signed.bodyBytes),
+                    authInfo: AuthInfoType.decode(signResult.signed.authInfoBytes),
+                    signatures: [signResult.signature.signature]
+                };
+
+                // Encode the final transaction
+                const txObj = TxType.create(finalTx);
                 const encodedTx = TxType.encode(txObj).finish();
                 const base64Tx = btoa(String.fromCharCode.apply(null, encodedTx));
 
-                // Broadcast the transaction using the encoded bytes
+                // Broadcast the transaction
                 const response = await fetch(`${this.rpcUrl}/cosmos/tx/v1beta1/txs`, {
                     method: 'POST',
                     headers: {
@@ -398,7 +351,7 @@
                     },
                     body: JSON.stringify({
                         tx_bytes: base64Tx,
-                        mode: mode
+                        mode: "BROADCAST_MODE_SYNC"
                     })
                 });
 
@@ -450,25 +403,19 @@
                 // If we get here, the transaction hasn't been included in a block
                 return result.tx_response;
             } catch (error) {
-                console.error('Error encoding transaction:', error);
+                console.error('Error in signAndBroadcastDirect:', error);
                 throw error;
             }
         }
+
+        // Legacy method for backward compatibility (deprecated)
+        async signAndBroadcast(signerAddress, messages, fee, memo = "") {
+            console.warn('signAndBroadcast is deprecated. Use signAndBroadcastDirect instead.');
+            return this.signAndBroadcastDirect(signerAddress, messages, fee, memo);
+        }
     }
 
-    // Export to both module and global scope
-    exports.SigningStargateClient = SigningStargateClient;
-    
-    // Ensure cosmjs object exists
-    window.cosmjs = window.cosmjs || {};
-    window.cosmjs.stargate = window.cosmjs.stargate || {};
-    
-    // Export to both locations
-    window.cosmjs.stargate.SigningStargateClient = SigningStargateClient;
-    window.cosmjsStargate = {
-        SigningStargateClient: SigningStargateClient
-    };
-
+    // Helper function to poll transaction status
     async function pollTransactionStatus(txHash) {
         try {
             // Format the hash to match the expected format (remove '0x' if present and ensure uppercase)
@@ -481,14 +428,11 @@
                 `${baseUrl}/cosmos/tx/v1beta1/txs/${formattedHash}`
             ];
             
-            console.log('Polling transaction status from:', endpoints[0]);
-            
             // Try the first endpoint
             let response = await fetch(endpoints[0]);
             let data;
             
             if (!response.ok) {
-                console.log('First endpoint failed, trying second endpoint...');
                 // Try the second endpoint
                 response = await fetch(endpoints[1]);
                 if (!response.ok) {
@@ -497,7 +441,6 @@
             }
             
             data = await response.json();
-            console.log('Transaction status:', data);
             
             // Handle both response formats
             let txResult;
@@ -513,21 +456,9 @@
             
             // Check if transaction was successful
             if (txResult.code === 0) {
-                console.log('Transaction successful!');
-                console.log('Gas used:', txResult.gas_used);
-                console.log('Gas wanted:', txResult.gas_wanted);
-                
                 // Look for the tokens_withdrawn event
                 const events = txResult.events || [];
                 const withdrawEvent = events.find(event => event.type === 'tokens_withdrawn');
-                if (withdrawEvent) {
-                    console.log('Withdrawal details:', {
-                        sender: withdrawEvent.attributes.find(attr => attr.key === 'sender')?.value,
-                        recipient: withdrawEvent.attributes.find(attr => attr.key === 'recipient_evm_address')?.value,
-                        amount: withdrawEvent.attributes.find(attr => attr.key === 'amount')?.value,
-                        withdrawId: withdrawEvent.attributes.find(attr => attr.key === 'withdraw_id')?.value
-                    });
-                }
                 
                 return {
                     success: true,
@@ -554,6 +485,7 @@
         }
     }
 
+    // Updated withdrawal function using direct signing
     async function withdrawFromLayer(amount, ethereumAddress, account) {
         try {
             const amountInMicroUnits = (parseFloat(amount) * 1000000).toString();
@@ -565,7 +497,7 @@
                 offlineSigner
             );
 
-            // Create a fresh message each time
+            // Create the message
             const msg = {
                 typeUrl: '/layer.bridge.MsgWithdrawTokens',
                 value: {
@@ -581,8 +513,8 @@
             // Show pending popup
             showPendingPopup();
 
-            // Sign and broadcast the transaction
-            const result = await client.signAndBroadcast(
+            // Sign and broadcast using direct signing
+            const result = await client.signAndBroadcastDirect(
                 account,
                 [msg],
                 {
@@ -603,6 +535,7 @@
         }
     }
 
+    // Updated attestation request function using direct signing
     async function requestAttestations(account, queryId, timestamp) {
         try {
             const offlineSigner = window.getOfflineSigner('layertest-4');
@@ -612,18 +545,18 @@
                 offlineSigner
             );
 
-            // Create the message using the same pattern as withdrawal
+            // Create the message
             const msg = {
                 typeUrl: '/layer.bridge.MsgRequestAttestations',
                 value: {
                     creator: account,
                     query_id: queryId,
-                    timestamp: timestamp.toString() // Ensure timestamp is a string
+                    timestamp: timestamp.toString()
                 }
             };
 
-            // Sign and broadcast using the same pattern as withdrawal
-            const result = await client.signAndBroadcast(
+            // Sign and broadcast using direct signing
+            const result = await client.signAndBroadcastDirect(
                 account,
                 [msg],
                 {
@@ -640,9 +573,56 @@
         }
     }
 
+    // Updated delegation function using direct signing
+    async function delegateTokens(account, validatorAddress, amount) {
+        try {
+            const offlineSigner = window.getOfflineSigner('layertest-4');
+
+            const client = await SigningStargateClient.connectWithSigner(
+                'https://node-palmito.tellorlayer.com/rpc',
+                offlineSigner
+            );
+
+            // Convert amount to micro units (1 TRB = 1,000,000 micro units)
+            const amountInMicroUnits = Math.floor(parseFloat(amount) * 1000000).toString();
+
+            // Create the message
+            const msg = {
+                typeUrl: '/cosmos.staking.v1beta1.MsgDelegate',
+                value: {
+                    delegatorAddress: account,
+                    validatorAddress: validatorAddress,
+                    amount: {
+                        denom: 'loya',
+                        amount: amountInMicroUnits
+                    }
+                }
+            };
+
+            // Sign and broadcast using direct signing
+            const result = await client.signAndBroadcastDirect(
+                account,
+                [msg],
+                {
+                    amount: [{ denom: 'loya', amount: '5000' }],
+                    gas: '200000'
+                },
+                'Delegate tokens to validator'
+            );
+
+            return result;
+        } catch (error) {
+            console.error('Delegation error:', error);
+            throw error;
+        }
+    }
+
     // Export to both module and global scope
     exports.SigningStargateClient = SigningStargateClient;
+    exports.withdrawFromLayer = withdrawFromLayer;
     exports.requestAttestations = requestAttestations;
+    exports.delegateTokens = delegateTokens;
+    exports.pollTransactionStatus = pollTransactionStatus;
 
     // Ensure cosmjs object exists
     window.cosmjs = window.cosmjs || {};
@@ -650,279 +630,16 @@
 
     // Export to both locations
     window.cosmjs.stargate.SigningStargateClient = SigningStargateClient;
+    window.cosmjs.stargate.withdrawFromLayer = withdrawFromLayer;
     window.cosmjs.stargate.requestAttestations = requestAttestations;
+    window.cosmjs.stargate.delegateTokens = delegateTokens;
+    window.cosmjs.stargate.pollTransactionStatus = pollTransactionStatus;
+    
     window.cosmjsStargate = {
         SigningStargateClient: SigningStargateClient,
-        requestAttestations: requestAttestations
+        withdrawFromLayer: withdrawFromLayer,
+        requestAttestations: requestAttestations,
+        delegateTokens: delegateTokens,
+        pollTransactionStatus: pollTransactionStatus
     };
-
-    // Delegation function using signDirect for standard Cosmos SDK messages
-    async function delegateTokens(account, validatorAddress, amount) {
-        try {
-            // Get the appropriate signer for direct signing
-            let offlineSigner;
-            if (window.getOfflineSignerAuto) {
-                offlineSigner = await window.getOfflineSignerAuto('layertest-4');
-            } else if (window.getOfflineSignerDirect) {
-                offlineSigner = window.getOfflineSignerDirect('layertest-4');
-            } else {
-                offlineSigner = window.getOfflineSigner('layertest-4');
-            }
-
-            // Get account info
-            const accountUrl = `https://node-palmito.tellorlayer.com/cosmos/auth/v1beta1/accounts/${account}`;
-            const accountResponse = await fetch(accountUrl);
-            const accountData = await accountResponse.json();
-            
-            const accountInfo = {
-                account_number: accountData.account?.account_number || "0",
-                sequence: accountData.account?.sequence || "0"
-            };
-
-            // Convert amount to micro units (1 TRB = 1,000,000 micro units)
-            const amountInMicroUnits = Math.floor(parseFloat(amount) * 1000000).toString();
-
-            // Create protobuf types for MsgDelegate
-            const root = new protobuf.Root();
-            
-            // Define Coin type
-            const Coin = new protobuf.Type("Coin")
-                .add(new protobuf.Field("denom", 1, "string"))
-                .add(new protobuf.Field("amount", 2, "string"));
-
-            // Define MsgDelegate type
-            const MsgDelegate = new protobuf.Type("MsgDelegate")
-                .add(new protobuf.Field("delegatorAddress", 1, "string"))
-                .add(new protobuf.Field("validatorAddress", 2, "string"))
-                .add(new protobuf.Field("amount", 3, "Coin"));
-
-            // Add types to root
-            root.add(Coin);
-            root.add(MsgDelegate);
-
-            // Encode the MsgDelegate message
-            const MsgType = root.lookupType("MsgDelegate");
-            const msgValue = {
-                delegatorAddress: account,
-                validatorAddress: validatorAddress,
-                amount: {
-                    denom: 'loya',
-                    amount: amountInMicroUnits
-                }
-            };
-            const encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
-
-            // Create protobuf types for transaction
-            const Any = new protobuf.Type("Any")
-                .add(new protobuf.Field("typeUrl", 1, "string"))
-                .add(new protobuf.Field("value", 2, "bytes"));
-
-            const TxBody = new protobuf.Type("TxBody")
-                .add(new protobuf.Field("messages", 1, "Any", "repeated"))
-                .add(new protobuf.Field("memo", 2, "string"))
-                .add(new protobuf.Field("timeoutHeight", 3, "uint64"))
-                .add(new protobuf.Field("extensionOptions", 1023, "Any", "repeated"))
-                .add(new protobuf.Field("nonCriticalExtensionOptions", 2047, "Any", "repeated"));
-
-            const PubKey = new protobuf.Type("PubKey")
-                .add(new protobuf.Field("key", 1, "bytes"));
-
-            const SignMode = new protobuf.Enum("SignMode")
-                .add("SIGN_MODE_UNSPECIFIED", 0)
-                .add("SIGN_MODE_DIRECT", 1)
-                .add("SIGN_MODE_TEXTUAL", 2)
-                .add("SIGN_MODE_LEGACY_AMINO_JSON", 127);
-
-            const Single = new protobuf.Type("Single")
-                .add(new protobuf.Field("mode", 1, "SignMode"));
-
-            const ModeInfo = new protobuf.Type("ModeInfo")
-                .add(new protobuf.Field("single", 1, "Single"));
-
-            const SignerInfo = new protobuf.Type("SignerInfo")
-                .add(new protobuf.Field("publicKey", 1, "Any"))
-                .add(new protobuf.Field("modeInfo", 2, "ModeInfo"))
-                .add(new protobuf.Field("sequence", 3, "uint64"));
-
-            const Fee = new protobuf.Type("Fee")
-                .add(new protobuf.Field("amount", 1, "Coin", "repeated"))
-                .add(new protobuf.Field("gasLimit", 2, "uint64"))
-                .add(new protobuf.Field("payer", 3, "string"))
-                .add(new protobuf.Field("granter", 4, "string"));
-
-            const AuthInfo = new protobuf.Type("AuthInfo")
-                .add(new protobuf.Field("signerInfos", 1, "SignerInfo", "repeated"))
-                .add(new protobuf.Field("fee", 2, "Fee"));
-
-            const Tx = new protobuf.Type("Tx")
-                .add(new protobuf.Field("body", 1, "TxBody"))
-                .add(new protobuf.Field("authInfo", 2, "AuthInfo"))
-                .add(new protobuf.Field("signatures", 3, "bytes", "repeated"));
-
-            // Add all types to root
-            root.add(Any);
-            root.add(TxBody);
-            root.add(PubKey);
-            root.add(SignMode);
-            root.add(Single);
-            root.add(ModeInfo);
-            root.add(SignerInfo);
-            root.add(Fee);
-            root.add(AuthInfo);
-            root.add(Tx);
-
-            // Get the types
-            const TxType = root.lookupType("Tx");
-            const AnyType = root.lookupType("Any");
-            const TxBodyType = root.lookupType("TxBody");
-            const AuthInfoType = root.lookupType("AuthInfo");
-            const PubKeyType = root.lookupType("PubKey");
-
-            // Create the message Any
-            const messageAny = {
-                typeUrl: '/cosmos.staking.v1beta1.MsgDelegate',
-                value: encodedMessage
-            };
-
-            // Create the TxBody
-            const txBody = {
-                messages: [messageAny],
-                memo: "Delegate tokens to validator",
-                timeoutHeight: 0,
-                extensionOptions: [],
-                nonCriticalExtensionOptions: []
-            };
-
-            // Encode TxBody
-            const encodedTxBody = TxBodyType.encode(TxBodyType.create(txBody)).finish();
-
-            // Get accounts from signer
-            const accounts = await offlineSigner.getAccounts();
-            if (!accounts || accounts.length === 0) {
-                throw new Error('No accounts found in signer');
-            }
-            const signerAccount = accounts[0];
-
-            // Create the AuthInfo
-            const authInfo = {
-                signerInfos: [{
-                    publicKey: {
-                        typeUrl: "/cosmos.crypto.secp256k1.PubKey",
-                        value: PubKeyType.encode({ key: signerAccount.pubkey }).finish()
-                    },
-                    modeInfo: {
-                        single: {
-                            mode: 1 // SIGN_MODE_DIRECT
-                        }
-                    },
-                    sequence: parseInt(accountInfo.sequence)
-                }],
-                fee: {
-                    amount: [{ denom: "loya", amount: "5000" }],
-                    gasLimit: parseInt("200000"),
-                    payer: "",
-                    granter: ""
-                }
-            };
-
-            // Encode AuthInfo
-            const encodedAuthInfo = AuthInfoType.encode(AuthInfoType.create(authInfo)).finish();
-
-            // Create the sign doc for direct signing
-            const signDoc = {
-                bodyBytes: encodedTxBody,
-                authInfoBytes: encodedAuthInfo,
-                chainId: 'layertest-4',
-                accountNumber: parseInt(accountInfo.account_number)
-            };
-
-            console.log('SignDoc being sent to signDirect:', signDoc);
-            console.log('Account info:', accountInfo);
-            console.log('Signer account:', signerAccount);
-
-            // Sign the transaction using signDirect
-            const signResult = await offlineSigner.signDirect(account, signDoc);
-
-            console.log('SignResult:', signResult);
-            console.log('Signature:', signResult.signature);
-            console.log('Signature bytes:', signResult.signature.signature);
-
-            // For direct signing, we need to use the signed bytes directly
-            // The signResult contains the signed transaction data and signature
-            const signedData = signResult.signed;
-            const signature = signResult.signature.signature;
-
-            console.log('Signed data:', signedData);
-            console.log('Signature:', signature);
-
-            // Use the signed bodyBytes and authInfoBytes directly
-            // These are the exact bytes that were signed by the wallet
-            const signedBodyBytes = signedData.bodyBytes;
-            const signedAuthInfoBytes = signedData.authInfoBytes;
-
-            console.log('Signed bodyBytes length:', signedBodyBytes.length);
-            console.log('Signed authInfoBytes length:', signedAuthInfoBytes.length);
-
-            // For direct signing, we need to create the proper transaction structure
-            // Let's decode the signed bytes back into the proper structure
-            const decodedBody = TxBodyType.decode(signedBodyBytes);
-            const decodedAuthInfo = AuthInfoType.decode(signedAuthInfoBytes);
-
-            console.log('Decoded body:', decodedBody);
-            console.log('Decoded auth info:', decodedAuthInfo);
-
-            // Create the final transaction with the decoded data
-            const finalTx = {
-                body: decodedBody,
-                authInfo: decodedAuthInfo,
-                signatures: [signature]
-            };
-
-            // Encode the final transaction
-            const txObj = TxType.create(finalTx);
-            const encodedTx = TxType.encode(txObj).finish();
-            const base64Tx = btoa(String.fromCharCode.apply(null, encodedTx));
-
-            console.log('Final transaction bytes length:', encodedTx.length);
-            console.log('Base64 transaction:', base64Tx.substring(0, 100) + '...');
-
-            // Broadcast the transaction
-            const response = await fetch('https://node-palmito.tellorlayer.com/cosmos/tx/v1beta1/txs', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    tx_bytes: base64Tx,
-                    mode: "BROADCAST_MODE_SYNC"
-                })
-            });
-
-            const result = await response.json();
-
-            if (result.tx_response?.code !== 0) {
-                console.error('Transaction error details:', {
-                    code: result.tx_response?.code,
-                    message: result.tx_response?.raw_log,
-                    txHash: result.tx_response?.txhash,
-                    height: result.tx_response?.height
-                });
-                throw new Error(result.tx_response?.raw_log || 'Transaction failed');
-            }
-
-            return result.tx_response;
-        } catch (error) {
-            console.error('Delegation error:', error);
-            throw error;
-        }
-    }
-
-
-
-    // Export the delegation function
-    exports.delegateTokens = delegateTokens;
-
-    // Export to global scope
-    window.cosmjs.stargate.delegateTokens = delegateTokens;
-    window.cosmjsStargate.delegateTokens = delegateTokens;
 }))); 
