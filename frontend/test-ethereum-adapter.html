@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ethereum Wallet Adapter Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.10.0/web3.min.js"></script>
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js" type="application/javascript"></script>
+    <style>
+        body {
+            font-family: 'PPNeueMontreal-Book', monospace;
+            background: linear-gradient(135deg, #003734 0%, #049159 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+        .log-container {
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .button {
+            background: #003734;
+            color: #eefffb;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 5px;
+            font-family: 'PPNeueMontreal-Bold', monospace;
+            transition: all 0.3s ease;
+        }
+        .button:hover {
+            background: #049159;
+            transform: translateY(-2px);
+        }
+        .button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .wallet-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #003734;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-3xl font-bold text-center mb-6" style="color: #003734;">Ethereum Wallet Adapter Test</h1>
+        
+        <div class="text-center mb-6">
+            <button id="connectBtn" class="button">Connect Wallet</button>
+            <button id="disconnectBtn" class="button" disabled>Disconnect</button>
+            <button id="detectBtn" class="button">Detect Wallets</button>
+            <button id="testBtn" class="button">Test Connection</button>
+            <button id="clearLogBtn" class="button">Clear Log</button>
+        </div>
+
+        <div id="status" class="status disconnected">
+            Status: Disconnected
+        </div>
+
+        <div id="walletInfo" class="wallet-info" style="display: none;">
+            <h3 class="font-bold mb-2">Connected Wallet Info:</h3>
+            <div id="walletDetails"></div>
+        </div>
+
+        <div id="availableWallets" class="wallet-info" style="display: none;">
+            <h3 class="font-bold mb-2">Available Wallets:</h3>
+            <div id="walletList"></div>
+        </div>
+
+        <div class="log-container" id="logContainer">
+            <div>Ethereum Wallet Adapter Test Console</div>
+            <div>Waiting for wallet adapter to load...</div>
+        </div>
+    </div>
+
+    <script>
+        function log(message) {
+            const logContainer = document.getElementById('logContainer');
+            const timestamp = new Date().toLocaleTimeString();
+            logContainer.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function updateStatus(connected, walletName = null) {
+            const statusDiv = document.getElementById('status');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const walletInfo = document.getElementById('walletInfo');
+
+            if (connected) {
+                statusDiv.className = 'status connected';
+                statusDiv.textContent = `Status: Connected to ${walletName || 'Ethereum Wallet'}`;
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                walletInfo.style.display = 'block';
+            } else {
+                statusDiv.className = 'status disconnected';
+                statusDiv.textContent = 'Status: Disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                walletInfo.style.display = 'none';
+            }
+        }
+
+        function updateWalletInfo(connectionResult) {
+            const walletDetails = document.getElementById('walletDetails');
+            walletDetails.innerHTML = `
+                <p><strong>Wallet:</strong> ${connectionResult.walletName}</p>
+                <p><strong>Type:</strong> ${connectionResult.walletType}</p>
+                <p><strong>Account:</strong> ${connectionResult.account}</p>
+                <p><strong>Chain ID:</strong> ${connectionResult.chainId}</p>
+                <p><strong>Provider:</strong> ${connectionResult.provider ? 'Available' : 'Not available'}</p>
+                <p><strong>Web3:</strong> ${connectionResult.web3 ? 'Available' : 'Not available'}</p>
+                <p><strong>Ethers:</strong> ${connectionResult.ethers ? 'Available' : 'Not available'}</p>
+            `;
+        }
+
+        function updateAvailableWallets(wallets) {
+            const walletList = document.getElementById('walletList');
+            const availableWallets = document.getElementById('availableWallets');
+            
+            if (wallets.length === 0) {
+                walletList.innerHTML = '<p>No wallets detected</p>';
+            } else {
+                walletList.innerHTML = wallets.map(wallet => 
+                    `<div class="mb-2 p-2 bg-gray-100 rounded">
+                        <strong>${wallet.name}</strong> (${wallet.type}) - Priority: ${wallet.priority}
+                    </div>`
+                ).join('');
+            }
+            
+            availableWallets.style.display = 'block';
+        }
+
+        // Load wallet adapter
+        async function loadWalletAdapter() {
+            try {
+                log('Loading Ethereum wallet adapter...');
+                
+                const script = document.createElement('script');
+                script.src = './js/ethereumWalletAdapter.js';
+                script.onload = function() {
+                    log('Ethereum wallet adapter loaded successfully');
+                    if (window.ethereumWalletAdapter) {
+                        log('Wallet adapter instance created');
+                    } else {
+                        log('ERROR: Wallet adapter not found after loading');
+                    }
+                };
+                script.onerror = function() {
+                    log('ERROR: Failed to load ethereumWalletAdapter.js');
+                };
+                document.head.appendChild(script);
+
+                const modalScript = document.createElement('script');
+                modalScript.src = './js/ethereumWalletModal.js';
+                modalScript.onload = function() {
+                    log('Ethereum wallet modal loaded successfully');
+                    if (window.ethereumWalletModal) {
+                        log('Wallet modal instance created');
+                    } else {
+                        log('ERROR: Wallet modal not found after loading');
+                    }
+                };
+                modalScript.onerror = function() {
+                    log('ERROR: Failed to load ethereumWalletModal.js');
+                };
+                document.head.appendChild(modalScript);
+
+            } catch (error) {
+                log(`ERROR loading wallet adapter: ${error.message}`);
+            }
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            log('Page loaded, checking for wallet adapter...');
+            
+            // Load wallet adapter
+            loadWalletAdapter();
+            
+            // Check if wallet adapter is loaded
+            setTimeout(() => {
+                if (window.ethereumWalletAdapter) {
+                    log('Wallet adapter found');
+                    updateAvailableWallets(window.ethereumWalletAdapter.detectWallets());
+                } else {
+                    log('Wallet adapter not found - loading...');
+                }
+            }, 1000);
+
+            // Connect button
+            document.getElementById('connectBtn').addEventListener('click', async function() {
+                try {
+                    log('Attempting to connect wallet...');
+                    const result = await window.ethereumWalletAdapter.connectToWallet();
+                    log(`Connected to ${result.walletName}: ${result.account}`);
+                    updateStatus(true, result.walletName);
+                    updateWalletInfo(result);
+                } catch (error) {
+                    log(`Connection failed: ${error.message}`);
+                }
+            });
+
+            // Disconnect button
+            document.getElementById('disconnectBtn').addEventListener('click', async function() {
+                try {
+                    log('Disconnecting wallet...');
+                    window.ethereumWalletAdapter.disconnect();
+                    log('Wallet disconnected');
+                    updateStatus(false);
+                } catch (error) {
+                    log(`Disconnect failed: ${error.message}`);
+                }
+            });
+
+            // Detect wallets button
+            document.getElementById('detectBtn').addEventListener('click', function() {
+                if (window.ethereumWalletAdapter) {
+                    const wallets = window.ethereumWalletAdapter.detectWallets();
+                    log(`Detected ${wallets.length} wallets`);
+                    updateAvailableWallets(wallets);
+                } else {
+                    log('Wallet adapter not available');
+                }
+            });
+
+            // Test connection button
+            document.getElementById('testBtn').addEventListener('click', async function() {
+                try {
+                    log('Testing wallet adapter connection...');
+                    if (window.ethereumWalletAdapter) {
+                        await window.ethereumWalletAdapter.testConnection();
+                    }
+                    
+                    log('Testing app connection...');
+                    if (window.App) {
+                        await window.App.testEthereumConnection();
+                    }
+                } catch (error) {
+                    log(`Test failed: ${error.message}`);
+                }
+            });
+
+            // Clear log button
+            document.getElementById('clearLogBtn').addEventListener('click', function() {
+                document.getElementById('logContainer').innerHTML = '<div>Log cleared</div>';
+            });
+        });
+
+        // Check for wallet adapter periodically
+        setInterval(() => {
+            if (window.ethereumWalletAdapter && !window.adapterLogged) {
+                log('Wallet adapter detected on interval check');
+                window.adapterLogged = true;
+                updateAvailableWallets(window.ethereumWalletAdapter.detectWallets());
+            }
+        }, 2000);
+    </script>
+</body>
+</html> 

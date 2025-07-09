@@ -143,45 +143,68 @@ const App = {
   initWeb3: function () {
     return new Promise((resolve, reject) => {
       try {
-        // Check for both MetaMask and Keplr
-        const hasMetaMask = typeof window.ethereum !== 'undefined';
+        // Check for Ethereum wallet adapter
+        const hasEthereumAdapter = typeof window.ethereumWalletAdapter !== 'undefined';
         const hasKeplr = typeof window.keplr !== 'undefined';
         
-        // Handle MetaMask if available
-        if (hasMetaMask) {
-          App.web3Provider = window.ethereum;
-          App.web3 = new Web3(window.ethereum);
+        // Handle Ethereum wallets
+        if (hasEthereumAdapter) {
+          // Use wallet adapter for Ethereum wallets
+          const availableWallets = window.ethereumWalletAdapter.detectWallets();
           
-          // Set up event listeners
-          const handleDisconnect = () => {
-            App.disconnectMetaMask();
-          };
-
-          const handleChainChanged = () => {
-            window.location.reload();
-          };
-
-          const handleAccountsChanged = (accounts) => {
-            App.handleAccountsChanged(accounts);
-          };
-
-          // Remove existing listeners if any
-          if(App.web3Provider) {
-            window.ethereum.removeListener('disconnect', handleDisconnect);
-            window.ethereum.removeListener('chainChanged', handleChainChanged);
-            window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+          if (availableWallets.length > 0) {
+            // Enable Ethereum wallet buttons
+            const walletButton = document.getElementById("walletButton");
+            const metamaskButton = document.getElementById("metamaskButton");
+            
+            if (walletButton) {
+              walletButton.disabled = false;
+              walletButton.innerHTML = 'Connect Ethereum Wallet';
+            }
+            if (metamaskButton) {
+              metamaskButton.disabled = false;
+              metamaskButton.innerHTML = 'Connect Ethereum Wallet';
+            }
           }
+        } else {
+          // Fallback to direct MetaMask detection
+          const hasMetaMask = typeof window.ethereum !== 'undefined';
           
-          // Add new listeners
-          window.ethereum.on('disconnect', handleDisconnect);
-          window.ethereum.on('chainChanged', handleChainChanged);
-          window.ethereum.on('accountsChanged', handleAccountsChanged);
+          if (hasMetaMask) {
+            App.web3Provider = window.ethereum;
+            App.web3 = new Web3(window.ethereum);
+            
+            // Set up event listeners
+            const handleDisconnect = () => {
+              App.disconnectMetaMask();
+            };
 
-          // Enable MetaMask buttons
-          const walletButton = document.getElementById("walletButton");
-          const metamaskButton = document.getElementById("metamaskButton");
-          if (walletButton) walletButton.disabled = false;
-          if (metamaskButton) metamaskButton.disabled = false;
+            const handleChainChanged = () => {
+              window.location.reload();
+            };
+
+            const handleAccountsChanged = (accounts) => {
+              App.handleAccountsChanged(accounts);
+            };
+
+            // Remove existing listeners if any
+            if(App.web3Provider) {
+              window.ethereum.removeListener('disconnect', handleDisconnect);
+              window.ethereum.removeListener('chainChanged', handleChainChanged);
+              window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+            }
+            
+            // Add new listeners
+            window.ethereum.on('disconnect', handleDisconnect);
+            window.ethereum.on('chainChanged', handleChainChanged);
+            window.ethereum.on('accountsChanged', handleAccountsChanged);
+
+            // Enable MetaMask buttons
+            const walletButton = document.getElementById("walletButton");
+            const metamaskButton = document.getElementById("metamaskButton");
+            if (walletButton) walletButton.disabled = false;
+            if (metamaskButton) metamaskButton.disabled = false;
+          }
         }
         
         // Handle Cosmos wallets
@@ -215,6 +238,143 @@ const App = {
   },
 
   connectMetaMask: async function() {
+    try {
+        // Use wallet adapter if available, otherwise fall back to direct MetaMask
+        if (window.ethereumWalletAdapter) {
+            return await this.connectEthereumWallet();
+        } else {
+            return await this.connectMetaMaskLegacy();
+        }
+    } catch (error) {
+        console.error("Error connecting Ethereum wallet:", error);
+        App.handleError(error);
+        throw error;
+    }
+  },
+
+  connectEthereumWallet: async function(walletType = null) {
+    try {
+        if (!window.ethereumWalletAdapter) {
+            throw new Error('Ethereum wallet adapter not available');
+        }
+
+        // Show wallet selection modal if no specific wallet type provided
+        if (!walletType) {
+            return new Promise((resolve, reject) => {
+                window.ethereumWalletModal.open(async (selectedWalletType) => {
+                    try {
+                        const result = await this.connectEthereumWallet(selectedWalletType);
+                        resolve(result);
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+            });
+        }
+
+        // Connect to the selected wallet
+        const connectionResult = await window.ethereumWalletAdapter.connectToWallet(walletType);
+        
+        // Set wallet state
+        App.account = connectionResult.account;
+        App.chainId = connectionResult.chainId;
+        App.web3Provider = connectionResult.provider;
+        App.web3 = connectionResult.web3;
+        App.ethers = connectionResult.ethers;
+        App.isConnected = true;
+        
+        // Switch to Sepolia if needed
+        if (App.chainId !== 11155111) {
+            console.log('Not on Sepolia, attempting to switch...');
+            try {
+                await window.ethereumWalletAdapter.switchChain(11155111);
+                App.chainId = 11155111;
+                console.log('Switched to Sepolia');
+            } catch (switchError) {
+                console.error('Failed to switch to Sepolia:', switchError);
+                alert('Please manually switch to Sepolia testnet in your wallet and try again.');
+                throw new Error('Failed to switch to Sepolia network');
+            }
+        }
+        
+        // Validate chain ID
+        try {
+            validateChainId(App.chainId);
+        } catch (error) {
+            console.error('Chain validation error:', error);
+            alert('Please connect to Sepolia (chain ID: 11155111). Mainnet support coming soon.');
+            throw error;
+        }
+        
+        // Initialize contracts
+        await App.initBridgeContract();
+        await App.initTokenContract();
+        
+        // Update wallet buttons
+        const truncatedAddress = `${App.account.substring(0, 6)}...${App.account.substring(App.account.length - 4)}`;
+        const walletName = connectionResult.walletName;
+        
+        const walletButton = document.getElementById('walletButton');
+        const metamaskButton = document.getElementById('metamaskButton');
+        
+        if (walletButton) {
+            walletButton.innerHTML = `Disconnect ${walletName} <span class="truncated-address">(${truncatedAddress})</span>`;
+        }
+        if (metamaskButton) {
+            metamaskButton.innerHTML = `Disconnect ${walletName} <span class="truncated-address">(${truncatedAddress})</span>`;
+        }
+        
+        // Update balances and limits
+        await Promise.all([
+            App.updateBalance(),
+            App.fetchDepositLimit()
+        ]);
+        
+        App.setPageParams();
+        
+        return connectionResult;
+        
+    } catch (error) {
+        console.error("Error connecting Ethereum wallet:", error);
+        App.handleError(error);
+        throw error;
+    }
+  },
+
+  // Test function to verify Ethereum wallet connection
+  testEthereumConnection: async function() {
+    console.log('=== App Ethereum Connection Test ===');
+    console.log('App state:', {
+      isConnected: this.isConnected,
+      account: this.account,
+      chainId: this.chainId,
+      web3: !!this.web3,
+      web3Provider: !!this.web3Provider
+    });
+    
+    if (this.isConnected && this.web3) {
+      try {
+        const balance = await this.web3.eth.getBalance(this.account);
+        console.log('App account balance:', this.web3.utils.fromWei(balance, 'ether'), 'ETH');
+        
+        // Test token balance if contracts are initialized
+        if (this.contracts.Token) {
+          const tokenBalance = await this.contracts.Token.methods.balanceOf(this.account).call();
+          console.log('Token balance:', this.web3.utils.fromWei(tokenBalance, 'ether'), 'TRB');
+        }
+        
+        return true;
+      } catch (error) {
+        console.error('Error in app connection test:', error);
+        return false;
+      }
+    } else {
+      console.log('App not connected or Web3 not available');
+      return false;
+    }
+  },
+
+  connectMetaMaskLegacy: async function() {
     try {
         if (!window.ethereum) {
             throw new Error('MetaMask not installed');
@@ -557,6 +717,11 @@ const App = {
             return;
         }
 
+        // Disconnect from wallet adapter if available
+        if (window.ethereumWalletAdapter && window.ethereumWalletAdapter.isWalletConnected()) {
+            window.ethereumWalletAdapter.disconnect();
+        }
+
         // Clear MetaMask state
         App.account = '0x0';
         App.isConnected = false;
@@ -568,11 +733,11 @@ const App = {
         const metamaskButton = document.getElementById('metamaskButton');
         
         if (walletButton) {
-            walletButton.innerHTML = 'Connect MetaMask';
+            walletButton.innerHTML = 'Connect Ethereum Wallet';
         }
         
         if (metamaskButton) {
-            metamaskButton.innerHTML = 'Connect MetaMask';
+            metamaskButton.innerHTML = 'Connect Ethereum Wallet';
         }
 
         // Update balances
@@ -595,9 +760,9 @@ const App = {
 
         // Update page parameters
         App.setPageParams();
-        console.log('MetaMask disconnected successfully');
+        console.log('Ethereum wallet disconnected successfully');
     } catch (error) {
-        console.error('Error disconnecting MetaMask:', error);
+        console.error('Error disconnecting Ethereum wallet:', error);
         App.handleError(error);
     }
   },
@@ -685,7 +850,14 @@ const App = {
         App.account = accounts[0];
         const truncatedAddress = `${accounts[0].substring(0, 6)}...${accounts[0].substring(accounts[0].length - 4)}`;
         
-        const chainId = await App.web3.eth.getChainId();
+        // Get chain ID from wallet adapter if available, otherwise from Web3
+        let chainId;
+        if (window.ethereumWalletAdapter && window.ethereumWalletAdapter.isWalletConnected()) {
+            const status = window.ethereumWalletAdapter.getConnectionStatus();
+            chainId = status.chainId;
+        } else {
+            chainId = await App.web3.eth.getChainId();
+        }
         App.chainId = chainId;
         
         if (!SUPPORTED_CHAIN_IDS[chainId]) {
@@ -708,11 +880,18 @@ const App = {
         
         App.isConnected = true;
         
+        // Get wallet name for display
+        let walletName = 'Ethereum Wallet';
+        if (window.ethereumWalletAdapter && window.ethereumWalletAdapter.isWalletConnected()) {
+            const status = window.ethereumWalletAdapter.getConnectionStatus();
+            walletName = status.walletName || 'Ethereum Wallet';
+        }
+        
         // Update the appropriate wallet button based on current direction
         if (this.currentBridgeDirection === 'layer') {
-            document.getElementById('walletButton').innerHTML = `Disconnect MetaMask <span class="truncated-address">(${truncatedAddress})</span>`;
+            document.getElementById('walletButton').innerHTML = `Disconnect ${walletName} <span class="truncated-address">(${truncatedAddress})</span>`;
         } else {
-            document.getElementById('metamaskButton').innerHTML = `Disconnect MetaMask <span class="truncated-address">(${truncatedAddress})</span>`;
+            document.getElementById('metamaskButton').innerHTML = `Disconnect ${walletName} <span class="truncated-address">(${truncatedAddress})</span>`;
         }
         
         App.setPageParams();

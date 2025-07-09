@@ -143,9 +143,8 @@
             </div>
           </div>
         </div>
-        <a target="_blank" href="https://github.com/tellor-io/frontend-layerbridgebutton">Front-End code</a>
-
       </div>
+      <a target="_blank" href="https://github.com/tellor-io/frontend-layerbridgebutton" class="frontend-code-link">Front-End code</a>
       <div id="bridgeTransactionsContainer" class="transactions-container">
         <div class="history-header">
           <h3>Withdrawal Transactions</h3>
@@ -239,11 +238,13 @@
       }
 
       // Function to load wallet adapter scripts
-      async function loadWalletAdapter() {
+      async function loadWalletAdapters() {
         try {
           const scripts = [
             './js/walletAdapter.js',
-            './js/walletModal.js'
+            './js/walletModal.js',
+            './js/ethereumWalletAdapter.js',
+            './js/ethereumWalletModal.js'
           ];
 
           // Load scripts sequentially
@@ -251,22 +252,26 @@
             await loadScript(src);
           }
 
-          // Verify wallet adapter is loaded
+          // Verify wallet adapters are loaded
           if (typeof window.cosmosWalletAdapter === 'undefined') {
-            console.warn('Wallet adapter not loaded - falling back to Keplr-only mode');
+            console.warn('Cosmos wallet adapter not loaded - falling back to Keplr-only mode');
+          }
+          
+          if (typeof window.ethereumWalletAdapter === 'undefined') {
+            console.warn('Ethereum wallet adapter not loaded - falling back to MetaMask-only mode');
           }
 
           return true;
         } catch (error) {
-          console.error('Error loading wallet adapter:', error);
+          console.error('Error loading wallet adapters:', error);
           return false;
         }
       }
 
-      // Load CosmJS and wallet adapter, then initialize the app
+      // Load CosmJS and wallet adapters, then initialize the app
       Promise.all([
         loadCosmJS(),
-        loadWalletAdapter()
+        loadWalletAdapters()
       ])
         .then(([cosmjsSuccess, adapterSuccess]) => {
           if (!cosmjsSuccess) {
@@ -475,7 +480,11 @@
           const amount = parseFloat(this.value) || 0;
           const approveButton = document.getElementById('approveButton');
           const depositButton = document.getElementById('depositButton');
-          hideBalanceErrorPopup();
+          
+          // Check if App is available and has the function
+          if (window.App && window.App.hideBalanceErrorPopup) {
+            window.App.hideBalanceErrorPopup();
+          }
           
           if (amount > 0) {
             const hasBalance = await checkBalance(amount);
@@ -488,6 +497,27 @@
           
           checkAllowance();
         });
+
+        async function checkBalance(amount) {
+          // Check if App is available and has the function
+          if (window.App && window.App.checkBalance) {
+            return await window.App.checkBalance(amount);
+          }
+          
+          // Fallback implementation
+          try {
+            if (!window.App || !window.App.isConnected) {
+              return false;
+            }
+            
+            const balance = await window.App.contracts.Token.methods.balanceOf(window.App.account).call();
+            const balanceInEther = window.App.web3.utils.fromWei(balance, 'ether');
+            return parseFloat(balanceInEther) >= amount;
+          } catch (error) {
+            console.error('Error checking balance:', error);
+            return false;
+          }
+        }
 
         async function checkAllowance() {
           const approveButton = document.getElementById('approveButton');
@@ -529,6 +559,13 @@
             approveButton.disabled = true;
             depositButton.disabled = true;
           }
+        }
+
+        // Hide all tooltips function
+        function hideAllTooltips() {
+          document.querySelectorAll('.tooltip').forEach(tooltip => {
+            tooltip.style.display = 'none';
+          });
         }
 
         // Initial checks
