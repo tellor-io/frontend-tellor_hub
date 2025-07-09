@@ -130,12 +130,18 @@
 
                 // Get the appropriate signer for direct signing
                 let offlineSigner;
-                if (window.getOfflineSignerAuto) {
+                if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+                    // Use wallet adapter if available
+                    offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+                } else if (window.getOfflineSignerAuto) {
+                    // Fallback to legacy methods
                     offlineSigner = await window.getOfflineSignerAuto('layertest-4');
                 } else if (window.getOfflineSignerDirect) {
                     offlineSigner = window.getOfflineSignerDirect('layertest-4');
-                } else {
+                } else if (window.getOfflineSigner) {
                     offlineSigner = window.getOfflineSigner('layertest-4');
+                } else {
+                    throw new Error('No offline signer available');
                 }
 
                 // Create protobuf types
@@ -228,24 +234,43 @@
                     let encodedMessage;
                     
                     if (message.typeUrl === '/layer.bridge.MsgWithdrawTokens') {
-                        // Encode withdrawal message
-                        const msg = {
+                        // Encode withdrawal message using the same approach as the original Amino method
+                        const MsgWithdrawTokens = new protobuf.Type("MsgWithdrawTokens")
+                            .add(new protobuf.Field("creator", 1, "string"))
+                            .add(new protobuf.Field("recipient", 2, "string"))
+                            .add(new protobuf.Field("amount", 3, "Coin"));
+                        
+                        root.add(MsgWithdrawTokens);
+                        const MsgType = root.lookupType("MsgWithdrawTokens");
+                        
+                        const msgValue = {
                             creator: message.value.creator,
-                            recipient: message.value.recipient.toLowerCase().replace('0x', ''),
+                            recipient: message.value.recipient.toLowerCase().replace('0x', ''), // Remove 0x prefix for Layer chain
                             amount: {
                                 denom: message.value.amount.denom,
                                 amount: message.value.amount.amount.toString()
                             }
                         };
-                        encodedMessage = window.layerProto.bridge.MsgWithdrawTokens.encode(msg);
+                        
+                        console.log('Encoding MsgWithdrawTokens:', msgValue);
+                        encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else if (message.typeUrl === '/layer.bridge.MsgRequestAttestations') {
-                        // Encode attestation request message
-                        const msg = {
+                        // Encode attestation request message using the same approach as the original Amino method
+                        const MsgRequestAttestations = new protobuf.Type("MsgRequestAttestations")
+                            .add(new protobuf.Field("creator", 1, "string"))
+                            .add(new protobuf.Field("query_id", 2, "string"))
+                            .add(new protobuf.Field("timestamp", 3, "string"));
+                        
+                        root.add(MsgRequestAttestations);
+                        const MsgType = root.lookupType("MsgRequestAttestations");
+                        
+                        const msgValue = {
                             creator: message.value.creator,
                             query_id: message.value.query_id,
                             timestamp: message.value.timestamp.toString()
                         };
-                        encodedMessage = window.layerProto.bridge.MsgRequestAttestations.encode(msg);
+                        
+                        encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else if (message.typeUrl === '/cosmos.staking.v1beta1.MsgDelegate') {
                         // Encode delegation message
                         const MsgDelegate = new protobuf.Type("MsgDelegate")
@@ -490,7 +515,15 @@
         try {
             const amountInMicroUnits = (parseFloat(amount) * 1000000).toString();
 
-            const offlineSigner = window.getOfflineSigner('layertest-4');
+            // Get offline signer from wallet adapter or fallback to legacy method
+            let offlineSigner;
+            if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+                offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+            } else if (window.getOfflineSigner) {
+                offlineSigner = window.getOfflineSigner('layertest-4');
+            } else {
+                throw new Error('No offline signer available');
+            }
 
             const client = await SigningStargateClient.connectWithSigner(
                 'https://node-palmito.tellorlayer.com/rpc',
@@ -538,7 +571,15 @@
     // Updated attestation request function using direct signing
     async function requestAttestations(account, queryId, timestamp) {
         try {
-            const offlineSigner = window.getOfflineSigner('layertest-4');
+            // Get offline signer from wallet adapter or fallback to legacy method
+            let offlineSigner;
+            if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+                offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+            } else if (window.getOfflineSigner) {
+                offlineSigner = window.getOfflineSigner('layertest-4');
+            } else {
+                throw new Error('No offline signer available');
+            }
 
             const client = await SigningStargateClient.connectWithSigner(
                 'https://node-palmito.tellorlayer.com/rpc',
@@ -576,7 +617,15 @@
     // Updated delegation function using direct signing
     async function delegateTokens(account, validatorAddress, amount) {
         try {
-            const offlineSigner = window.getOfflineSigner('layertest-4');
+            // Get offline signer from wallet adapter or fallback to legacy method
+            let offlineSigner;
+            if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+                offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+            } else if (window.getOfflineSigner) {
+                offlineSigner = window.getOfflineSigner('layertest-4');
+            } else {
+                throw new Error('No offline signer available');
+            }
 
             const client = await SigningStargateClient.connectWithSigner(
                 'https://node-palmito.tellorlayer.com/rpc',

@@ -184,17 +184,25 @@ const App = {
           if (metamaskButton) metamaskButton.disabled = false;
         }
         
-        // Handle Keplr if available
-        if (hasKeplr) {
-          App.keplrProvider = window.keplr;
-          // Enable Keplr buttons
+        // Handle Cosmos wallets
+        const hasCosmosWallet = hasKeplr || 
+                               typeof window.cosmostation !== 'undefined' || 
+                               typeof window.leap !== 'undefined' || 
+                               typeof window.station !== 'undefined';
+        
+        if (hasCosmosWallet) {
+          // Enable Cosmos wallet buttons
           const keplrButton = document.getElementById("keplrButton");
           const delegateKeplrButton = document.getElementById("delegateKeplrButton");
           if (keplrButton) {
             keplrButton.disabled = false;
+            // Update button text to be more generic
+            keplrButton.innerHTML = 'Connect Cosmos Wallet';
           }
           if (delegateKeplrButton) {
             delegateKeplrButton.disabled = false;
+            // Update button text to be more generic
+            delegateKeplrButton.innerHTML = 'Connect Cosmos Wallet';
           }
         }
         
@@ -348,6 +356,91 @@ const App = {
 
   connectKeplr: async function() {
     try {
+        // Use wallet adapter if available, otherwise fall back to direct Keplr
+        if (window.cosmosWalletAdapter) {
+            return await this.connectCosmosWallet();
+        } else {
+            return await this.connectKeplrLegacy();
+        }
+    } catch (error) {
+        console.error("Error connecting Cosmos wallet:", error);
+        App.handleError(error);
+        throw error;
+    }
+  },
+
+  connectCosmosWallet: async function(walletType = null) {
+    try {
+        if (!window.cosmosWalletAdapter) {
+            throw new Error('Wallet adapter not available');
+        }
+
+        // Show wallet selection modal if no specific wallet type provided
+        if (!walletType) {
+            return new Promise((resolve, reject) => {
+                window.walletModal.open(async (selectedWalletType) => {
+                    try {
+                        const result = await this.connectCosmosWallet(selectedWalletType);
+                        resolve(result);
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+            });
+        }
+
+        // Connect to the selected wallet
+        const connectionResult = await window.cosmosWalletAdapter.connectToWallet(walletType);
+        
+        // Set wallet state
+        App.keplrAddress = connectionResult.address;
+        App.isKeplrConnected = true;
+        App.connectedWallet = connectionResult.walletName;
+        
+        // Update button text with wallet name and address
+        const truncatedAddress = `${App.keplrAddress.substring(0, 6)}...${App.keplrAddress.substring(App.keplrAddress.length - 4)}`;
+        const walletDisplayName = connectionResult.walletName;
+        
+        const keplrButton = document.getElementById('keplrButton');
+        const delegateKeplrButton = document.getElementById('delegateKeplrButton');
+        
+        if (keplrButton) {
+            keplrButton.innerHTML = `Disconnect ${walletDisplayName} <span class="truncated-address">(${truncatedAddress})</span>`;
+        }
+        if (delegateKeplrButton) {
+            delegateKeplrButton.innerHTML = `Disconnect ${walletDisplayName} <span class="truncated-address">(${truncatedAddress})</span>`;
+        }
+        
+        // Update balance immediately after connection
+        await App.updateKeplrBalance();
+        
+        // Enable action buttons based on current section
+        if (App.currentBridgeDirection === 'ethereum') {
+            const withdrawButton = document.getElementById('withdrawButton');
+            if (withdrawButton) {
+                withdrawButton.disabled = false;
+            }
+        } else if (App.currentBridgeDirection === 'delegate') {
+            const delegateButton = document.getElementById('delegateButton');
+            if (delegateButton) {
+                delegateButton.disabled = false;
+            }
+        }
+        
+        App.setPageParams();
+        return connectionResult;
+    } catch (error) {
+        // Clear connection state on error
+        App.keplrAddress = null;
+        App.isKeplrConnected = false;
+        App.connectedWallet = null;
+        
+        throw error;
+    }
+  },
+
+  connectKeplrLegacy: async function() {
+    try {
         if (!window.keplr) {
             throw new Error('Keplr not installed');
         }
@@ -418,6 +511,7 @@ const App = {
         // Set Keplr state
         App.keplrAddress = accounts[0].address;
         App.isKeplrConnected = true;
+        App.connectedWallet = 'Keplr';
         
         // Update button text
         const truncatedAddress = `${App.keplrAddress.substring(0, 6)}...${App.keplrAddress.substring(App.keplrAddress.length - 4)}`;
@@ -451,10 +545,8 @@ const App = {
         // Clear connection state on error
         App.keplrAddress = null;
         App.isKeplrConnected = false;
-        App.keplrProvider = null;
+        App.connectedWallet = null;
         
-        console.error("Error connecting Keplr:", error);
-        App.handleError(error);
         throw error;
     }
   },
@@ -512,37 +604,41 @@ const App = {
 
   disconnectKeplr: async function() {
     try {
-        console.log('Disconnecting Keplr...');
+        console.log('Disconnecting Cosmos wallet...');
         if (!App.isKeplrConnected) {
-            console.log('Keplr already disconnected');
+            console.log('Cosmos wallet already disconnected');
             return;
         }
 
-        // Try to disable the chain in Keplr
-        try {
-            if (window.keplr && typeof window.keplr.disable === 'function') {
-                await window.keplr.disable('layertest-4');
+        // Use wallet adapter if available, otherwise use legacy method
+        if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+            await window.cosmosWalletAdapter.disconnect();
+        } else {
+            // Legacy Keplr disconnect
+            try {
+                if (window.keplr && typeof window.keplr.disable === 'function') {
+                    await window.keplr.disable('layertest-4');
+                }
+            } catch (error) {
+                console.warn('Could not disable chain in Keplr:', error);
             }
-        } catch (error) {
-            console.warn('Could not disable chain in Keplr:', error);
-            // Continue with disconnection even if disable fails
         }
 
-        // Clear Keplr state
+        // Clear wallet state
         App.keplrAddress = null;
         App.isKeplrConnected = false;
-        App.keplrProvider = null;
+        App.connectedWallet = null;
 
-        // Update Keplr buttons
+        // Update wallet buttons with generic text
         const keplrButton = document.getElementById('keplrButton');
         const delegateKeplrButton = document.getElementById('delegateKeplrButton');
         if (keplrButton) {
-            keplrButton.innerHTML = 'Connect Keplr';
-            console.log('Updated Keplr button');
+            keplrButton.innerHTML = 'Connect Cosmos Wallet';
+            console.log('Updated Cosmos wallet button');
         }
         if (delegateKeplrButton) {
-            delegateKeplrButton.innerHTML = 'Connect Keplr';
-            console.log('Updated delegate Keplr button');
+            delegateKeplrButton.innerHTML = 'Connect Cosmos Wallet';
+            console.log('Updated delegate Cosmos wallet button');
         }
 
         // Update balances
@@ -565,14 +661,14 @@ const App = {
             delegateButton.disabled = true;
         }
 
-        // Update withdrawal history to reflect Keplr disconnection
+        // Update withdrawal history to reflect wallet disconnection
         await this.updateWithdrawalHistory();
 
         // Update page parameters
         App.setPageParams();
-        console.log('Keplr disconnected successfully');
+        console.log('Cosmos wallet disconnected successfully');
     } catch (error) {
-        console.error('Error disconnecting Keplr:', error);
+        console.error('Error disconnecting Cosmos wallet:', error);
         App.handleError(error);
     }
   },
@@ -861,7 +957,15 @@ const App = {
             return;
         }
 
-        const offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+        // Use wallet adapter if available, otherwise fall back to direct Keplr
+        let offlineSigner;
+        if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+            offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+        } else {
+            // Legacy Keplr method
+            offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+        }
+
         const signingClient = await window.cosmjs.stargate.SigningStargateClient.connectWithSigner(
             'https://node-palmito.tellorlayer.com/rpc',
             offlineSigner
@@ -877,7 +981,7 @@ const App = {
         // Format balance to 6 decimal places consistently
         const readableBalance = (balanceAmount / 1000000).toFixed(6);
 
-        // Update Keplr balance displays for Ethereum and Delegate sections only
+        // Update Cosmos wallet balance displays for Ethereum and Delegate sections only
         // (currentBalance in Bridge to Tellor section is for MetaMask only)
         const ethKeplrBalanceElement = document.getElementById("ethKeplrBalance");
         const delegateKeplrBalanceElement = document.getElementById("delegateKeplrBalance");
@@ -889,8 +993,8 @@ const App = {
             delegateKeplrBalanceElement.textContent = `${readableBalance} TRB`;
         }
     } catch (error) {
-        console.error("Error fetching Keplr balance:", error);
-        // Set Keplr balances to 0 on error (excluding currentBalance which is for MetaMask)
+        console.error("Error fetching Cosmos wallet balance:", error);
+        // Set Cosmos wallet balances to 0 on error (excluding currentBalance which is for MetaMask)
         const ethKeplrBalanceElement = document.getElementById("ethKeplrBalance");
         const delegateKeplrBalanceElement = document.getElementById("delegateKeplrBalance");
         
@@ -1311,222 +1415,208 @@ const App = {
 
         // Convert amount to micro units (1 TRB = 1,000,000 micro units)
         const amountInMicroUnits = Math.floor(parseFloat(amount) * 1000000).toString();
-
-        // Get offline signer from Keplr
-        const offlineSigner = window.keplr.getOfflineSigner('layertest-4');
-
-        // Get account info first - use keplrAddress instead of account
-        const accountUrl = `https://node-palmito.tellorlayer.com/cosmos/auth/v1beta1/accounts/${App.keplrAddress}`;
-        const accountResponse = await fetch(accountUrl);
-        const accountData = await accountResponse.json();
         
-        const accountInfo = {
-            account_number: accountData.account?.account_number || "0",
-            sequence: accountData.account?.sequence || "0"
-        };
+        // Validate amount is positive and reasonable
+        if (parseInt(amountInMicroUnits) <= 0) {
+            alert('Please enter a valid amount greater than 0');
+            return;
+        }
 
-        // Create the message data for signing - use keplrAddress as creator
-        const msgData = {
-            creator: App.keplrAddress,
-            recipient: ethereumAddress.toLowerCase().replace('0x', ''), // Remove 0x prefix for chain
-            amount: {
-                denom: "loya",
-                amount: amountInMicroUnits
+        // Get offline signer from wallet adapter or Keplr
+        let offlineSigner;
+        if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+            offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+        } else {
+            offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+        }
+
+        // Create the client using the stargate implementation
+        const client = await window.cosmjs.stargate.SigningStargateClient.connectWithSigner(
+            'https://node-palmito.tellorlayer.com',
+            offlineSigner
+        );
+
+        console.log('Created stargate client with RPC URL:', client.rpcUrl);
+
+        // Create the message - using the same format as the successful transaction
+        const msg = {
+            typeUrl: '/layer.bridge.MsgWithdrawTokens',
+            value: {
+                creator: App.keplrAddress,
+                recipient: ethereumAddress.toLowerCase().replace('0x', ''), // Remove 0x prefix for Layer chain
+                amount: {
+                    denom: 'loya',
+                    amount: amountInMicroUnits
+                }
             }
         };
-
-        // Create the transaction to sign
-        const txToSign = {
-            chain_id: 'layertest-4',
-            account_number: accountInfo.account_number,
-            sequence: accountInfo.sequence,
-            fee: {
-                amount: [{ denom: "loya", amount: "5000" }],
-                gas: "200000"
-            },
-            msgs: [{
-                type: "/layer.bridge.MsgWithdrawTokens",
-                value: msgData
-            }],
-            memo: "Withdraw TRB to Ethereum"
-        };
-
-        // Sign the transaction
-        const signResult = await offlineSigner.signAmino(App.keplrAddress, txToSign);
-
-        const signature = signResult.signature.signature;
-        const publicKey = signResult.signature.pub_key.value;
-
-        // Create protobuf types for transaction
-        const root = new protobuf.Root();
-        
-        // Define all necessary types
-        const Coin = new protobuf.Type("Coin")
-            .add(new protobuf.Field("denom", 1, "string"))
-            .add(new protobuf.Field("amount", 2, "string"));
-
-        const MsgWithdrawTokens = new protobuf.Type("MsgWithdrawTokens")
-            .add(new protobuf.Field("creator", 1, "string"))
-            .add(new protobuf.Field("recipient", 2, "string"))
-            .add(new protobuf.Field("amount", 3, "Coin"));
-
-        const Any = new protobuf.Type("Any")
-            .add(new protobuf.Field("typeUrl", 1, "string"))
-            .add(new protobuf.Field("value", 2, "bytes"));
-
-        const TxBody = new protobuf.Type("TxBody")
-            .add(new protobuf.Field("messages", 1, "Any", "repeated"))
-            .add(new protobuf.Field("memo", 2, "string"));
-
-        const PubKey = new protobuf.Type("PubKey")
-            .add(new protobuf.Field("key", 1, "bytes"));
-
-        const Single = new protobuf.Type("Single")
-            .add(new protobuf.Field("mode", 1, "uint32"));
-
-        const ModeInfo = new protobuf.Type("ModeInfo")
-            .add(new protobuf.Field("single", 1, "Single"));
-
-        const SignerInfo = new protobuf.Type("SignerInfo")
-            .add(new protobuf.Field("publicKey", 1, "Any"))
-            .add(new protobuf.Field("modeInfo", 2, "ModeInfo"))
-            .add(new protobuf.Field("sequence", 3, "uint64"));
-
-        const Fee = new protobuf.Type("Fee")
-            .add(new protobuf.Field("amount", 1, "Coin", "repeated"))
-            .add(new protobuf.Field("gasLimit", 2, "uint64"));
-
-        const AuthInfo = new protobuf.Type("AuthInfo")
-            .add(new protobuf.Field("signerInfos", 1, "SignerInfo", "repeated"))
-            .add(new protobuf.Field("fee", 2, "Fee"));
-
-        const Tx = new protobuf.Type("Tx")
-            .add(new protobuf.Field("body", 1, "TxBody"))
-            .add(new protobuf.Field("authInfo", 2, "AuthInfo"))
-            .add(new protobuf.Field("signatures", 3, "bytes", "repeated"));
-
-        // Add all types to root
-        root.add(Coin);
-        root.add(MsgWithdrawTokens);
-        root.add(Any);
-        root.add(TxBody);
-        root.add(PubKey);
-        root.add(Single);
-        root.add(ModeInfo);
-        root.add(SignerInfo);
-        root.add(Fee);
-        root.add(AuthInfo);
-        root.add(Tx);
-
-        // Encode the message
-        const MsgType = root.lookupType("MsgWithdrawTokens");
-        const msg = MsgType.create(msgData);
-        const encodedMessage = MsgType.encode(msg).finish();
-
-        // Create the public key Any
-        const pubKeyAny = {
-            typeUrl: "/cosmos.crypto.secp256k1.PubKey",
-            value: PubKey.encode({ key: publicKey }).finish()
-        };
-
-        // Create the message Any
-        const messageAny = {
-            typeUrl: "/layer.bridge.MsgWithdrawTokens",
-            value: encodedMessage
-        };
-
-        // Create the final transaction
-        const tx = {
-            body: {
-                messages: [messageAny],
-                memo: "Withdraw TRB to Ethereum"
-            },
-            authInfo: {
-                signerInfos: [{
-                    publicKey: pubKeyAny,
-                    modeInfo: {
-                        single: {
-                            mode: 127 // SIGN_MODE_LEGACY_AMINO_JSON
-                        }
-                    },
-                    sequence: parseInt(accountInfo.sequence)
-                }],
-                fee: {
-                    amount: [{ denom: "loya", amount: "5000" }],
-                    gasLimit: 200000
-                }
-            },
-            signatures: [signature]
-        };
-
-        console.log('Final transaction:', tx);
-
-        // Encode and broadcast the transaction
-        const txObj = Tx.create(tx);
-        const encodedTx = Tx.encode(txObj).finish();
-        const base64Tx = btoa(String.fromCharCode.apply(null, encodedTx));
 
         App.showPendingPopup("Withdrawal transaction pending...");
 
-        // Broadcast the transaction
-        const response = await fetch('https://node-palmito.tellorlayer.com/cosmos/tx/v1beta1/txs', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
+        // Sign and broadcast using direct signing
+        console.log('About to sign and broadcast with message:', msg);
+        console.log('Message details:', {
+            creator: msg.value.creator,
+            recipient: msg.value.recipient,
+            amount: msg.value.amount,
+            amountInMicroUnits: amountInMicroUnits,
+            originalAmount: amount,
+            ethereumAddress: ethereumAddress
+        });
+        
+        // Compare with successful transaction format
+        console.log('Expected format (from successful tx):', {
+            creator: 'tellor1072q49v0sacgmlq4hkwzhryz5zefgl73jg5493',
+            recipient: 'b2d6aaf0bca136c252ec94f0f06c2489f734675f',
+            amount: { denom: 'loya', amount: '100000' }
+        });
+        const result = await client.signAndBroadcastDirect(
+            App.keplrAddress,
+            [msg],
+            {
+                amount: [{ denom: 'loya', amount: '5000' }],
+                gas: '200000'
             },
-            body: JSON.stringify({
-                tx_bytes: base64Tx,
-                mode: "BROADCAST_MODE_SYNC"
-            })
-        });
+            'Withdraw TRB to Ethereum'
+        );
 
-        const result = await response.json();
-        console.log('Transaction result:', result);
+        console.log('Withdrawal result:', result);
+        console.log('Result type:', typeof result);
+        console.log('Result keys:', Object.keys(result));
 
-        if (result.tx_response?.code !== 0) {
-            throw new Error(result.tx_response?.raw_log || 'Transaction failed');
-        }
-
-        // Poll for transaction status
-        const txHash = result.tx_response.txhash;
-        let attempts = 0;
-        const maxAttempts = 10;
-        const pollInterval = 2000;
-
-        while (attempts < maxAttempts) {
-            attempts++;
-            const statusResponse = await fetch(`https://node-palmito.tellorlayer.com/cosmos/tx/v1beta1/txs/${txHash}`);
-            const statusData = await statusResponse.json();
+        console.log('Hiding pending popup');
+        App.hidePendingPopup();
+        
+        if (result && result.code === 0) {
+            // Get transaction hash from the result - try multiple possible locations
+            const txHash = result.txhash || 
+                          result.tx_response?.txhash || 
+                          result.transactionHash ||
+                          result.hash ||
+                          (result.tx_response && result.tx_response.txhash);
             
-            if (statusResponse.ok && statusData.tx_response) {
-                const txResponse = statusData.tx_response;
-                if (txResponse.height !== "0") {
-                    if (txResponse.code === 0) {
-                        App.hidePendingPopup();
-                        App.showSuccessPopup("Withdrawal successful! You will need to wait 12 hours before you can claim your tokens on Ethereum.", txHash, 'cosmos');
-                        await App.updateKeplrBalance();
-                        return txResponse;
-                    } else {
-                        throw new Error(txResponse.raw_log || 'Transaction failed');
-                    }
-                }
+            console.log('Attempting to extract transaction hash from:', {
+                result_txhash: result.txhash,
+                result_tx_response_txhash: result.tx_response?.txhash,
+                result_transactionHash: result.transactionHash,
+                result_hash: result.hash,
+                full_result: result
+            });
+            
+            if (!txHash) {
+                console.error('No transaction hash found in result:', result);
+                App.showErrorPopup("Transaction successful but no hash found. Please check your wallet.");
+                return result;
             }
-            await new Promise(resolve => setTimeout(resolve, pollInterval));
+            
+            console.log('Transaction hash:', txHash);
+            console.log('Full result object:', result);
+            
+            // Try different hash formats for the explorer
+            const hashFormats = [
+                txHash,
+                txHash.toUpperCase(),
+                txHash.toLowerCase(),
+                txHash.replace('0x', ''),
+                txHash.replace('0x', '').toUpperCase(),
+                txHash.replace('0x', '').toLowerCase()
+            ];
+            
+            // Try different explorer URLs
+            const explorerUrls = [
+                `https://explorer.tellor.io/txs/`,
+                `https://testnet-explorer.tellor.io/txs/`,
+                `https://layer-explorer.tellor.io/txs/`,
+                `https://explorer.palmito.tellorlayer.com/txs/`,
+                `https://testnet.palmito.tellorlayer.com/txs/`
+            ];
+            
+            console.log('Hash formats to try:', hashFormats);
+            console.log('Explorer URLs to try:', explorerUrls.map(base => hashFormats.map(h => base + h)).flat());
+            
+            // Wait a moment for transaction to be indexed
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Verify transaction exists on blockchain
+            let transactionConfirmed = false;
+            try {
+                const verifyResponse = await fetch(`https://node-palmito.tellorlayer.com/cosmos/tx/v1beta1/txs/${txHash}`);
+                if (verifyResponse.ok) {
+                    const verifyData = await verifyResponse.json();
+                    console.log('Transaction verification:', verifyData);
+                    if (verifyData.tx_response && verifyData.tx_response.code === 0) {
+                        console.log('Transaction confirmed on blockchain');
+                        transactionConfirmed = true;
+                        
+                        // Check for withdrawal-specific events
+                        const events = verifyData.tx_response.events || [];
+                        const withdrawEvent = events.find(event => event.type === 'tokens_withdrawn');
+                        if (withdrawEvent) {
+                            console.log('Withdrawal event found:', withdrawEvent);
+                        } else {
+                            console.warn('No withdrawal event found in successful transaction');
+                        }
+                    } else {
+                        console.log('Transaction verification failed - checking alternative endpoints');
+                        console.warn('Transaction not found or failed on blockchain');
+                        console.log('Transaction error details:', {
+                            code: verifyData.tx_response?.code,
+                            raw_log: verifyData.tx_response?.raw_log,
+                            events: verifyData.tx_response?.events
+                        });
+                        
+                        // Try alternative endpoints
+                        const altEndpoints = [
+                            `https://node-palmito.tellorlayer.com/rpc/tx?hash=0x${txHash}&prove=false`,
+                            `https://node-palmito.tellorlayer.com/cosmos/tx/v1beta1/txs/${txHash.toUpperCase()}`,
+                            `https://node-palmito.tellorlayer.com/cosmos/tx/v1beta1/txs/${txHash.toLowerCase()}`
+                        ];
+                        
+                        for (const endpoint of altEndpoints) {
+                            try {
+                                const altResponse = await fetch(endpoint);
+                                if (altResponse.ok) {
+                                    const altData = await altResponse.json();
+                                    console.log(`Alternative endpoint ${endpoint} result:`, altData);
+                                    if (altData.tx_response && altData.tx_response.code === 0) {
+                                        transactionConfirmed = true;
+                                        console.log('Transaction confirmed via alternative endpoint');
+                                    }
+                                    break;
+                                }
+                            } catch (altError) {
+                                console.warn(`Alternative endpoint ${endpoint} failed:`, altError);
+                            }
+                        }
+                    }
+                } else {
+                    console.warn('Could not verify transaction on blockchain');
+                }
+            } catch (error) {
+                console.warn('Error verifying transaction:', error);
+            }
+            
+            console.log('Transaction verification completed. transactionConfirmed:', transactionConfirmed);
+        
+        // Simplify success handling to match the working requestAttestation pattern
+        if (result && result.code === 0) {
+            // Get transaction hash from the result (same as requestAttestation)
+            const txHash = result.txhash || result.tx_response?.txhash;
+            App.showSuccessPopup("Withdrawal successful! You will need to wait 12 hours before you can claim your tokens on Ethereum.", txHash, 'cosmos');
+        } else {
+            throw new Error(result?.rawLog || result?.raw_log || "Withdrawal failed");
         }
-
-        // If we get here, the transaction hasn't been included in a block
-        App.hidePendingPopup();
-        return result.tx_response;
-
+        
+        await App.updateKeplrBalance();
+        return result;
+        } else {
+            throw new Error(result?.rawLog || result?.raw_log || "Withdrawal failed");
+        }
     } catch (error) {
+        console.error('Withdrawal error:', error);
         App.hidePendingPopup();
-        console.error("Error in withdrawal:", error);
-        console.error("Error details:", {
-            message: error.message,
-            stack: error.stack,
-            name: error.name
-        });
-        alert(error.message || "Error in withdrawal. Please try again.");
+        App.showErrorPopup(error.message || "Error withdrawing tokens. Please try again.");
+        throw error;
     }
   },
 
@@ -1956,23 +2046,31 @@ const App = {
   // Add new function to handle delegation
   delegateTokens: async function() {
     try {
-        if (!App.isKeplrConnected || !window.keplr) {
-            alert('Please connect your Keplr wallet first');
+        if (!App.isKeplrConnected) {
+            alert('Please connect your Cosmos wallet first');
             return;
         }
 
-        // Verify Keplr is still enabled for the chain
+        // Verify wallet is still enabled for the chain
         try {
-            await window.keplr.enable('layertest-4');
+            if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+                // Re-enable the chain using wallet adapter
+                await window.cosmosWalletAdapter.enableChain();
+            } else if (window.keplr) {
+                // Fallback to legacy Keplr method
+                await window.keplr.enable('layertest-4');
+            } else {
+                throw new Error('No wallet available');
+            }
         } catch (error) {
-            console.error('Keplr not enabled for chain:', error);
+            console.error('Wallet not enabled for chain:', error);
             App.isKeplrConnected = false;
             App.keplrAddress = null;
             const keplrButton = document.getElementById('keplrButton');
             if (keplrButton) {
-                keplrButton.innerHTML = 'Connect Keplr';
+                keplrButton.innerHTML = 'Connect Cosmos Wallet';
             }
-            alert('Please reconnect your Keplr wallet');
+            alert('Please reconnect your Cosmos wallet');
             return;
         }
 
@@ -2005,8 +2103,13 @@ const App = {
 
         App.showPendingPopup("Delegating tokens...");
 
-        // Get the Layer account from Keplr
-        const offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+        // Get the Layer account from wallet adapter or Keplr
+        let offlineSigner;
+        if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+            offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+        } else {
+            offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+        }
         const accounts = await offlineSigner.getAccounts();
         const layerAccount = accounts[0].address;
 
@@ -2047,23 +2150,31 @@ const App = {
   // Add new function to handle attestation requests
   requestAttestation: async function(withdrawalId) {
     try {
-        if (!App.isKeplrConnected || !window.keplr) {
-            alert('Please connect your Keplr wallet first');
+        if (!App.isKeplrConnected) {
+            alert('Please connect your Cosmos wallet first');
             return;
         }
 
-        // Verify Keplr is still enabled for the chain
+        // Verify wallet is still enabled for the chain
         try {
-            await window.keplr.enable('layertest-4');
+            if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+                // Re-enable the chain using wallet adapter
+                await window.cosmosWalletAdapter.enableChain();
+            } else if (window.keplr) {
+                // Fallback to legacy Keplr method
+                await window.keplr.enable('layertest-4');
+            } else {
+                throw new Error('No wallet available');
+            }
         } catch (error) {
-            console.error('Keplr not enabled for chain:', error);
+            console.error('Wallet not enabled for chain:', error);
             App.isKeplrConnected = false;
             App.keplrAddress = null;
             const keplrButton = document.getElementById('keplrButton');
             if (keplrButton) {
-                keplrButton.innerHTML = 'Connect Keplr';
+                keplrButton.innerHTML = 'Connect Cosmos Wallet';
             }
-            alert('Please reconnect your Keplr wallet');
+            alert('Please reconnect your Cosmos wallet');
             return;
         }
 
@@ -2095,8 +2206,13 @@ const App = {
         // Use the timestamp from the oracle response
         const timestamp = data.timestamp;
 
-        // Get the Layer account from Keplr
-        const offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+        // Get the Layer account from wallet adapter or Keplr
+        let offlineSigner;
+        if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+            offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+        } else {
+            offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+        }
         const accounts = await offlineSigner.getAccounts();
         const layerAccount = accounts[0].address;
 
