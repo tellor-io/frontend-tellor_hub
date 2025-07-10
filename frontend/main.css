@@ -118,7 +118,7 @@ p {
     justify-content: center;
     align-items: flex-start;
     box-sizing: border-box;
-    min-height: 600px;
+    min-height: auto;
 }
 
 /* Update direction classes to maintain centering */
@@ -157,7 +157,7 @@ a {
     background-color: #003734;
     font-family: 'PPNeueMontreal-Book', monospace;  
     color: #eefffb;
-    padding: 10px 50px;
+    padding: 7px 50px;
     border: none;
     font-size: 15px;
     border-radius: 24px;
@@ -677,8 +677,8 @@ select.input-address option {
     display: flex;
     flex-direction: column;
     transition: all 0.3s ease-in-out;
-    min-height: 600px;
-    max-height: 600px;
+    min-height: 450px;
+    max-height: 450px;
     box-sizing: border-box;
     gap: 20px;
     overflow-y: auto;
@@ -978,6 +978,7 @@ input {
     scrollbar-width: thin;
     scrollbar-color: #083b44 #C4EDEB;
     height: calc(100% - 60px); /* Subtract header height */
+    max-height: 300px; /* Limit maximum height to prevent overflow */
     display: flex;
     flex-direction: column;
 }
@@ -1367,7 +1368,7 @@ input {
     transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
     opacity: 1;
     visibility: visible;
-    min-height: 600px;
+    min-height: 450px;
     max-height: 600px;
     position: relative;
     margin: 0;

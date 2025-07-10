@@ -312,16 +312,15 @@ const App = {
         
         // Update wallet buttons
         const truncatedAddress = `${App.account.substring(0, 6)}...${App.account.substring(App.account.length - 4)}`;
-        const walletName = connectionResult.walletName;
         
         const walletButton = document.getElementById('walletButton');
         const metamaskButton = document.getElementById('metamaskButton');
         
         if (walletButton) {
-            walletButton.innerHTML = `Disconnect ${walletName} <span class="truncated-address">(${truncatedAddress})</span>`;
+            walletButton.innerHTML = `Disconnect Ethereum Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
         }
         if (metamaskButton) {
-            metamaskButton.innerHTML = `Disconnect ${walletName} <span class="truncated-address">(${truncatedAddress})</span>`;
+            metamaskButton.innerHTML = `Disconnect Ethereum Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
         }
         
         // Update balances and limits
@@ -494,10 +493,10 @@ const App = {
         const metamaskButton = document.getElementById('metamaskButton');
         
         if (walletButton) {
-            walletButton.innerHTML = `Disconnect MetaMask <span class="truncated-address">(${truncatedAddress})</span>`;
+            walletButton.innerHTML = `Disconnect Ethereum Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
         }
         if (metamaskButton) {
-            metamaskButton.innerHTML = `Disconnect MetaMask <span class="truncated-address">(${truncatedAddress})</span>`;
+            metamaskButton.innerHTML = `Disconnect Ethereum Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
         }
         
         // Update balances and limits
@@ -559,16 +558,15 @@ const App = {
         
         // Update button text with wallet name and address
         const truncatedAddress = `${App.keplrAddress.substring(0, 6)}...${App.keplrAddress.substring(App.keplrAddress.length - 4)}`;
-        const walletDisplayName = connectionResult.walletName;
         
         const keplrButton = document.getElementById('keplrButton');
         const delegateKeplrButton = document.getElementById('delegateKeplrButton');
         
         if (keplrButton) {
-            keplrButton.innerHTML = `Disconnect ${walletDisplayName} <span class="truncated-address">(${truncatedAddress})</span>`;
+            keplrButton.innerHTML = `Disconnect Cosmos Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
         }
         if (delegateKeplrButton) {
-            delegateKeplrButton.innerHTML = `Disconnect ${walletDisplayName} <span class="truncated-address">(${truncatedAddress})</span>`;
+            delegateKeplrButton.innerHTML = `Disconnect Cosmos Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
         }
         
         // Update balance immediately after connection
@@ -678,10 +676,10 @@ const App = {
         const keplrButton = document.getElementById('keplrButton');
         const delegateKeplrButton = document.getElementById('delegateKeplrButton');
         if (keplrButton) {
-            keplrButton.innerHTML = `Disconnect Keplr <span class="truncated-address">(${truncatedAddress})</span>`;
+            keplrButton.innerHTML = `Disconnect Cosmos Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
         }
         if (delegateKeplrButton) {
-            delegateKeplrButton.innerHTML = `Disconnect Keplr <span class="truncated-address">(${truncatedAddress})</span>`;
+            delegateKeplrButton.innerHTML = `Disconnect Cosmos Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
         }
         
         // Update balance immediately after connection
@@ -880,18 +878,11 @@ const App = {
         
         App.isConnected = true;
         
-        // Get wallet name for display
-        let walletName = 'Ethereum Wallet';
-        if (window.ethereumWalletAdapter && window.ethereumWalletAdapter.isWalletConnected()) {
-            const status = window.ethereumWalletAdapter.getConnectionStatus();
-            walletName = status.walletName || 'Ethereum Wallet';
-        }
-        
         // Update the appropriate wallet button based on current direction
         if (this.currentBridgeDirection === 'layer') {
-            document.getElementById('walletButton').innerHTML = `Disconnect ${walletName} <span class="truncated-address">(${truncatedAddress})</span>`;
+            document.getElementById('walletButton').innerHTML = `Disconnect Ethereum Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
         } else {
-            document.getElementById('metamaskButton').innerHTML = `Disconnect ${walletName} <span class="truncated-address">(${truncatedAddress})</span>`;
+            document.getElementById('metamaskButton').innerHTML = `Disconnect Ethereum Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
         }
         
         App.setPageParams();
@@ -2944,6 +2935,12 @@ const App = {
     if (transactionsContainer) {
         transactionsContainer.classList.remove('active');
     }
+    
+    // Initially show frontend code link (since we start with layer direction)
+    const frontendCodeLink = document.querySelector('.frontend-code-link');
+    if (frontendCodeLink) {
+        frontendCodeLink.style.display = 'block';
+    }
 
     // Add click event listeners
     bridgeToLayerBtn.addEventListener('click', () => {
@@ -3008,6 +3005,12 @@ const App = {
     // Show/hide transactions container based on direction only
     if (transactionsContainer) {
         transactionsContainer.classList.toggle('active', direction === 'ethereum');
+    }
+    
+    // Hide frontend code link when ethereum direction is selected
+    const frontendCodeLink = document.querySelector('.frontend-code-link');
+    if (frontendCodeLink) {
+        frontendCodeLink.style.display = direction === 'ethereum' ? 'none' : 'block';
     }
 
     // Store the new direction
