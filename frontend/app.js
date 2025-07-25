@@ -68,7 +68,7 @@ const App = {
                             await App.connectMetaMask();
                         }
                     } catch (error) {
-                        console.error('MetaMask operation failed:', error);
+                        // console.error(...);
                         App.handleError(error);
                     }
                 });
@@ -85,7 +85,7 @@ const App = {
                             await App.connectMetaMask();
                         }
                     } catch (error) {
-                        console.error('MetaMask operation failed:', error);
+                        // console.error(...);
                         App.handleError(error);
                     }
                 });
@@ -102,7 +102,7 @@ const App = {
                             await App.connectKeplr();
                         }
                     } catch (error) {
-                        console.error('Keplr operation failed:', error);
+                        // console.error(...);
                         App.handleError(error);
                     }
                 });
@@ -121,7 +121,7 @@ const App = {
                             await App.connectKeplr();
                         }
                     } catch (error) {
-                        console.error('Keplr operation failed:', error);
+                        // console.error(...);
                         App.handleError(error);
                     }
                 });
@@ -130,11 +130,11 @@ const App = {
             resolve();
           })
           .catch(error => {
-            console.error("Error initializing app:", error);
+            // console.error(...);
             reject(error);
           });
       } catch (error) {
-        console.error("Initialization error:", error);
+        // console.error(...);
         reject(error);
       }
     });
@@ -179,9 +179,11 @@ const App = {
               App.disconnectMetaMask();
             };
 
-            const handleChainChanged = () => {
-              window.location.reload();
-            };
+                const handleChainChanged = () => {
+      // Prevent automatic page reload to avoid hosting issues
+      // window.location.reload();
+      App.handleError(new Error('Network changed. Please refresh manually if needed.'));
+    };
 
             const handleAccountsChanged = (accounts) => {
               App.handleAccountsChanged(accounts);
@@ -231,7 +233,7 @@ const App = {
         
         resolve();
       } catch (error) {
-        console.error("Error in initWeb3:", error);
+        // console.error(...);
         resolve();
       }
     });
@@ -246,7 +248,7 @@ const App = {
             return await this.connectMetaMaskLegacy();
         }
     } catch (error) {
-        console.error("Error connecting Ethereum wallet:", error);
+        // console.error(...);
         App.handleError(error);
         throw error;
     }
@@ -285,13 +287,13 @@ const App = {
         
         // Switch to Sepolia if needed
         if (App.chainId !== 11155111) {
-            console.log('Not on Sepolia, attempting to switch...');
+            // console.log(...);
             try {
                 await window.ethereumWalletAdapter.switchChain(11155111);
                 App.chainId = 11155111;
-                console.log('Switched to Sepolia');
+                // console.log(...);
             } catch (switchError) {
-                console.error('Failed to switch to Sepolia:', switchError);
+                // console.error(...);
                 alert('Please manually switch to Sepolia testnet in your wallet and try again.');
                 throw new Error('Failed to switch to Sepolia network');
             }
@@ -301,7 +303,7 @@ const App = {
         try {
             validateChainId(App.chainId);
         } catch (error) {
-            console.error('Chain validation error:', error);
+            // console.error(...);
             alert('Please connect to Sepolia (chain ID: 11155111). Mainnet support coming soon.');
             throw error;
         }
@@ -334,7 +336,7 @@ const App = {
         return connectionResult;
         
     } catch (error) {
-        console.error("Error connecting Ethereum wallet:", error);
+        // console.error(...);
         App.handleError(error);
         throw error;
     }
@@ -342,7 +344,7 @@ const App = {
 
   // Test function to verify Ethereum wallet connection
   testEthereumConnection: async function() {
-    console.log('=== App Ethereum Connection Test ===');
+    // console.log(...);
     console.log('App state:', {
       isConnected: this.isConnected,
       account: this.account,
@@ -354,21 +356,21 @@ const App = {
     if (this.isConnected && this.web3) {
       try {
         const balance = await this.web3.eth.getBalance(this.account);
-        console.log('App account balance:', this.web3.utils.fromWei(balance, 'ether'), 'ETH');
+        // console.log(...);
         
         // Test token balance if contracts are initialized
         if (this.contracts.Token) {
           const tokenBalance = await this.contracts.Token.methods.balanceOf(this.account).call();
-          console.log('Token balance:', this.web3.utils.fromWei(tokenBalance, 'ether'), 'TRB');
+          // console.log(...);
         }
         
         return true;
       } catch (error) {
-        console.error('Error in app connection test:', error);
+        // console.error(...);
         return false;
       }
     } else {
-      console.log('App not connected or Web3 not available');
+      // console.log(...);
       return false;
     }
   },
@@ -405,11 +407,11 @@ const App = {
         }
         
         App.chainId = chainId;
-        console.log('Current chain ID:', chainId);
+        // console.log(...);
         
         // If not on Sepolia, try to switch to it
         if (chainId !== 11155111) {
-            console.log('Not on Sepolia, attempting to switch...');
+            // console.log(...);
             try {
                 // Try to switch to Sepolia
                 await window.ethereum.request({
@@ -423,15 +425,15 @@ const App = {
                     chainId = parseInt(chainId, 16);
                 }
                 App.chainId = chainId;
-                console.log('Switched to chain ID:', chainId);
+                // console.log(...);
                 
             } catch (switchError) {
-                console.log('Switch error:', switchError);
+                // console.log(...);
                 
                 // If the network doesn't exist (error code 4902), add it
                 if (switchError.code === 4902) {
                     try {
-                        console.log('Adding Sepolia network...');
+                        // console.log(...);
                         await window.ethereum.request({
                             method: 'wallet_addEthereumChain',
                             params: [{
@@ -453,15 +455,15 @@ const App = {
                             chainId = parseInt(chainId, 16);
                         }
                         App.chainId = chainId;
-                        console.log('Added and switched to chain ID:', chainId);
+                        // console.log(...);
                         
                     } catch (addError) {
-                        console.error('Failed to add Sepolia network:', addError);
+                        // console.error(...);
                         alert('Please manually add Sepolia testnet to MetaMask and try again.');
                         throw new Error('Failed to add Sepolia network to MetaMask');
                     }
                 } else {
-                    console.error('Failed to switch to Sepolia:', switchError);
+                    // console.error(...);
                     alert('Please manually switch to Sepolia testnet in MetaMask and try again.');
                     throw new Error('Failed to switch to Sepolia network');
                 }
@@ -472,9 +474,9 @@ const App = {
         try {
             validateChainId(chainId);
         } catch (error) {
-            console.error('Chain validation error:', error);
-            console.error('Current chain ID:', chainId, 'Type:', typeof chainId);
-            console.error('Supported chain IDs:', Object.keys(SUPPORTED_CHAIN_IDS));
+            // console.error(...);
+            // console.error(...);
+            // console.error(...);
             alert('Please connect to Sepolia (chain ID: 11155111). Mainnet support coming soon.');
             throw error;
         }
@@ -507,7 +509,7 @@ const App = {
         
         App.setPageParams();
     } catch (error) {
-        console.error("Error connecting MetaMask:", error);
+        // console.error(...);
         App.handleError(error);
         throw error;
     }
@@ -522,7 +524,7 @@ const App = {
             return await this.connectKeplrLegacy();
         }
     } catch (error) {
-        console.error("Error connecting Cosmos wallet:", error);
+        // console.error(...);
         App.handleError(error);
         throw error;
     }
@@ -609,7 +611,7 @@ const App = {
                 await window.keplr.disable('layertest-4');
             }
         } catch (error) {
-            console.warn('Could not disable existing chain connection:', error);
+            // console.warn(...);
         }
 
         // Suggest the chain to the user
@@ -758,18 +760,18 @@ const App = {
 
         // Update page parameters
         App.setPageParams();
-        console.log('Ethereum wallet disconnected successfully');
+        // console.log(...);
     } catch (error) {
-        console.error('Error disconnecting Ethereum wallet:', error);
+        // console.error(...);
         App.handleError(error);
     }
   },
 
   disconnectKeplr: async function() {
     try {
-        console.log('Disconnecting Cosmos wallet...');
+        // console.log(...);
         if (!App.isKeplrConnected) {
-            console.log('Cosmos wallet already disconnected');
+            // console.log(...);
             return;
         }
 
@@ -783,7 +785,7 @@ const App = {
                     await window.keplr.disable('layertest-4');
                 }
             } catch (error) {
-                console.warn('Could not disable chain in Keplr:', error);
+                // console.warn(...);
             }
         }
 
@@ -797,11 +799,11 @@ const App = {
         const delegateKeplrButton = document.getElementById('delegateKeplrButton');
         if (keplrButton) {
             keplrButton.innerHTML = 'Connect Cosmos Wallet';
-            console.log('Updated Cosmos wallet button');
+            // console.log(...);
         }
         if (delegateKeplrButton) {
             delegateKeplrButton.innerHTML = 'Connect Cosmos Wallet';
-            console.log('Updated delegate Cosmos wallet button');
+            // console.log(...);
         }
 
         // Update balances
@@ -829,9 +831,9 @@ const App = {
 
         // Update page parameters
         App.setPageParams();
-        console.log('Cosmos wallet disconnected successfully');
+        // console.log(...);
     } catch (error) {
-        console.error('Error disconnecting Cosmos wallet:', error);
+        // console.error(...);
         App.handleError(error);
     }
   },
@@ -888,7 +890,7 @@ const App = {
         App.setPageParams();
         this.updateUIForCurrentDirection();
     } catch (error) {
-        console.error('Error in handleAccountsChanged:', error);
+        // console.error(...);
         App.handleError(error);
         await App.disconnectWallet();
     } finally {
@@ -924,7 +926,7 @@ const App = {
             await App.web3.eth.clearSubscriptions();
         }
     } catch (error) {
-        console.error('Error during wallet disconnection:', error);
+        // console.error(...);
         App.handleError(error);
     }
   },
@@ -941,7 +943,7 @@ const App = {
   },
 
   handleError: function(error) {
-    console.error("An error occurred:", error);
+    // console.error(...);
     alert("An error occurred. Please check the console for more details.");
   },
 
@@ -993,7 +995,7 @@ const App = {
         App.contracts.Bridge.options.address = address;
         return true;
     } catch (error) {
-        console.error("Bridge contract initialization error:", error);
+        // console.error(...);
         console.error("Error details:", {
             message: error.message,
             stack: error.stack,
@@ -1035,11 +1037,11 @@ const App = {
           App.contracts.Token.options.address = address;
           resolve();
         } catch (error) {
-          console.error("Token contract initialization error:", error);
+          // console.error(...);
           reject(error);
         }
       }).fail(function(error) {
-        console.error("Failed to load Token ABI:", error);
+        // console.error(...);
         reject(error);
       });
     });
@@ -1064,12 +1066,12 @@ const App = {
         if (depositLimitElement) {
             depositLimitElement.textContent = readableLimit + ' TRB';
         } else {
-            console.warn("depositLimit element not found in DOM");
+            // console.warn(...);
         }
 
         return readableLimit;
     } catch (error) {
-        console.error("Failed to fetch DepositLimit:", error);
+        // console.error(...);
         throw error;
     }
   },
@@ -1089,13 +1091,13 @@ const App = {
         document.getElementById('depositButton').disabled = false;
         // Always fetch deposit limit in Layer section
         App.fetchDepositLimit().catch(error => {
-          console.error("Error fetching deposit limit:", error);
+          // console.error(...);
         });
       }
       // Update MetaMask balance if connected
       if (App.isConnected) {
         App.updateBalance().catch(error => {
-          console.error("Error updating MetaMask balance:", error);
+          // console.error(...);
         });
       }
     } else {
@@ -1103,13 +1105,13 @@ const App = {
       if (App.isConnected) {
         // Update MetaMask balance
         App.updateBalance().catch(error => {
-          console.error("Error updating MetaMask balance:", error);
+          // console.error(...);
         });
       }
       if (App.isKeplrConnected) {
         // Update Keplr balance
         App.updateKeplrBalance().catch(error => {
-          console.error("Error updating Keplr balance:", error);
+          // console.error(...);
         });
         document.getElementById('withdrawButton').disabled = false;
       }
@@ -1163,7 +1165,7 @@ const App = {
             delegateKeplrBalanceElement.textContent = `${readableBalance} TRB`;
         }
     } catch (error) {
-        console.error("Error fetching Cosmos wallet balance:", error);
+        // console.error(...);
         // Set Cosmos wallet balances to 0 on error (excluding currentBalance which is for MetaMask)
         const ethKeplrBalanceElement = document.getElementById("ethKeplrBalance");
         const delegateKeplrBalanceElement = document.getElementById("delegateKeplrBalance");
@@ -1209,7 +1211,7 @@ const App = {
       })
       .catch(function(error) {
         App.hidePendingPopup();
-        console.error("Error in approval", error);
+        // console.error(...);
         alert("Error in approval. Please try again.");
       });
   },
@@ -1321,7 +1323,7 @@ const App = {
         App.showSuccessPopup("Deposit to layer successful! You will need to wait 12 hours before you can claim your tokens on Tellor Layer.", txHash, 'ethereum');
     } catch (error) {
         App.hidePendingPopup();
-        console.error("Error in depositing to layer:", error);
+        // console.error(...);
         alert(error.message || "Error in depositing to layer. Please try again.");
     }
   },
@@ -1388,7 +1390,7 @@ const App = {
         // Convert to USD (divide by 1e18 since the value is in wei)
         trbPrice = Number(decimalValue) / 1e18;
       } catch (error) {
-        console.warn('Error fetching TRB price from Tellor Layer:', error);
+        // console.warn(...);
         trbPrice = 0.5; // Default value in USD
       }
     }
@@ -1423,15 +1425,17 @@ const App = {
         clearInterval(priceUpdateInterval);
       } else {
     updateTrbPrice();
-        priceUpdateInterval = setInterval(updateTrbPrice, 60000);
+        // Reduce polling frequency to avoid hosting issues
+        priceUpdateInterval = setInterval(updateTrbPrice, 300000); // 5 minutes instead of 1 minute
       }
     });
 
     // Initial price fetch
     updateTrbPrice().catch(error => {
-      console.warn('Initial TRB price fetch failed:', error);
+      // // console.warn(...);
     });
-    priceUpdateInterval = setInterval(updateTrbPrice, 60000);
+    // Reduce polling frequency to avoid hosting issues
+    priceUpdateInterval = setInterval(updateTrbPrice, 300000); // 5 minutes instead of 1 minute
 
     // Add event listeners to both input fields
     stakeAmountInput.addEventListener('input', updateTooltip);
@@ -1518,7 +1522,7 @@ const App = {
     }
 
     if (!App.account || !App.contracts.Token || !App.contracts.Bridge) {
-      console.error('Wallet not connected or contracts not initialized');
+      // console.error(...);
       return '0';
     }
 
@@ -1529,7 +1533,7 @@ const App = {
       ).call();
       return allowance;
     } catch (error) {
-      console.error('Error fetching allowance:', error);
+      // console.error(...);
       return '0';
     }
   },
@@ -1553,7 +1557,7 @@ const App = {
             ethBalanceElement.textContent = `${formattedBalance} TRB`;
         }
     } catch (error) {
-        console.error("Error fetching balance:", error);
+        // console.error(...);
         // Set both balances to 0 on error
         const layerBalanceElement = document.getElementById("currentBalance");
         const ethBalanceElement = document.getElementById("ethMetaMaskBalance");
@@ -1606,7 +1610,7 @@ const App = {
             offlineSigner
         );
 
-        console.log('Created stargate client with RPC URL:', client.rpcUrl);
+        // console.log(...);
 
         // Create the message - using the same format as the successful transaction
         const msg = {
@@ -1624,7 +1628,7 @@ const App = {
         App.showPendingPopup("Withdrawal transaction pending...");
 
         // Sign and broadcast using direct signing
-        console.log('About to sign and broadcast with message:', msg);
+        // console.log(...);
         console.log('Message details:', {
             creator: msg.value.creator,
             recipient: msg.value.recipient,
@@ -1650,11 +1654,11 @@ const App = {
             'Withdraw TRB to Ethereum'
         );
 
-        console.log('Withdrawal result:', result);
-        console.log('Result type:', typeof result);
-        console.log('Result keys:', Object.keys(result));
+        // console.log(...);
+        // console.log(...);
+        // console.log(...);
 
-        console.log('Hiding pending popup');
+        // console.log(...);
         App.hidePendingPopup();
         
         if (result && result.code === 0) {
@@ -1674,13 +1678,13 @@ const App = {
             });
             
             if (!txHash) {
-                console.error('No transaction hash found in result:', result);
+                // console.error(...);
                 App.showErrorPopup("Transaction successful but no hash found. Please check your wallet.");
                 return result;
             }
             
-            console.log('Transaction hash:', txHash);
-            console.log('Full result object:', result);
+            // console.log(...);
+            // console.log(...);
             
             // Try different hash formats for the explorer
             const hashFormats = [
@@ -1701,8 +1705,8 @@ const App = {
                 `https://testnet.palmito.tellorlayer.com/txs/`
             ];
             
-            console.log('Hash formats to try:', hashFormats);
-            console.log('Explorer URLs to try:', explorerUrls.map(base => hashFormats.map(h => base + h)).flat());
+            // console.log(...);
+            // console.log(...);
             
             // Wait a moment for transaction to be indexed
             await new Promise(resolve => setTimeout(resolve, 2000));
@@ -1713,22 +1717,22 @@ const App = {
                 const verifyResponse = await fetch(`https://node-palmito.tellorlayer.com/cosmos/tx/v1beta1/txs/${txHash}`);
                 if (verifyResponse.ok) {
                     const verifyData = await verifyResponse.json();
-                    console.log('Transaction verification:', verifyData);
+                    // console.log(...);
                     if (verifyData.tx_response && verifyData.tx_response.code === 0) {
-                        console.log('Transaction confirmed on blockchain');
+                        // console.log(...);
                         transactionConfirmed = true;
                         
                         // Check for withdrawal-specific events
                         const events = verifyData.tx_response.events || [];
                         const withdrawEvent = events.find(event => event.type === 'tokens_withdrawn');
                         if (withdrawEvent) {
-                            console.log('Withdrawal event found:', withdrawEvent);
+                            // console.log(...);
                         } else {
-                            console.warn('No withdrawal event found in successful transaction');
+                            // console.warn(...);
                         }
                     } else {
-                        console.log('Transaction verification failed - checking alternative endpoints');
-                        console.warn('Transaction not found or failed on blockchain');
+                        // console.log(...);
+                        // console.warn(...);
                         console.log('Transaction error details:', {
                             code: verifyData.tx_response?.code,
                             raw_log: verifyData.tx_response?.raw_log,
@@ -1747,26 +1751,26 @@ const App = {
                                 const altResponse = await fetch(endpoint);
                                 if (altResponse.ok) {
                                     const altData = await altResponse.json();
-                                    console.log(`Alternative endpoint ${endpoint} result:`, altData);
+                                    // console.log(...);
                                     if (altData.tx_response && altData.tx_response.code === 0) {
                                         transactionConfirmed = true;
-                                        console.log('Transaction confirmed via alternative endpoint');
+                                        // console.log(...);
                                     }
                                     break;
                                 }
                             } catch (altError) {
-                                console.warn(`Alternative endpoint ${endpoint} failed:`, altError);
+                                // console.warn(...);
                             }
                         }
                     }
                 } else {
-                    console.warn('Could not verify transaction on blockchain');
+                    // console.warn(...);
                 }
             } catch (error) {
-                console.warn('Error verifying transaction:', error);
+                // console.warn(...);
             }
             
-            console.log('Transaction verification completed. transactionConfirmed:', transactionConfirmed);
+            // console.log(...);
         
         // Simplify success handling to match the working requestAttestation pattern
         if (result && result.code === 0) {
@@ -1783,7 +1787,7 @@ const App = {
             throw new Error(result?.rawLog || result?.raw_log || "Withdrawal failed");
         }
     } catch (error) {
-        console.error('Withdrawal error:', error);
+        // console.error(...);
         App.hidePendingPopup();
         App.showErrorPopup(error.message || "Error withdrawing tokens. Please try again.");
         throw error;
@@ -1840,7 +1844,7 @@ const App = {
         });
 
         if (!response.ok) {
-            console.error('Failed to fetch last withdrawal ID:', response.status);
+            // console.error(...);
             return [];
         }
 
@@ -1911,7 +1915,7 @@ const App = {
 
         return withdrawals;
     } catch (error) {
-        console.error('Error in getWithdrawalHistory:', error);
+        // console.error(...);
         return [];
     }
   },
@@ -1952,7 +1956,7 @@ const App = {
             parsed: this.parseWithdrawalData(data.aggregate.aggregate_value)
         };
     } catch (error) {
-        console.error('Error in fetchWithdrawalData:', error);
+        // console.error(...);
         // Retry on network errors or if we haven't exceeded retry limit
         if (retryCount < 3 && (error.message.includes('NetworkError') || error.message.includes('Failed to fetch'))) {
             await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // Exponential backoff
@@ -1984,7 +1988,7 @@ const App = {
             tip
         };
     } catch (error) {
-        console.error('Error parsing withdrawal data:', error);
+        // console.error(...);
         return null;
     }
   },
@@ -1996,7 +2000,7 @@ const App = {
 
         const tableBody = document.querySelector('#withdrawal-history tbody');
         if (!tableBody) {
-            console.error('Transaction history table body not found');
+            // console.error(...);
             return;
         }
 
@@ -2154,11 +2158,11 @@ const App = {
                 `;
                 tableBody.appendChild(row);
             } catch (error) {
-                console.error('Error formatting transaction:', tx, error);
+                // console.error(...);
             }
         }
     } catch (error) {
-        console.error('Error updating transaction history:', error);
+        // console.error(...);
         const tableBody = document.querySelector('#withdrawal-history tbody');
         if (tableBody) {
             tableBody.innerHTML = `
@@ -2233,7 +2237,7 @@ const App = {
                 throw new Error('No wallet available');
             }
         } catch (error) {
-            console.error('Wallet not enabled for chain:', error);
+            // console.error(...);
             App.isKeplrConnected = false;
             App.keplrAddress = null;
             const keplrButton = document.getElementById('keplrButton');
@@ -2304,7 +2308,7 @@ const App = {
             throw new Error(result?.rawLog || "Delegation failed");
         }
     } catch (error) {
-        console.error('Error delegating tokens:', error);
+        // console.error(...);
         App.hidePendingPopup();
         App.showErrorPopup(error.message || "Error delegating tokens. Please try again.");
         
@@ -2337,7 +2341,7 @@ const App = {
                 throw new Error('No wallet available');
             }
         } catch (error) {
-            console.error('Wallet not enabled for chain:', error);
+            // console.error(...);
             App.isKeplrConnected = false;
             App.keplrAddress = null;
             const keplrButton = document.getElementById('keplrButton');
@@ -2410,7 +2414,7 @@ const App = {
             throw new Error(result?.rawLog || "Transaction failed");
         }
     } catch (error) {
-        console.error('Error requesting attestation:', error);
+        // console.error(...);
         App.hidePendingPopup();
         App.showErrorPopup(error.message || "Error requesting attestation. Please try again.");
         
@@ -2437,7 +2441,7 @@ const App = {
                 
                 // Check if validator has required fields
                 if (!validator.addr || !validator.power) {
-                    console.error('Invalid validator structure:', validator);
+                    // console.error(...);
                     throw new Error(`Invalid validator at index ${i}: missing required fields`);
                 }
 
@@ -2445,13 +2449,13 @@ const App = {
                 try {
                     ethers.utils.getAddress(validator.addr);
                 } catch (e) {
-                    console.error('Invalid validator address:', validator.addr);
+                    // console.error(...);
                     throw new Error(`Invalid validator at index ${i}: invalid address format`);
                 }
 
                 // Validate power is a positive number
                 if (!ethers.BigNumber.from(validator.power).gt(0)) {
-                    console.error('Invalid validator power:', validator.power);
+                    // console.error(...);
                     throw new Error(`Invalid validator at index ${i}: power must be positive`);
                 }
             }
@@ -2485,7 +2489,7 @@ const App = {
                 throw new Error(`Bridge is not active. Current state: ${bridgeState}`);
             }
         } catch (error) {
-            console.error('Validation error:', error);
+            // console.error(...);
             throw error;
         }
     },
@@ -2516,7 +2520,7 @@ const App = {
 
         // Get the timestamp from the withdrawal data
         const withdrawalTimestamp = withdrawalData.raw.timestamp;
-        console.log('Withdrawal timestamp:', withdrawalTimestamp);
+        // console.log(...);
 
         // Fetch attestation data with the withdrawal timestamp
         const attestationData = await this.fetchAttestationData(
@@ -2546,13 +2550,13 @@ const App = {
         ).send({ from: App.account });
 
         txHash = tx.transactionHash;
-        console.log('Withdrawal claim transaction:', tx);
+        // console.log(...);
         App.showSuccessPopup("Withdrawal claimed successfully!", txHash, 'ethereum');
         await this.updateWithdrawalHistory();
         return tx;
 
     } catch (error) {
-        console.error('Error claiming withdrawal:', error);
+        // console.error(...);
         // Get transaction hash from error if available
         if (error.transactionHash) {
             txHash = error.transactionHash;
@@ -2586,7 +2590,7 @@ const App = {
 
         if (!snapshotsResponse.ok) {
             const errorText = await snapshotsResponse.text();
-            console.error('Snapshots response error:', { status: snapshotsResponse.status, text: errorText });
+            // console.error(...);
             throw new Error(`Failed to fetch snapshots: ${errorText}`);
         }
 
@@ -2766,7 +2770,7 @@ const App = {
             rawAttestationData: rawAttestationData  // Include raw data for debugging
         };
     } catch (error) {
-        console.error('Error in fetchAttestationData:', error);
+        // console.error(...);
         throw error;
     }
   },
@@ -2784,7 +2788,7 @@ const App = {
     
     // Get message hash using ethers - this matches Python's sha256(data).digest()
     const messageHash = ethers.utils.sha256(ethers.utils.arrayify(checkpointHex));
-    console.log('Message hash for signature recovery:', messageHash);
+    // console.log(...);
     
     const zeroBytes = '0x0000000000000000000000000000000000000000000000000000000000000000';
     
@@ -2808,7 +2812,7 @@ const App = {
         }
 
         if (signature.length !== 128) {
-            console.error(`Invalid signature length at index ${i}:`, signature.length);
+            // console.error(...);
             derivedSignatures.push({
                 v: 0,
                 r: zeroBytes,
@@ -2835,7 +2839,7 @@ const App = {
                     break;
                 }
             } catch (error) {
-                console.error(`Error recovering address for v=${v}:`, error);
+                // console.error(...);
             }
         }
 
@@ -2920,7 +2924,7 @@ const App = {
     const transactionsContainer = document.getElementById('bridgeTransactionsContainer');
 
     if (!bridgeToLayerBtn || !bridgeToEthBtn || !delegateBtn || !bridgeToLayerSection || !bridgeToEthSection || !delegateSection) {
-        console.error('Bridge direction UI elements not found');
+        // console.error(...);
         return;
     }
 
@@ -2964,7 +2968,7 @@ const App = {
 
   switchBridgeDirection: function(direction) {
     if (direction !== 'layer' && direction !== 'ethereum' && direction !== 'delegate') {
-        console.error('Invalid bridge direction:', direction);
+        // console.error(...);
         return;
     }
 
@@ -2978,7 +2982,7 @@ const App = {
     const boxWrapper = document.querySelector('.box-wrapper');
 
     if (!bridgeToLayerBtn || !bridgeToEthBtn || !delegateBtn || !bridgeToLayerSection || !bridgeToEthSection || !delegateSection) {
-        console.error('Bridge direction UI elements not found');
+        // console.error(...);
         return;
     }
 
@@ -3022,12 +3026,12 @@ const App = {
     // Update balances when switching directions
     if (App.isConnected) {
         App.updateBalance().catch(error => {
-            console.error("Error updating MetaMask balance:", error);
+            // console.error(...);
         });
     }
     if (App.isKeplrConnected) {
         App.updateKeplrBalance().catch(error => {
-            console.error("Error updating Keplr balance:", error);
+            // console.error(...);
         });
     }
     
@@ -3100,7 +3104,7 @@ const App = {
         jailed: validator.jailed || false
       }));
     } catch (error) {
-      console.error('Error fetching validators:', error);
+      // console.error(...);
       throw error;
     }
   },
@@ -3110,7 +3114,7 @@ const App = {
     try {
       const dropdown = document.getElementById('delegateValidatorDropdown');
       if (!dropdown) {
-        console.error('Validator dropdown not found');
+        // console.error(...);
         return;
       }
       
@@ -3161,7 +3165,7 @@ const App = {
           try {
             await App.populateValidatorDropdown();
           } catch (error) {
-            console.error('Error refreshing validators:', error);
+            // console.error(...);
           } finally {
             this.disabled = false;
             this.textContent = '↻';
@@ -3170,7 +3174,7 @@ const App = {
       }
       
     } catch (error) {
-      console.error('Error populating validator dropdown:', error);
+      // console.error(...);
       const dropdown = document.getElementById('delegateValidatorDropdown');
       if (dropdown) {
         dropdown.innerHTML = '<option value="">Error loading validators</option>';
@@ -3201,11 +3205,11 @@ $(function () {
         try {
             // Initialize app
             App.init().catch(error => {
-                console.error('Failed to initialize app:', error);
+                // console.error(...);
                 App.handleError(error);
             });
         } catch (error) {
-            console.error('App initialization failed:', error);
+            // console.error(...);
             // Show user-friendly error message but keep button enabled
             const walletButton = document.getElementById("walletButton");
             if (walletButton) {
@@ -3237,7 +3241,7 @@ async function checkBalance(amount) {
     }
     return true;
   } catch (error) {
-    console.error("Error checking balance:", error);
+    // console.error(...);
     return false;
   }
 }
