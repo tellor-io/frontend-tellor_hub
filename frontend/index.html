@@ -22,7 +22,8 @@
     </script>
 
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <!-- Removed CryptoJS to avoid hosting security flags -->
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script> -->
     <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js" type="application/javascript"></script>
   </head>
 
@@ -30,8 +31,8 @@
     <header>
       <div class="top-right">
       </div>
-      <h1 style="display: flex; align-items: center; justify-content: center; margin: 0; padding: 32px 0 0 0;">
-        <img src="bridge-title.png" alt="Bridge Title" style="max-width:600px;width:100%;height:auto;display:block;margin:0 auto;">
+      <h1 style="display: flex; align-items: center; justify-content: center; margin: 0; padding: 12px 0 0 0;">
+        <img src="bridge-title.png" alt="Bridge Title" style="max-width:500px;width:100%;height:auto;display:block;margin:0 auto;">
       </h1>
       <div class="disclaimer">*Sepolia Test Network Only*</div>
     </header>
@@ -39,25 +40,28 @@
       <div class="main-content">
         <div class="bridge-buttons-container">
           <div class="bridge-direction-selector">
-            <button id="bridgeToLayerBtn" class="bridge-direction-btn active">Bridge to Layer</button>
+            <button id="bridgeToLayerBtn" class="bridge-direction-btn active">Bridge to Tellor</button>
             <button id="bridgeToEthBtn" class="bridge-direction-btn">Bridge to Ethereum</button>
+            <button id="delegateBtn" class="bridge-direction-btn">Delegate Tokens</button>
           </div>
 
           <!-- Bridge to Layer Section -->
           <div id="bridgeToLayerSection" class="bridge-section active">
             <w3m-button></w3m-button>
-            <button id="walletButton" class="button-style-2" disabled>Connect MetaMask</button>
+            <button id="walletButton" class="button-style-1" disabled>Connect MetaMask</button>
             <div class="balance-info">
               <p class="info-text">(Current Balance: <span id="currentBalance">0 TRB</span>)</p>
-              <p class="info-text">(Deposit limit: <span id="depositLimit"></span>)</p>
             
               <div class="input-button-container">
                 <div class="input-with-label">
                   <span class="input-label">TRB</span>
                   <input class="input" type="text" id="stakeAmount" placeholder="0" />
                 </div>
+               
               </div>
-
+              <div class="Deposit-limit">
+                <p class="info-text">(Deposit limit: <span id="depositLimit"></span>)</p>
+              </div>
               <div class="input-button-container">
                 <div class="input-with-label">
                   <input class="input-address" type="text" id="_queryId" placeholder="To address (e.g. tellor1py3fs...)" />
@@ -81,7 +85,7 @@
                     <p class="info-text">(Balance: <span id="ethMetaMaskBalance">0 TRB</span>)</p>
                 </div>
                 <div class="wallet-button-group">
-                    <button id="keplrButton" class="button-style-2" disabled>Connect Keplr</button>
+                    <button id="keplrButton" class="button-style-2" disabled>Connect Cosmos Wallet</button>
                     <p class="info-text">(Balance: <span id="ethKeplrBalance">0 TRB</span>)</p>
                 </div>
             </div>
@@ -105,9 +109,43 @@
                 </div>
             </div>
           </div>
-          <a target="_blank" href="https://github.com/tellor-io/frontend-layerbridgebutton">Front-End code</a>
+
+          <!-- Delegate Section -->
+          <div id="delegateSection" class="bridge-section">
+            <div class="wallet-disclaimer">*Please connect your Cosmos wallet to delegate tokens*</div>
+            <div class="wallet-connection-container">
+                <div class="wallet-button-group">
+                    <button id="delegateKeplrButton" class="button-style-3" disabled>Connect Cosmos Wallet</button>
+                    <p class="info-text">(Balance: <span id="delegateKeplrBalance">0 TRB</span>)</p>
+                </div>
+            </div>
+            <div class="balance-info">
+                <div class="input-button-container">
+                    <div class="input-with-label">
+                        <span class="input-label">TRB</span>
+                        <input class="input" type="text" id="delegateStakeAmount" placeholder="0" />
+                    </div>
+                </div>
+
+                <div class="input-button-container">
+                    <div class="input-with-label">
+                        <select class="input-address" id="delegateValidatorDropdown">
+                            <option value="">Select a validator...</option>
+                        </select>
+                        <input type="hidden" id="delegateValidatorAddress" />
+                        <button type="button" id="refreshValidatorsBtn" class="refresh-btn" title="Refresh validator list">↻</button>
+                        <span class="info-icon" data-tooltip="Select a validator from the list to delegate your tokens to">ⓘ</span>
+                    </div>
+                </div>
+
+                <div class="bridge-direction">
+                    <button id="delegateButton" class="button-style-3" onclick="App.delegateTokens()">Delegate Tokens</button>
+                </div>
+            </div>
+          </div>
         </div>
       </div>
+      <a target="_blank" href="https://github.com/tellor-io/frontend-layerbridgebutton" class="frontend-code-link">Front-End code</a>
       <div id="bridgeTransactionsContainer" class="transactions-container">
         <div class="history-header">
           <h3>Withdrawal Transactions</h3>
@@ -141,7 +179,7 @@
       </footer>
     </div>
     <script src="./extensions/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.7.4/web3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.10.0/web3.min.js"></script>
     <!-- Load app.js as a module only once -->
     <script type="module">
       // Define a global variable to track CosmJS loading
@@ -200,10 +238,44 @@
         }
       }
 
-      // Load CosmJS and then initialize the app
-      loadCosmJS()
-        .then(success => {
-          if (!success) {
+      // Function to load wallet adapter scripts
+      async function loadWalletAdapters() {
+        try {
+          const scripts = [
+            './js/walletAdapter.js',
+            './js/walletModal.js',
+            './js/ethereumWalletAdapter.js',
+            './js/ethereumWalletModal.js'
+          ];
+
+          // Load scripts sequentially
+          for (const src of scripts) {
+            await loadScript(src);
+          }
+
+          // Verify wallet adapters are loaded
+          if (typeof window.cosmosWalletAdapter === 'undefined') {
+            console.warn('Cosmos wallet adapter not loaded - falling back to Keplr-only mode');
+          }
+          
+          if (typeof window.ethereumWalletAdapter === 'undefined') {
+            console.warn('Ethereum wallet adapter not loaded - falling back to MetaMask-only mode');
+          }
+
+          return true;
+        } catch (error) {
+          console.error('Error loading wallet adapters:', error);
+          return false;
+        }
+      }
+
+      // Load CosmJS and wallet adapters, then initialize the app
+      Promise.all([
+        loadCosmJS(),
+        loadWalletAdapters()
+      ])
+        .then(([cosmjsSuccess, adapterSuccess]) => {
+          if (!cosmjsSuccess) {
             throw new Error('Failed to load CosmJS');
           }
           
@@ -252,13 +324,15 @@
         // Add tab switch handlers
         const bridgeToLayerBtn = document.getElementById('bridgeToLayerBtn');
         const bridgeToEthBtn = document.getElementById('bridgeToEthBtn');
+        const delegateBtn = document.getElementById('delegateBtn');
         
         bridgeToLayerBtn.addEventListener('click', hideAllTooltips);
         bridgeToEthBtn.addEventListener('click', hideAllTooltips);
+        delegateBtn.addEventListener('click', hideAllTooltips);
         
         infoIcons.forEach(icon => {
-            // Only add tooltip functionality to the icon in the Bridge to Layer section
-            if (icon.closest('#bridgeToLayerSection')) {
+            // Add tooltip functionality to icons in the Bridge to Layer section and Delegate section
+            if (icon.closest('#bridgeToLayerSection') || icon.closest('#delegateSection')) {
                 const tooltip = document.createElement('div');
                 tooltip.className = 'tooltip';
                 tooltip.innerHTML = icon.getAttribute('data-tooltip');
@@ -266,8 +340,9 @@
                 
                 // Show tooltip on hover
                 icon.addEventListener('mouseenter', function(e) {
-                    // Only show tooltip if we're in the Bridge to Layer section
-                    if (!document.getElementById('bridgeToLayerSection').classList.contains('active')) {
+                    // Only show tooltip if we're in the Bridge to Layer section or Delegate section
+                    if (!document.getElementById('bridgeToLayerSection').classList.contains('active') && 
+                        !document.getElementById('delegateSection').classList.contains('active')) {
                         return;
                     }
                     
@@ -312,8 +387,9 @@
                 
                 // Also handle click for mobile devices
                 icon.addEventListener('click', function(e) {
-                    // Only show tooltip if we're in the Bridge to Layer section
-                    if (!document.getElementById('bridgeToLayerSection').classList.contains('active')) {
+                    // Only show tooltip if we're in the Bridge to Layer section or Delegate section
+                    if (!document.getElementById('bridgeToLayerSection').classList.contains('active') && 
+                        !document.getElementById('delegateSection').classList.contains('active')) {
                         return;
                     }
                     
@@ -371,7 +447,8 @@
             document.querySelectorAll('.tooltip').forEach(tooltip => {
                 if (tooltip.style.display === 'block') {
                     const icon = document.querySelector('.info-icon[data-tooltip="' + tooltip.innerHTML + '"]');
-                    if (icon && document.getElementById('bridgeToLayerSection').classList.contains('active')) {
+                    if (icon && (document.getElementById('bridgeToLayerSection').classList.contains('active') || 
+                                document.getElementById('delegateSection').classList.contains('active'))) {
                         const iconRect = icon.getBoundingClientRect();
                         const tooltipRect = tooltip.getBoundingClientRect();
                         
@@ -404,7 +481,11 @@
           const amount = parseFloat(this.value) || 0;
           const approveButton = document.getElementById('approveButton');
           const depositButton = document.getElementById('depositButton');
-          hideBalanceErrorPopup();
+          
+          // Check if App is available and has the function
+          if (window.App && window.App.hideBalanceErrorPopup) {
+            window.App.hideBalanceErrorPopup();
+          }
           
           if (amount > 0) {
             const hasBalance = await checkBalance(amount);
@@ -417,6 +498,27 @@
           
           checkAllowance();
         });
+
+        async function checkBalance(amount) {
+          // Check if App is available and has the function
+          if (window.App && window.App.checkBalance) {
+            return await window.App.checkBalance(amount);
+          }
+          
+          // Fallback implementation
+          try {
+            if (!window.App || !window.App.isConnected) {
+              return false;
+            }
+            
+            const balance = await window.App.contracts.Token.methods.balanceOf(window.App.account).call();
+            const balanceInEther = window.App.web3.utils.fromWei(balance, 'ether');
+            return parseFloat(balanceInEther) >= amount;
+          } catch (error) {
+            console.error('Error checking balance:', error);
+            return false;
+          }
+        }
 
         async function checkAllowance() {
           const approveButton = document.getElementById('approveButton');
@@ -458,6 +560,13 @@
             approveButton.disabled = true;
             depositButton.disabled = true;
           }
+        }
+
+        // Hide all tooltips function
+        function hideAllTooltips() {
+          document.querySelectorAll('.tooltip').forEach(tooltip => {
+            tooltip.style.display = 'none';
+          });
         }
 
         // Initial checks

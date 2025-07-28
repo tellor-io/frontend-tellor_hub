@@ -118,12 +118,13 @@ p {
     justify-content: center;
     align-items: flex-start;
     box-sizing: border-box;
-    min-height: 600px;
+    min-height: auto;
 }
 
 /* Update direction classes to maintain centering */
 .box-wrapper.layer-direction,
-.box-wrapper.ethereum-direction {
+.box-wrapper.ethereum-direction,
+.box-wrapper.delegate-direction {
     justify-content: center;
 }
 
@@ -156,9 +157,9 @@ a {
     background-color: #003734;
     font-family: 'PPNeueMontreal-Book', monospace;  
     color: #eefffb;
-    padding: 10px 50px;
+    padding: 7px 50px;
     border: none;
-    font-size: 20px;
+    font-size: 15px;
     border-radius: 24px;
     cursor: pointer;
     text-align: center;
@@ -256,7 +257,7 @@ a {
     color: #eefffb;
     padding: 10px 50px;
     border: none;
-    font-size: 20px;
+    font-size: 15px;
     border-radius: 24px;
     cursor: pointer;
     text-align: center;
@@ -414,18 +415,109 @@ input:not(:placeholder-shown) {
 .input-address {
     font-size: 20px !important;
     padding: 10px !important;
-    width: 400px !important;
+    width: 100% !important;
+    max-width: 400px !important;
     color: #008D8B !important;
     border: 1px solid #7FAFB1 !important;
     border-radius: 12px !important;
     background-color: #f0f0f0 !important;
-    height: 43px !important;
+    height: 45px !important;
     box-sizing: border-box !important;
     margin-top: 12px !important;
+    line-height: 1.2 !important;
 }
 
 .input-address:not(:placeholder-shown) {
     color: #008D8B !important;
+}
+
+/* Style for select dropdowns */
+select.input-address {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23008D8B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 16px;
+    padding-right: 45px !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+}
+
+select.input-address:disabled {
+    background-color: #f5f5f5 !important;
+    color: #999 !important;
+    cursor: not-allowed;
+}
+
+select.input-address option {
+    background-color: #eefffb;
+    color: #003734;
+    padding: 8px;
+    white-space: normal;
+    word-wrap: break-word;
+}
+
+/* Refresh button for validator dropdown */
+.refresh-btn {
+    position: absolute;
+    right: 40px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #008D8B;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 3px;
+    transition: all 0.3s ease;
+    z-index: 3;
+}
+
+/* Specific styling for delegate section to ensure proper width */
+#delegateSection .input-button-container {
+    max-width: 340px;
+    padding-right: 35px;
+}
+
+#delegateSection .input-address {
+    max-width: 340px !important;
+}
+
+/* Ensure all sections with info icons have proper spacing */
+.input-button-container:has(.info-icon) {
+    padding-right: 35px;
+}
+
+/* Specific styling for bridge to layer section */
+#bridgeToLayerSection .input-button-container:has(.info-icon) {
+    max-width: 340px;
+}
+
+/* Specific styling for bridge to ethereum section */
+#bridgeToEthSection .input-button-container:has(.info-icon) {
+    max-width: 340px;
+}
+
+/* Fallback for browsers that don't support :has() */
+#bridgeToLayerSection .input-button-container,
+#bridgeToEthSection .input-button-container,
+#delegateSection .input-button-container {
+    padding-right: 0px;
+    max-width: 340px;
+}
+
+.refresh-btn:hover {
+    background-color: #e0e0e0;
+    color: #003734;
+}
+
+.refresh-btn:active {
+    transform: translateY(-50%) scale(0.95);
 }
 
 .deposit-limit {
@@ -441,13 +533,21 @@ input:not(:placeholder-shown) {
   }
   .info-icon {
     position: absolute;
-    right: -25px;
+    right: -30px;
     top: 50%;
     transform: translateY(-50%);
     cursor: pointer;
     color: #165863;
     font-size: 16px;
     z-index: 2;
+    background-color: #f0f0f0;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
 }
 
 /* Hide info icon in Bridge to Ethereum section */
@@ -497,9 +597,57 @@ input:not(:placeholder-shown) {
 
 @media (max-width: 400px) {
     h1 {
-
         font-size: clamp(13px, 6vw, 35px); /* Fluid typography */
-       
+    }
+    
+    select.input-address {
+        font-size: 14px !important;
+        padding: 8px !important;
+        padding-right: 40px !important;
+        padding-top: 10px !important;
+        padding-bottom: 10px !important;
+    }
+    
+    .refresh-btn {
+        right: 35px;
+        font-size: 14px;
+    }
+    
+    .info-icon {
+        right: -25px;
+        width: 18px;
+        height: 18px;
+        font-size: 14px;
+    }
+    
+    #delegateSection .input-button-container {
+        max-width: 300px;
+        padding-right: 25px;
+    }
+    
+    #delegateSection .input-address {
+        max-width: 300px !important;
+    }
+    
+    /* Mobile spacing for all sections with info icons */
+    .input-button-container:has(.info-icon) {
+        padding-right: 25px;
+    }
+    
+    #bridgeToLayerSection .input-button-container:has(.info-icon) {
+        max-width: 300px;
+    }
+    
+    #bridgeToEthSection .input-button-container:has(.info-icon) {
+        max-width: 300px;
+    }
+    
+    /* Mobile fallback for browsers that don't support :has() */
+    #bridgeToLayerSection .input-button-container,
+    #bridgeToEthSection .input-button-container,
+    #delegateSection .input-button-container {
+        padding-right: 25px;
+        max-width: 300px;
     }
 
     .box-wrapper {
@@ -529,8 +677,8 @@ input:not(:placeholder-shown) {
     display: flex;
     flex-direction: column;
     transition: all 0.3s ease-in-out;
-    min-height: 600px;
-    max-height: 600px;
+    min-height: 450px;
+    max-height: 450px;
     box-sizing: border-box;
     gap: 20px;
     overflow-y: auto;
@@ -651,13 +799,15 @@ input {
     justify-content: space-between;
     gap: 10px;
     width: 100%;
-    max-width: 270px;
+    max-width: 300px;
     margin: 0 auto;
 }
 
 .input-with-label {
     display: flex;
     align-items: center;
+    width: 100%;
+    position: relative;
 }
 
 .input-label, .input-label-2 {
@@ -688,6 +838,7 @@ input {
     background-color: #f0f0f0;
     border: 1px solid #7FAFB1;
     width: 100%;
+    border-radius: 0px 12px 12px 0px;
 }
 
 .balance-error-popup {
@@ -718,6 +869,28 @@ input {
     z-index: 1000;
 }
 
+.frontend-code-link {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    font-family: 'PPNeueMontreal-Book', monospace;
+    font-size: 14px;
+    color: #01A09C;
+    text-decoration: none;
+    padding: 8px 12px;
+    background-color: rgba(255, 255, 255, 0.9);
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+
+.frontend-code-link:hover {
+    background-color: rgba(255, 255, 255, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    color: #003734;
+}
+
 .truncated-address {
     font-family: 'PPNeueMontreal-Thin', Arial, sans-serif;
     font-size: 14px;
@@ -729,7 +902,7 @@ input {
   gap: 10px;
   justify-content: center;
   align-items: center;
-  margin: 20px auto;
+  margin: 10px auto;
   width: 100%;
   max-width: 300px;
 }
@@ -805,6 +978,7 @@ input {
     scrollbar-width: thin;
     scrollbar-color: #083b44 #C4EDEB;
     height: calc(100% - 60px); /* Subtract header height */
+    max-height: 300px; /* Limit maximum height to prevent overflow */
     display: flex;
     flex-direction: column;
 }
@@ -988,7 +1162,7 @@ input {
     display: flex;
     justify-content: stretch; /* Changed from flex-start to stretch */
     gap: 0;
-    margin: -20px -20px 20px -20px;
+    margin: -20px -20px 10px -20px;
     border-bottom: 3px solid black;
     background-color: #C4EDEB;
     border-radius: 10px 10px 0 0;
@@ -1002,14 +1176,12 @@ input {
     padding: 12px 24px;
     border: none;
     font-family: 'PPNeueMontreal-Book', Arial, sans-serif;
-    font-size: 16px;
+    font-size: 20px;
     cursor: pointer;
     background-color: #E0E0E0; /* Greyed out background for unselected */
     color: #666666; /* Muted text color for unselected */
     transition: all 0.3s ease;
     border-right: 1px solid #7FAFB1;
-    border-bottom: 3px solid transparent;
-    margin-bottom: -3px;
     position: relative;
     border-radius: 0;
     text-align: center;
@@ -1040,13 +1212,13 @@ input {
     background-color: #C4EDEB;
     border: 3px solid black;
     border-radius: 10px;
-    padding: 20px;
+    padding: 10px;
     display: flex;
     flex-direction: column;
     width: 100%;
     max-width: 400px;
     margin: 0 auto;
-    height: 600px; /* Fixed height instead of calc */
+    height: 450px; /* Fixed height instead of calc */
     box-sizing: border-box;
     position: relative;
     overflow: hidden;
@@ -1065,6 +1237,11 @@ input {
     background-color: #EFFEFC;
 }
 
+/* Add 4px gap between connect MetaMask button and current balance in Bridge to Layer section */
+#bridgeToLayerSection #walletButton + .balance-info {
+    margin-top: 4px;
+}
+
 /* Update bridge section to account for link */
 .bridge-section {
     display: none;
@@ -1073,15 +1250,17 @@ input {
     width: 100%;
     max-width: 400px;
     margin: 0 auto;
-    padding-top: 10px;
+    padding-top: 0;
     flex: 1;
-    overflow-y: auto;
+    overflow-y: visible;
 }
 
 .bridge-section.active {
     display: flex;
     flex-direction: column;
     opacity: 1;
+    align-items: flex-start;
+    justify-content: flex-start;
 }
 
 /* Wallet Connection Container */
@@ -1089,7 +1268,7 @@ input {
     display: flex;
     justify-content: center;
     gap: 6px;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
     flex-wrap: nowrap;
     width: 100%;
     padding: 0 5px;
@@ -1151,7 +1330,7 @@ input {
     width: 100%;
     max-width: 300px;
     margin: 0 auto;
-    gap: 10px;
+    gap: 0px;
 }
 
 .balance-info .info-text {
@@ -1189,7 +1368,7 @@ input {
     transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
     opacity: 1;
     visibility: visible;
-    min-height: 600px;
+    min-height: 450px;
     max-height: 600px;
     position: relative;
     margin: 0;
@@ -1241,7 +1420,7 @@ input {
     }
 
     .bridge-buttons-container {
-        height: 600px; /* Maintain fixed height */
+        height: 450px; /* Maintain fixed height */
     }
 
     .transactions-container {
@@ -1350,5 +1529,255 @@ input {
     #walletAddress {
         font-size: 9px;
         padding: 5px 2px;
+    }
+    
+    .frontend-code-link {
+        bottom: 10px;
+        right: 10px;
+        font-size: 12px;
+        padding: 6px 10px;
+    }
+}
+
+/* Ethereum Wallet Modal Styles */
+.wallet-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(5px);
+}
+
+.wallet-modal {
+    background: linear-gradient(135deg, #003734 0%, #049159 100%);
+    border-radius: 20px;
+    padding: 0;
+    max-width: 450px;
+    width: 90%;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    border: 2px solid #38A8A3;
+}
+
+.wallet-modal-header {
+    background: rgba(56, 168, 163, 0.1);
+    padding: 20px 25px 15px;
+    border-bottom: 1px solid rgba(56, 168, 163, 0.3);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.wallet-modal-header h3 {
+    font-family: 'PPNeueMontreal-Bold', monospace;
+    color: #eefffb;
+    margin: 0;
+    font-size: 20px;
+}
+
+.wallet-modal-close {
+    background: none;
+    border: none;
+    color: #38A8A3;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+}
+
+.wallet-modal-close:hover {
+    background-color: rgba(56, 168, 163, 0.2);
+    color: #eefffb;
+}
+
+.wallet-modal-content {
+    padding: 20px 25px;
+}
+
+.wallet-modal-description {
+    font-family: 'PPNeueMontreal-Book', monospace;
+    color: #eefffb;
+    margin: 0 0 20px 0;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.wallet-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.wallet-item {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    background: rgba(56, 168, 163, 0.1);
+    border: 1px solid rgba(56, 168, 163, 0.3);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.wallet-item:hover {
+    background: rgba(56, 168, 163, 0.2);
+    border-color: #38A8A3;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(56, 168, 163, 0.2);
+}
+
+.wallet-item.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.wallet-item.disabled:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.wallet-icon {
+    font-size: 24px;
+    margin-right: 15px;
+    width: 30px;
+    text-align: center;
+}
+
+.wallet-info {
+    flex: 1;
+}
+
+.wallet-name {
+    font-family: 'PPNeueMontreal-Bold', monospace;
+    color: #eefffb;
+    font-size: 16px;
+    margin-bottom: 4px;
+}
+
+.wallet-description {
+    font-family: 'PPNeueMontreal-Book', monospace;
+    color: rgba(238, 255, 251, 0.8);
+    font-size: 12px;
+    line-height: 1.3;
+}
+
+.wallet-arrow {
+    color: #38A8A3;
+    font-size: 18px;
+    font-weight: bold;
+    transition: transform 0.3s ease;
+}
+
+.wallet-item:hover .wallet-arrow {
+    transform: translateX(3px);
+}
+
+.wallet-modal-footer {
+    border-top: 1px solid rgba(56, 168, 163, 0.3);
+    padding-top: 15px;
+    text-align: center;
+}
+
+.wallet-modal-note {
+    font-family: 'PPNeueMontreal-Book', monospace;
+    color: rgba(238, 255, 251, 0.7);
+    font-size: 12px;
+    margin: 0;
+}
+
+.wallet-modal-note a {
+    color: #38A8A3;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.wallet-modal-note a:hover {
+    color: #eefffb;
+    text-decoration: underline;
+}
+
+.wallet-error {
+    text-align: center;
+    padding: 20px;
+}
+
+.error-icon {
+    font-size: 32px;
+    margin-bottom: 10px;
+}
+
+.error-message {
+    font-family: 'PPNeueMontreal-Book', monospace;
+    color: #ff6b6b;
+    margin-bottom: 15px;
+    font-size: 14px;
+}
+
+.error-retry {
+    background: #38A8A3;
+    color: #003734;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-family: 'PPNeueMontreal-Bold', monospace;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.error-retry:hover {
+    background: #eefffb;
+    transform: translateY(-1px);
+}
+
+/* Mobile responsive styles for wallet modal */
+@media (max-width: 480px) {
+    .wallet-modal {
+        width: 95%;
+        max-height: 85vh;
+    }
+    
+    .wallet-modal-header {
+        padding: 15px 20px 10px;
+    }
+    
+    .wallet-modal-header h3 {
+        font-size: 18px;
+    }
+    
+    .wallet-modal-content {
+        padding: 15px 20px;
+    }
+    
+    .wallet-item {
+        padding: 12px;
+    }
+    
+    .wallet-icon {
+        font-size: 20px;
+        margin-right: 12px;
+        width: 25px;
+    }
+    
+    .wallet-name {
+        font-size: 14px;
+    }
+    
+    .wallet-description {
+        font-size: 11px;
     }
 }

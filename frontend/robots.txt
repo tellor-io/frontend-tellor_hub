@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+
+# Prevent excessive crawling
+Crawl-delay: 10
+
+# Allow all resources
+Allow: /*.js
+Allow: /*.css
+Allow: /*.png
+Allow: /*.jpg
+Allow: /*.svg
+Allow: /*.woff
+Allow: /*.woff2
+Allow: /*.otf 

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wallet Adapter Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-2xl mx-auto">
+        <h1 class="text-3xl font-bold mb-8 text-center">Cosmos Wallet Adapter Test</h1>
+        
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Available Wallets</h2>
+            <div id="walletList" class="space-y-2">
+                <p class="text-gray-500">Loading...</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Connection Status</h2>
+            <div id="connectionStatus" class="text-gray-500">
+                Not connected
+            </div>
+            <div id="connectionDetails" class="mt-2 text-sm text-gray-600 hidden">
+                <p><strong>Address:</strong> <span id="walletAddress"></span></p>
+                <p><strong>Wallet:</strong> <span id="walletName"></span></p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4">Actions</h2>
+            <div class="space-y-3">
+                <button id="connectBtn" class="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 disabled:bg-gray-400">
+                    Connect Wallet
+                </button>
+                <button id="disconnectBtn" class="w-full bg-red-500 text-white py-2 px-4 rounded hover:bg-red-600 disabled:bg-gray-400" disabled>
+                    Disconnect Wallet
+                </button>
+                <button id="testBalanceBtn" class="w-full bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600 disabled:bg-gray-400" disabled>
+                    Test Balance Query
+                </button>
+            </div>
+        </div>
+
+        <div id="log" class="mt-6 bg-gray-800 text-green-400 p-4 rounded font-mono text-sm max-h-64 overflow-y-auto">
+            <div>Wallet adapter test initialized...</div>
+        </div>
+    </div>
+
+    <script>
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateConnectionStatus(connected, details = null) {
+            const statusDiv = document.getElementById('connectionStatus');
+            const detailsDiv = document.getElementById('connectionDetails');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const testBalanceBtn = document.getElementById('testBalanceBtn');
+
+            if (connected && details) {
+                statusDiv.textContent = 'Connected';
+                statusDiv.className = 'text-green-600 font-semibold';
+                detailsDiv.classList.remove('hidden');
+                document.getElementById('walletAddress').textContent = details.address;
+                document.getElementById('walletName').textContent = details.walletName;
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                testBalanceBtn.disabled = false;
+            } else {
+                statusDiv.textContent = 'Not connected';
+                statusDiv.className = 'text-gray-500';
+                detailsDiv.classList.add('hidden');
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                testBalanceBtn.disabled = true;
+            }
+        }
+
+        function updateWalletList() {
+            const walletList = document.getElementById('walletList');
+            
+            if (!window.cosmosWalletAdapter) {
+                walletList.innerHTML = '<p class="text-red-500">Wallet adapter not loaded</p>';
+                return;
+            }
+
+            const wallets = window.cosmosWalletAdapter.getWalletOptions();
+            
+            if (wallets.length === 0) {
+                walletList.innerHTML = '<p class="text-yellow-500">No Cosmos wallets detected</p>';
+                return;
+            }
+
+            walletList.innerHTML = wallets.map(wallet => 
+                `<div class="flex items-center justify-between p-3 border rounded">
+                    <div>
+                        <div class="font-semibold">${wallet.name}</div>
+                        <div class="text-sm text-gray-600">${wallet.description}</div>
+                    </div>
+                    <div class="text-xs bg-gray-100 px-2 py-1 rounded">${wallet.type}</div>
+                </div>`
+            ).join('');
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            log('Page loaded, checking for wallet adapter...');
+            
+            // Check if wallet adapter is loaded
+            if (window.cosmosWalletAdapter) {
+                log('Wallet adapter found');
+                updateWalletList();
+            } else {
+                log('Wallet adapter not found - loading...');
+                // Try to load the adapter
+                const script = document.createElement('script');
+                script.src = './js/walletAdapter.js';
+                script.onload = function() {
+                    log('Wallet adapter loaded');
+                    updateWalletList();
+                };
+                script.onerror = function() {
+                    log('Failed to load wallet adapter');
+                };
+                document.head.appendChild(script);
+            }
+
+            // Connect button
+            document.getElementById('connectBtn').addEventListener('click', async function() {
+                try {
+                    log('Attempting to connect wallet...');
+                    const result = await window.cosmosWalletAdapter.connectToWallet();
+                    log(`Connected to ${result.walletName}: ${result.address}`);
+                    updateConnectionStatus(true, result);
+                } catch (error) {
+                    log(`Connection failed: ${error.message}`);
+                }
+            });
+
+            // Disconnect button
+            document.getElementById('disconnectBtn').addEventListener('click', async function() {
+                try {
+                    log('Disconnecting wallet...');
+                    await window.cosmosWalletAdapter.disconnect();
+                    log('Wallet disconnected');
+                    updateConnectionStatus(false);
+                } catch (error) {
+                    log(`Disconnect failed: ${error.message}`);
+                }
+            });
+
+            // Test balance button
+            document.getElementById('testBalanceBtn').addEventListener('click', async function() {
+                try {
+                    log('Testing balance query...');
+                    const offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+                    const accounts = await offlineSigner.getAccounts();
+                    log(`Found ${accounts.length} account(s)`);
+                    
+                    // This would require CosmJS to be loaded for full functionality
+                    log('Balance query test completed (full functionality requires CosmJS)');
+                } catch (error) {
+                    log(`Balance test failed: ${error.message}`);
+                }
+            });
+        });
+    </script>
+</body>
+</html> 

@@ -12,6 +12,7 @@
   },
   "scripts": {
     "start": "http-server . -p 8080 --cors -P http://localhost:8080?",
+    "dev": "http-server frontend -p 8000 --cors -o",
     "compile-proto": "pbjs -t static-module -w commonjs -o frontend/proto/layer_proto.js frontend/proto/bridge/tx.proto && pbts -o frontend/proto/layer_proto.d.ts frontend/proto/layer_proto.js"
   },
   "devDependencies": {

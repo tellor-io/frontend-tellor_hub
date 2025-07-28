@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wallet Adapter Debug</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-8 text-center">Wallet Adapter Debug</h1>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Wallet Detection -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Wallet Detection</h2>
+                <div id="walletDetection" class="space-y-2">
+                    <p class="text-gray-500">Loading...</p>
+                </div>
+                <button id="detectBtn" class="mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600">
+                    Detect Wallets
+                </button>
+            </div>
+
+            <!-- Connection Test -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Connection Test</h2>
+                <div id="connectionTest" class="space-y-2">
+                    <p class="text-gray-500">Not connected</p>
+                </div>
+                <button id="connectBtn" class="mt-4 w-full bg-green-500 text-white py-2 px-4 rounded hover:bg-green-600">
+                    Test Connection
+                </button>
+            </div>
+
+            <!-- Wallet Methods -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Wallet Methods</h2>
+                <div id="walletMethods" class="space-y-2">
+                    <p class="text-gray-500">No wallet selected</p>
+                </div>
+            </div>
+
+            <!-- Error Log -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Error Log</h2>
+                <div id="errorLog" class="bg-gray-800 text-green-400 p-4 rounded font-mono text-sm max-h-64 overflow-y-auto">
+                    <div>Debug session started...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Wallet Info -->
+        <div class="mt-6 bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4">Detailed Wallet Information</h2>
+            <div id="detailedInfo" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <h3 class="font-semibold">Keplr</h3>
+                        <div id="keplrInfo" class="text-sm text-gray-600">Not available</div>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold">Leap</h3>
+                        <div id="leapInfo" class="text-sm text-gray-600">Not available</div>
+                    </div>
+                    <div>
+                        <h3 class="font-semibold">Cosmostation</h3>
+                        <div id="cosmostationInfo" class="text-sm text-gray-600">Not available</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('errorLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? 'text-red-400' : type === 'warning' ? 'text-yellow-400' : 'text-green-400';
+            logDiv.innerHTML += `<div class="${color}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateWalletDetection() {
+            const detectionDiv = document.getElementById('walletDetection');
+            const wallets = [];
+            
+            if (typeof window.keplr !== 'undefined') {
+                wallets.push('<span class="text-green-600">✓ Keplr</span>');
+            }
+            if (typeof window.leap !== 'undefined') {
+                wallets.push('<span class="text-green-600">✓ Leap</span>');
+            }
+            if (typeof window.leapWallet !== 'undefined') {
+                wallets.push('<span class="text-green-600">✓ Leap Wallet</span>');
+            }
+            if (typeof window.cosmostation !== 'undefined') {
+                wallets.push('<span class="text-green-600">✓ Cosmostation</span>');
+            }
+            if (typeof window.station !== 'undefined') {
+                wallets.push('<span class="text-green-600">✓ Station</span>');
+            }
+            
+            if (wallets.length === 0) {
+                detectionDiv.innerHTML = '<p class="text-red-500">No wallets detected</p>';
+            } else {
+                detectionDiv.innerHTML = wallets.join('<br>');
+            }
+        }
+
+        function updateDetailedInfo() {
+            // Keplr info
+            const keplrInfo = document.getElementById('keplrInfo');
+            if (typeof window.keplr !== 'undefined') {
+                const methods = Object.getOwnPropertyNames(window.keplr).filter(name => 
+                    typeof window.keplr[name] === 'function'
+                );
+                keplrInfo.innerHTML = `Methods: ${methods.join(', ')}`;
+            } else {
+                keplrInfo.innerHTML = 'Not available';
+            }
+
+            // Leap info
+            const leapInfo = document.getElementById('leapInfo');
+            if (typeof window.leap !== 'undefined') {
+                const methods = Object.getOwnPropertyNames(window.leap).filter(name => 
+                    typeof window.leap[name] === 'function'
+                );
+                leapInfo.innerHTML = `Methods: ${methods.join(', ')}`;
+            } else {
+                leapInfo.innerHTML = 'Not available';
+            }
+
+            // Cosmostation info
+            const cosmostationInfo = document.getElementById('cosmostationInfo');
+            if (typeof window.cosmostation !== 'undefined') {
+                const methods = Object.getOwnPropertyNames(window.cosmostation).filter(name => 
+                    typeof window.cosmostation[name] === 'function'
+                );
+                cosmostationInfo.innerHTML = `Methods: ${methods.join(', ')}`;
+            } else {
+                cosmostationInfo.innerHTML = 'Not available';
+            }
+        }
+
+        function updateWalletMethods(wallet) {
+            const methodsDiv = document.getElementById('walletMethods');
+            if (!wallet) {
+                methodsDiv.innerHTML = '<p class="text-gray-500">No wallet selected</p>';
+                return;
+            }
+
+            const methods = Object.getOwnPropertyNames(wallet).filter(name => 
+                typeof wallet[name] === 'function'
+            );
+            
+            methodsDiv.innerHTML = `
+                <p><strong>Selected:</strong> ${wallet.constructor.name}</p>
+                <p><strong>Methods:</strong></p>
+                <ul class="list-disc list-inside text-sm">
+                    ${methods.map(method => `<li>${method}</li>`).join('')}
+                </ul>
+            `;
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            log('Page loaded');
+            updateWalletDetection();
+            updateDetailedInfo();
+
+            // Load wallet adapter
+            const script = document.createElement('script');
+            script.src = './js/walletAdapter.js';
+            script.onload = function() {
+                log('Wallet adapter loaded');
+                if (window.cosmosWalletAdapter) {
+                    log('Wallet adapter instance created');
+                    updateWalletDetection();
+                } else {
+                    log('Failed to create wallet adapter instance', 'error');
+                }
+            };
+            script.onerror = function() {
+                log('Failed to load wallet adapter', 'error');
+            };
+            document.head.appendChild(script);
+
+            // Detect button
+            document.getElementById('detectBtn').addEventListener('click', function() {
+                log('Manual wallet detection triggered');
+                updateWalletDetection();
+                updateDetailedInfo();
+                
+                if (window.cosmosWalletAdapter) {
+                    const wallets = window.cosmosWalletAdapter.detectWallets();
+                    log(`Detected ${wallets.length} wallets: ${wallets.map(w => w.name).join(', ')}`);
+                }
+            });
+
+            // Connect button
+            document.getElementById('connectBtn').addEventListener('click', async function() {
+                try {
+                    log('Testing wallet connection...');
+                    
+                    if (!window.cosmosWalletAdapter) {
+                        throw new Error('Wallet adapter not loaded');
+                    }
+
+                    const wallets = window.cosmosWalletAdapter.detectWallets();
+                    if (wallets.length === 0) {
+                        throw new Error('No wallets detected');
+                    }
+
+                    log(`Attempting to connect to ${wallets[0].name}...`);
+                    const result = await window.cosmosWalletAdapter.connectToWallet(wallets[0].type);
+                    log(`Successfully connected to ${result.walletName}: ${result.address}`);
+                    
+                    document.getElementById('connectionTest').innerHTML = `
+                        <p class="text-green-600">Connected to ${result.walletName}</p>
+                        <p class="text-sm">Address: ${result.address}</p>
+                    `;
+                    
+                    updateWalletMethods(result.offlineSigner);
+                    
+                } catch (error) {
+                    log(`Connection failed: ${error.message}`, 'error');
+                    document.getElementById('connectionTest').innerHTML = `
+                        <p class="text-red-500">Connection failed</p>
+                        <p class="text-sm">${error.message}</p>
+                    `;
+                }
+            });
+        });
+
+        // Global error handler
+        window.addEventListener('error', function(event) {
+            log(`Global error: ${event.error?.message || event.message}`, 'error');
+        });
+
+        // Unhandled promise rejection handler
+        window.addEventListener('unhandledrejection', function(event) {
+            log(`Unhandled promise rejection: ${event.reason}`, 'error');
+        });
+    </script>
+</body>
+</html> 
