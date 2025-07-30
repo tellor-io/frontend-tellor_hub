@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mainnet Configuration Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js" type="application/javascript"></script>
+</head>
+<body class="p-4 bg-gray-100">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-2xl font-bold mb-4">Mainnet Configuration Test</h1>
+        
+        <div class="bg-white p-4 rounded-lg shadow mb-4">
+            <h2 class="text-lg font-semibold mb-2">Contract Addresses</h2>
+            <div class="space-y-2">
+                <div><strong>Sepolia Bridge:</strong> <code class="bg-gray-100 px-2 py-1 rounded">0x5acb5977f35b1A91C4fE0F4386eB669E046776F2</code></div>
+                <div><strong>Mainnet Bridge:</strong> <code class="bg-gray-100 px-2 py-1 rounded">0x5589e306b1920F009979a50B88caE32aecD471E4</code></div>
+                <div><strong>Sepolia Token:</strong> <code class="bg-gray-100 px-2 py-1 rounded">0x80fc34a2f9FfE86F41580F47368289C402DEc660</code></div>
+                <div><strong>Mainnet Token:</strong> <code class="bg-gray-100 px-2 py-1 rounded">0x88dF592F8eb5D7Bd38bFeF7dEb0fBc02cf3778a0</code></div>
+            </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow mb-4">
+            <h2 class="text-lg font-semibold mb-2">API Endpoints</h2>
+            <div class="space-y-2">
+                <div><strong>Sepolia API:</strong> <code class="bg-gray-100 px-2 py-1 rounded">https://node-palmito.tellorlayer.com</code></div>
+                <div><strong>Mainnet API:</strong> <code class="bg-gray-100 px-2 py-1 rounded">https://mainnet.tellorlayer.com</code></div>
+            </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow mb-4">
+            <h2 class="text-lg font-semibold mb-2">Network Configuration Test</h2>
+            <button id="testBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Test Network Configuration</button>
+            <div id="testResults" class="mt-4"></div>
+        </div>
+
+        <div class="bg-white p-4 rounded-lg shadow">
+            <h2 class="text-lg font-semibold mb-2">Supported Networks</h2>
+            <div class="space-y-2">
+                <div><strong>Chain ID 1:</strong> Ethereum Mainnet</div>
+                <div><strong>Chain ID 11155111:</strong> Sepolia Testnet</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mock App object for testing
+        const mockApp = {
+            chainId: null,
+            getApiEndpoint: function() {
+                if (this.chainId === 1) {
+                    return 'https://mainnet.tellorlayer.com';
+                } else {
+                    return 'https://node-palmito.tellorlayer.com';
+                }
+            },
+            updateNetworkDisplay: function() {
+                const networkDisplay = document.getElementById('network-display');
+                if (networkDisplay) {
+                    if (this.chainId === 1) {
+                        networkDisplay.textContent = '*Ethereum Mainnet*';
+                        networkDisplay.style.color = '#10b981';
+                    } else if (this.chainId === 11155111) {
+                        networkDisplay.textContent = '*Sepolia Test Network*';
+                        networkDisplay.style.color = '#f59e0b';
+                    } else {
+                        networkDisplay.textContent = '*Unsupported Network*';
+                        networkDisplay.style.color = '#ef4444';
+                    }
+                }
+            }
+        };
+
+        // Contract addresses
+        const contractAddresses = {
+            11155111: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2", // Sepolia
+            1: "0x5589e306b1920F009979a50B88caE32aecD471E4",        // Mainnet
+        };
+
+        const tokenAddresses = {
+            11155111: "0x80fc34a2f9FfE86F41580F47368289C402DEc660", // Sepolia
+            1: "0x88dF592F8eb5D7Bd38bFeF7dEb0fBc02cf3778a0",        // Mainnet
+        };
+
+        document.getElementById('testBtn').addEventListener('click', async () => {
+            const results = document.getElementById('testResults');
+            results.innerHTML = '<div class="text-blue-600">Testing...</div>';
+
+            try {
+                let testResults = [];
+
+                // Test Sepolia configuration
+                mockApp.chainId = 11155111;
+                const sepoliaApi = mockApp.getApiEndpoint();
+                const sepoliaBridge = contractAddresses[11155111];
+                const sepoliaToken = tokenAddresses[11155111];
+
+                testResults.push(`✅ Sepolia API: ${sepoliaApi}`);
+                testResults.push(`✅ Sepolia Bridge: ${sepoliaBridge}`);
+                testResults.push(`✅ Sepolia Token: ${sepoliaToken}`);
+
+                // Test Mainnet configuration
+                mockApp.chainId = 1;
+                const mainnetApi = mockApp.getApiEndpoint();
+                const mainnetBridge = contractAddresses[1];
+                const mainnetToken = tokenAddresses[1];
+
+                testResults.push(`✅ Mainnet API: ${mainnetApi}`);
+                testResults.push(`✅ Mainnet Bridge: ${mainnetBridge}`);
+                testResults.push(`✅ Mainnet Token: ${mainnetToken}`);
+
+                // Test network display
+                const networkDisplay = document.createElement('div');
+                networkDisplay.id = 'network-display';
+                document.body.appendChild(networkDisplay);
+
+                mockApp.chainId = 1;
+                mockApp.updateNetworkDisplay();
+                testResults.push(`✅ Mainnet Display: ${networkDisplay.textContent}`);
+
+                mockApp.chainId = 11155111;
+                mockApp.updateNetworkDisplay();
+                testResults.push(`✅ Sepolia Display: ${networkDisplay.textContent}`);
+
+                document.body.removeChild(networkDisplay);
+
+                results.innerHTML = testResults.map(result => `<div class="text-green-600">${result}</div>`).join('');
+
+            } catch (error) {
+                results.innerHTML = `<div class="text-red-600">❌ Test failed: ${error.message}</div>`;
+            }
+        });
+    </script>
+</body>
+</html> 

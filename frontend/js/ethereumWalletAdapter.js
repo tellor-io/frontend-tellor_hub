@@ -404,6 +404,17 @@ class EthereumWalletAdapter {
     // Add chain to wallet
     async addChain(chainId) {
         const chainConfigs = {
+            1: {
+                chainId: '0x1',
+                chainName: 'Ethereum Mainnet',
+                nativeCurrency: {
+                    name: 'Ether',
+                    symbol: 'ETH',
+                    decimals: 18
+                },
+                rpcUrls: ['https://mainnet.infura.io/v3/52474cef7b964b4fbf8e954a5dfa481b'],
+                blockExplorerUrls: ['https://etherscan.io']
+            },
             11155111: {
                 chainId: '0xaa36a7',
                 chainName: 'Sepolia',

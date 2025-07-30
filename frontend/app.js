@@ -1,9 +1,6 @@
 import { ethers } from 'https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.esm.min.js';
 import { 
-    generateWithdrawalQueryId, 
-    generateDepositQueryId,
-    isWithdrawClaimed,
-    Deposit
+    generateWithdrawalQueryId
 } from './js/bridgeContract.js';
 
 // Create the App object
@@ -26,6 +23,7 @@ const App = {
   connectedWallet: null,
   keplrAddress: null,
   currentBridgeDirection: 'layer', // 'layer' or 'ethereum'
+  cosmosChainId: 'layertest-4', // Default to testnet
 
   _depositLimit: function() {
     return App.depositLimit;
@@ -52,32 +50,18 @@ const App = {
             App.initInputValidation();
             App.initBridgeDirectionUI(); // Initialize bridge direction UI
             
+            // Initialize network display
+            App.updateNetworkDisplay();
+            App.updateCosmosNetworkDisplay();
+            
             // Remove any existing event listeners
             const walletButton = document.getElementById('walletButton');
-            const metamaskButton = document.getElementById('metamaskButton');
             const keplrButton = document.getElementById('keplrButton');
 
             if (walletButton) {
                 const newWalletButton = walletButton.cloneNode(true);
                 walletButton.parentNode.replaceChild(newWalletButton, walletButton);
                 newWalletButton.addEventListener('click', async () => {
-                    try {
-                        if (App.isConnected) {
-                            await App.disconnectMetaMask();
-                        } else {
-                            await App.connectMetaMask();
-                        }
-                    } catch (error) {
-                        // console.error(...);
-                        App.handleError(error);
-                    }
-                });
-            }
-
-            if (metamaskButton) {
-                const newMetamaskButton = metamaskButton.cloneNode(true);
-                metamaskButton.parentNode.replaceChild(newMetamaskButton, metamaskButton);
-                newMetamaskButton.addEventListener('click', async () => {
                     try {
                         if (App.isConnected) {
                             await App.disconnectMetaMask();
@@ -108,18 +92,31 @@ const App = {
                 });
             }
 
-            // Handle delegate Keplr button
-            const delegateKeplrButton = document.getElementById('delegateKeplrButton');
-            if (delegateKeplrButton) {
-                const newDelegateKeplrButton = delegateKeplrButton.cloneNode(true);
-                delegateKeplrButton.parentNode.replaceChild(newDelegateKeplrButton, delegateKeplrButton);
-                newDelegateKeplrButton.addEventListener('click', async () => {
+
+
+            // Handle network toggle button
+            const networkToggleBtn = document.getElementById('network-toggle-btn');
+            if (networkToggleBtn) {
+                const newNetworkToggleBtn = networkToggleBtn.cloneNode(true);
+                networkToggleBtn.parentNode.replaceChild(newNetworkToggleBtn, networkToggleBtn);
+                newNetworkToggleBtn.addEventListener('click', async () => {
                     try {
-                        if (App.isKeplrConnected) {
-                            await App.disconnectKeplr();
-                        } else {
-                            await App.connectKeplr();
-                        }
+                        await App.switchNetwork();
+                    } catch (error) {
+                        // console.error(...);
+                        App.handleError(error);
+                    }
+                });
+            }
+
+            // Handle Cosmos network toggle button
+            const cosmosNetworkToggleBtn = document.getElementById('cosmos-network-toggle-btn');
+            if (cosmosNetworkToggleBtn) {
+                const newCosmosNetworkToggleBtn = cosmosNetworkToggleBtn.cloneNode(true);
+                cosmosNetworkToggleBtn.parentNode.replaceChild(newCosmosNetworkToggleBtn, cosmosNetworkToggleBtn);
+                newCosmosNetworkToggleBtn.addEventListener('click', async () => {
+                    try {
+                        await App.switchCosmosNetwork();
                     } catch (error) {
                         // console.error(...);
                         App.handleError(error);
@@ -155,15 +152,10 @@ const App = {
           if (availableWallets.length > 0) {
             // Enable Ethereum wallet buttons
             const walletButton = document.getElementById("walletButton");
-            const metamaskButton = document.getElementById("metamaskButton");
             
             if (walletButton) {
               walletButton.disabled = false;
               walletButton.innerHTML = 'Connect Ethereum Wallet';
-            }
-            if (metamaskButton) {
-              metamaskButton.disabled = false;
-              metamaskButton.innerHTML = 'Connect Ethereum Wallet';
             }
           }
         } else {
@@ -183,6 +175,11 @@ const App = {
       // Prevent automatic page reload to avoid hosting issues
       // window.location.reload();
       App.handleError(new Error('Network changed. Please refresh manually if needed.'));
+      
+      // Update network display
+      if (App.updateNetworkDisplay) {
+        App.updateNetworkDisplay();
+      }
     };
 
             const handleAccountsChanged = (accounts) => {
@@ -203,9 +200,7 @@ const App = {
 
             // Enable MetaMask buttons
             const walletButton = document.getElementById("walletButton");
-            const metamaskButton = document.getElementById("metamaskButton");
             if (walletButton) walletButton.disabled = false;
-            if (metamaskButton) metamaskButton.disabled = false;
           }
         }
         
@@ -218,16 +213,10 @@ const App = {
         if (hasCosmosWallet) {
           // Enable Cosmos wallet buttons
           const keplrButton = document.getElementById("keplrButton");
-          const delegateKeplrButton = document.getElementById("delegateKeplrButton");
           if (keplrButton) {
             keplrButton.disabled = false;
             // Update button text to be more generic
             keplrButton.innerHTML = 'Connect Cosmos Wallet';
-          }
-          if (delegateKeplrButton) {
-            delegateKeplrButton.disabled = false;
-            // Update button text to be more generic
-            delegateKeplrButton.innerHTML = 'Connect Cosmos Wallet';
           }
         }
         
@@ -285,17 +274,35 @@ const App = {
         App.ethers = connectionResult.ethers;
         App.isConnected = true;
         
-        // Switch to Sepolia if needed
+        // Always try to switch to Sepolia first (preferred for testing)
         if (App.chainId !== 11155111) {
             // console.log(...);
             try {
+                // Try to switch to Sepolia first (preferred for testing)
                 await window.ethereumWalletAdapter.switchChain(11155111);
                 App.chainId = 11155111;
                 // console.log(...);
             } catch (switchError) {
-                // console.error(...);
-                alert('Please manually switch to Sepolia testnet in your wallet and try again.');
-                throw new Error('Failed to switch to Sepolia network');
+                // If switching to Sepolia fails, check if we're on mainnet
+                if (App.chainId === 1) {
+                    // User is on mainnet, ask if they want to stay or switch
+                    const userChoice = confirm('You are connected to Ethereum Mainnet. Would you like to switch to Sepolia Testnet for testing? Click OK to switch to Sepolia, or Cancel to stay on Mainnet.');
+                    if (userChoice) {
+                        // User wants to switch to Sepolia, try again
+                        try {
+                            await window.ethereumWalletAdapter.switchChain(11155111);
+                            App.chainId = 11155111;
+                        } catch (secondSwitchError) {
+                            alert('Failed to switch to Sepolia. Please manually switch to Sepolia testnet (chain ID: 11155111) in your wallet.');
+                            throw new Error('Failed to switch to Sepolia network');
+                        }
+                    }
+                    // If user cancels, they stay on mainnet
+                } else {
+                    // User is on an unsupported network
+                    alert('Please manually switch to Sepolia testnet (chain ID: 11155111) or Ethereum Mainnet (chain ID: 1) in your wallet and try again.');
+                    throw new Error('Failed to switch to supported network');
+                }
             }
         }
         
@@ -304,7 +311,7 @@ const App = {
             validateChainId(App.chainId);
         } catch (error) {
             // console.error(...);
-            alert('Please connect to Sepolia (chain ID: 11155111). Mainnet support coming soon.');
+            alert('Please connect to Sepolia (chain ID: 11155111) or Ethereum Mainnet (chain ID: 1).');
             throw error;
         }
         
@@ -316,13 +323,9 @@ const App = {
         const truncatedAddress = `${App.account.substring(0, 6)}...${App.account.substring(App.account.length - 4)}`;
         
         const walletButton = document.getElementById('walletButton');
-        const metamaskButton = document.getElementById('metamaskButton');
         
         if (walletButton) {
-            walletButton.innerHTML = `Disconnect Ethereum Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
-        }
-        if (metamaskButton) {
-            metamaskButton.innerHTML = `Disconnect Ethereum Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
+            walletButton.innerHTML = `Disconnect <span class="truncated-address">(${truncatedAddress})</span>`;
         }
         
         // Update balances and limits
@@ -332,6 +335,9 @@ const App = {
         ]);
         
         App.setPageParams();
+        
+        // Update network display
+        App.updateNetworkDisplay();
         
         return connectionResult;
         
@@ -409,11 +415,11 @@ const App = {
         App.chainId = chainId;
         // console.log(...);
         
-        // If not on Sepolia, try to switch to it
+        // Always try to switch to Sepolia first (preferred for testing)
         if (chainId !== 11155111) {
             // console.log(...);
             try {
-                // Try to switch to Sepolia
+                // Try to switch to Sepolia first (preferred for testing)
                 await window.ethereum.request({
                     method: 'wallet_switchEthereumChain',
                     params: [{ chainId: '0xaa36a7' }], // 11155111 in hex
@@ -430,42 +436,68 @@ const App = {
             } catch (switchError) {
                 // console.log(...);
                 
-                // If the network doesn't exist (error code 4902), add it
-                if (switchError.code === 4902) {
-                    try {
-                        // console.log(...);
-                        await window.ethereum.request({
-                            method: 'wallet_addEthereumChain',
-                            params: [{
-                                chainId: '0xaa36a7', // 11155111 in hex
-                                chainName: 'Sepolia',
-                                nativeCurrency: {
-                                    name: 'Sepolia Ether',
-                                    symbol: 'ETH',
-                                    decimals: 18
-                                },
-                                rpcUrls: ['https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161'],
-                                blockExplorerUrls: ['https://sepolia.etherscan.io']
-                            }]
-                        });
-                        
-                        // Verify the add worked
-                        chainId = await window.ethereum.request({ method: 'eth_chainId' });
-                        if (typeof chainId === 'string' && chainId.startsWith('0x')) {
-                            chainId = parseInt(chainId, 16);
+                // If switching to Sepolia fails, check if we're on mainnet
+                if (chainId === 1) {
+                    // User is on mainnet, ask if they want to stay or switch
+                    const userChoice = confirm('You are connected to Ethereum Mainnet. Would you like to switch to Sepolia Testnet for testing? Click OK to switch to Sepolia, or Cancel to stay on Mainnet.');
+                    if (userChoice) {
+                        // User wants to switch to Sepolia, try again
+                        try {
+                            await window.ethereum.request({
+                                method: 'wallet_switchEthereumChain',
+                                params: [{ chainId: '0xaa36a7' }], // 11155111 in hex
+                            });
+                            
+                            // Verify the switch worked
+                            chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                            if (typeof chainId === 'string' && chainId.startsWith('0x')) {
+                                chainId = parseInt(chainId, 16);
+                            }
+                            App.chainId = chainId;
+                        } catch (secondSwitchError) {
+                            alert('Failed to switch to Sepolia. Please manually switch to Sepolia testnet (chain ID: 11155111) in your wallet.');
+                            throw new Error('Failed to switch to Sepolia network');
                         }
-                        App.chainId = chainId;
-                        // console.log(...);
-                        
-                    } catch (addError) {
-                        // console.error(...);
-                        alert('Please manually add Sepolia testnet to MetaMask and try again.');
-                        throw new Error('Failed to add Sepolia network to MetaMask');
                     }
+                    // If user cancels, they stay on mainnet
                 } else {
-                    // console.error(...);
-                    alert('Please manually switch to Sepolia testnet in MetaMask and try again.');
-                    throw new Error('Failed to switch to Sepolia network');
+                    // If the network doesn't exist (error code 4902), add it
+                    if (switchError.code === 4902) {
+                        try {
+                            // console.log(...);
+                            await window.ethereum.request({
+                                method: 'wallet_addEthereumChain',
+                                params: [{
+                                    chainId: '0xaa36a7', // 11155111 in hex
+                                    chainName: 'Sepolia',
+                                    nativeCurrency: {
+                                        name: 'Sepolia Ether',
+                                        symbol: 'ETH',
+                                        decimals: 18
+                                    },
+                                    rpcUrls: ['https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161'],
+                                    blockExplorerUrls: ['https://sepolia.etherscan.io']
+                                }]
+                            });
+                            
+                            // Verify the add worked
+                            chainId = await window.ethereum.request({ method: 'eth_chainId' });
+                            if (typeof chainId === 'string' && chainId.startsWith('0x')) {
+                                chainId = parseInt(chainId, 16);
+                            }
+                            App.chainId = chainId;
+                            // console.log(...);
+                            
+                        } catch (addError) {
+                            // console.error(...);
+                            alert('Please manually add Sepolia testnet (chain ID: 11155111) or Ethereum Mainnet (chain ID: 1) to MetaMask and try again.');
+                            throw new Error('Failed to add supported network to MetaMask');
+                        }
+                    } else {
+                        // console.error(...);
+                        alert('Please manually switch to Sepolia testnet (chain ID: 11155111) or Ethereum Mainnet (chain ID: 1) in MetaMask and try again.');
+                        throw new Error('Failed to switch to supported network');
+                    }
                 }
             }
         }
@@ -477,7 +509,7 @@ const App = {
             // console.error(...);
             // console.error(...);
             // console.error(...);
-            alert('Please connect to Sepolia (chain ID: 11155111). Mainnet support coming soon.');
+            alert('Please connect to Sepolia (chain ID: 11155111) or Ethereum Mainnet (chain ID: 1).');
             throw error;
         }
         
@@ -489,17 +521,14 @@ const App = {
         await App.initBridgeContract();
         await App.initTokenContract();
         
-        // Update both MetaMask buttons regardless of current direction
+        // Update MetaMask button
         const truncatedAddress = `${App.account.substring(0, 6)}...${App.account.substring(App.account.length - 4)}`;
         const walletButton = document.getElementById('walletButton');
-        const metamaskButton = document.getElementById('metamaskButton');
         
         if (walletButton) {
-            walletButton.innerHTML = `Disconnect Ethereum Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
+            walletButton.innerHTML = `Disconnect <span class="truncated-address">(${truncatedAddress})</span>`;
         }
-        if (metamaskButton) {
-            metamaskButton.innerHTML = `Disconnect Ethereum Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
-        }
+
         
         // Update balances and limits
         await Promise.all([
@@ -508,6 +537,9 @@ const App = {
         ]);
         
         App.setPageParams();
+        
+        // Update network display
+        App.updateNetworkDisplay();
     } catch (error) {
         // console.error(...);
         App.handleError(error);
@@ -562,13 +594,9 @@ const App = {
         const truncatedAddress = `${App.keplrAddress.substring(0, 6)}...${App.keplrAddress.substring(App.keplrAddress.length - 4)}`;
         
         const keplrButton = document.getElementById('keplrButton');
-        const delegateKeplrButton = document.getElementById('delegateKeplrButton');
         
         if (keplrButton) {
-            keplrButton.innerHTML = `Disconnect Cosmos Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
-        }
-        if (delegateKeplrButton) {
-            delegateKeplrButton.innerHTML = `Disconnect Cosmos Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
+            keplrButton.innerHTML = `Disconnect  <span class="truncated-address">(${truncatedAddress})</span>`;
         }
         
         // Update balance immediately after connection
@@ -605,10 +633,22 @@ const App = {
             throw new Error('Keplr not installed');
         }
         
+        // Get the appropriate endpoints based on current Cosmos network
+        let rpcUrl, restUrl, chainName;
+        if (App.cosmosChainId === 'tellor-1') {
+            rpcUrl = "https://mainnet.tellorlayer.com/rpc";
+            restUrl = "https://mainnet.tellorlayer.com/rpc";
+            chainName = "Tellor Layer";
+        } else {
+            rpcUrl = "https://node-palmito.tellorlayer.com/rpc";
+            restUrl = "https://node-palmito.tellorlayer.com/rpc";
+            chainName = "Tellor Layer Testnet";
+        }
+        
         // First try to disable any existing connection
         try {
             if (typeof window.keplr.disable === 'function') {
-                await window.keplr.disable('layertest-4');
+                await window.keplr.disable(App.cosmosChainId);
             }
         } catch (error) {
             // console.warn(...);
@@ -616,10 +656,10 @@ const App = {
 
         // Suggest the chain to the user
         await window.keplr.experimentalSuggestChain({
-            chainId: "layertest-4",
-            chainName: "Layer",
-            rpc: "https://node-palmito.tellorlayer.com/rpc",
-            rest: "https://node-palmito.tellorlayer.com/rpc",
+            chainId: App.cosmosChainId,
+            chainName: chainName,
+            rpc: rpcUrl,
+            rest: restUrl,
             bip44: {
                 coinType: 118
             },
@@ -658,10 +698,10 @@ const App = {
         });
 
         // Enable the chain
-        await window.keplr.enable('layertest-4');
+        await window.keplr.enable(App.cosmosChainId);
         
         // Get the offline signer
-        const offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+        const offlineSigner = window.keplr.getOfflineSigner(App.cosmosChainId);
         const accounts = await offlineSigner.getAccounts();
         
         if (!accounts || accounts.length === 0) {
@@ -676,16 +716,15 @@ const App = {
         // Update button text
         const truncatedAddress = `${App.keplrAddress.substring(0, 6)}...${App.keplrAddress.substring(App.keplrAddress.length - 4)}`;
         const keplrButton = document.getElementById('keplrButton');
-        const delegateKeplrButton = document.getElementById('delegateKeplrButton');
         if (keplrButton) {
-            keplrButton.innerHTML = `Disconnect Cosmos Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
-        }
-        if (delegateKeplrButton) {
-            delegateKeplrButton.innerHTML = `Disconnect Cosmos Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
+            keplrButton.innerHTML = `Disconnect <span class="truncated-address">(${truncatedAddress})</span>`;
         }
         
         // Update balance immediately after connection
         await App.updateKeplrBalance();
+        
+        // Update Cosmos network display
+        App.updateCosmosNetworkDisplay();
         
         // Enable action buttons based on current section
         if (App.currentBridgeDirection === 'ethereum') {
@@ -728,27 +767,18 @@ const App = {
         App.web3 = null;
         App.web3Provider = null;
         
-        // Update both wallet buttons (main and MetaMask-specific)
+        // Update wallet button
         const walletButton = document.getElementById('walletButton');
-        const metamaskButton = document.getElementById('metamaskButton');
         
         if (walletButton) {
             walletButton.innerHTML = 'Connect Ethereum Wallet';
         }
-        
-        if (metamaskButton) {
-            metamaskButton.innerHTML = 'Connect Ethereum Wallet';
-        }
 
         // Update balances
         const currentBalance = document.getElementById('currentBalance');
-        const ethMetaMaskBalance = document.getElementById('ethMetaMaskBalance');
         
         if (currentBalance) {
-            currentBalance.textContent = '0 TRB';
-        }
-        if (ethMetaMaskBalance) {
-            ethMetaMaskBalance.textContent = '0 TRB';
+            currentBalance.textContent = 'Balance: 0 TRB';
         }
 
         // Disable action buttons
@@ -779,14 +809,14 @@ const App = {
         if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
             await window.cosmosWalletAdapter.disconnect();
         } else {
-            // Legacy Keplr disconnect
-            try {
-                if (window.keplr && typeof window.keplr.disable === 'function') {
-                    await window.keplr.disable('layertest-4');
-                }
-            } catch (error) {
-                // console.warn(...);
+                    // Legacy Keplr disconnect
+        try {
+            if (window.keplr && typeof window.keplr.disable === 'function') {
+                await window.keplr.disable(App.cosmosChainId);
             }
+        } catch (error) {
+            // console.warn(...);
+        }
         }
 
         // Clear wallet state
@@ -794,26 +824,17 @@ const App = {
         App.isKeplrConnected = false;
         App.connectedWallet = null;
 
-        // Update wallet buttons with generic text
+        // Update wallet button with generic text
         const keplrButton = document.getElementById('keplrButton');
-        const delegateKeplrButton = document.getElementById('delegateKeplrButton');
         if (keplrButton) {
             keplrButton.innerHTML = 'Connect Cosmos Wallet';
-            // console.log(...);
-        }
-        if (delegateKeplrButton) {
-            delegateKeplrButton.innerHTML = 'Connect Cosmos Wallet';
             // console.log(...);
         }
 
         // Update balances
         const ethKeplrBalance = document.getElementById('ethKeplrBalance');
-        const delegateKeplrBalance = document.getElementById('delegateKeplrBalance');
         if (ethKeplrBalance) {
-            ethKeplrBalance.textContent = '0 TRB';
-        }
-        if (delegateKeplrBalance) {
-            delegateKeplrBalance.textContent = '0 TRB';
+            ethKeplrBalance.textContent = 'Balance: 0 TRB';
         }
 
         // Disable action buttons
@@ -829,6 +850,9 @@ const App = {
         // Update withdrawal history to reflect wallet disconnection
         await this.updateWithdrawalHistory();
 
+        // Update Cosmos network display
+        App.updateCosmosNetworkDisplay();
+        
         // Update page parameters
         App.setPageParams();
         // console.log(...);
@@ -880,12 +904,8 @@ const App = {
         
         App.isConnected = true;
         
-        // Update the appropriate wallet button based on current direction
-        if (this.currentBridgeDirection === 'layer') {
-            document.getElementById('walletButton').innerHTML = `Disconnect Ethereum Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
-        } else {
-            document.getElementById('metamaskButton').innerHTML = `Disconnect Ethereum Wallet <span class="truncated-address">(${truncatedAddress})</span>`;
-        }
+        // Update the wallet button
+        document.getElementById('walletButton').innerHTML = `Disconnect <span class="truncated-address">(${truncatedAddress})</span>`;
         
         App.setPageParams();
         this.updateUIForCurrentDirection();
@@ -974,8 +994,8 @@ const App = {
         
         const contractAddresses = {
             11155111: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2", // Sepolia
+            1: "0x5589e306b1920F009979a50B88caE32aecD471E4",        // Mainnet
             421613: "0xb2CB696fE5244fB9004877e58dcB680cB86Ba444",   // Arbitrum Goerli
-            1: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",        // Mainnet
             137: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",      // Polygon
             80001: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",    // Mumbai
             100: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",      // Gnosis
@@ -983,7 +1003,6 @@ const App = {
             10: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",       // Optimism
             420: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",      // Optimism Goerli
             42161: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",    // Arbitrum
-            421613: "0xb2CB696fE5244fB9004877e58dcB680cB86Ba444",   // Arbitrum Goerli
             3141: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2"      // Filecoin
         };
 
@@ -1045,6 +1064,216 @@ const App = {
         reject(error);
       });
     });
+  },
+
+  // Get the appropriate API endpoint based on current network
+  getApiEndpoint: function() {
+    if (App.chainId === 1) {
+      return 'https://mainnet.tellorlayer.com';
+    } else {
+      return 'https://node-palmito.tellorlayer.com';
+    }
+  },
+
+  // Update network display in UI
+  updateNetworkDisplay: function() {
+    const networkDisplay = document.getElementById('network-display');
+    const toggleButton = document.getElementById('network-toggle-btn');
+    const toggleText = document.getElementById('toggle-text');
+    
+    if (networkDisplay) {
+      if (App.chainId === 1) {
+        networkDisplay.textContent = '*Ethereum Mainnet:';
+        networkDisplay.style.color = '#10b981'; // Green for mainnet
+        // Show network toggle for mainnet
+        if (toggleButton) {
+          toggleButton.style.display = 'inline-flex';
+          toggleButton.setAttribute('data-network', 'mainnet');
+          toggleButton.className = 'toggle-button mainnet';
+          toggleButton.disabled = false;
+        }
+        if (toggleText) toggleText.textContent = 'Switch to Sepolia';
+      } else if (App.chainId === 11155111) {
+        networkDisplay.textContent = '*Sepolia Test Network:';
+        networkDisplay.style.color = '#f59e0b'; // Orange for testnet
+        // Show network toggle for sepolia
+        if (toggleButton) {
+          toggleButton.style.display = 'inline-flex';
+          toggleButton.setAttribute('data-network', 'sepolia');
+          toggleButton.className = 'toggle-button sepolia';
+          toggleButton.disabled = false;
+        }
+        if (toggleText) toggleText.textContent = 'Switch to Mainnet';
+      } else if (App.chainId === undefined || App.chainId === null) {
+        networkDisplay.textContent = '*Connect Wallet to Start*';
+        networkDisplay.style.color = '#6b7280'; // Gray for disconnected
+        // Hide network toggle when not connected
+        if (toggleButton) toggleButton.style.display = 'none';
+      } else {
+        networkDisplay.textContent = '*Unsupported Network*';
+        networkDisplay.style.color = '#ef4444'; // Red for unsupported
+        // Hide network toggle for unsupported networks
+        if (toggleButton) toggleButton.style.display = 'none';
+      }
+    }
+  },
+
+  // Update Cosmos network display in UI
+  updateCosmosNetworkDisplay: function() {
+    const cosmosNetworkDisplay = document.getElementById('cosmos-network-display');
+    const cosmosToggleButton = document.getElementById('cosmos-network-toggle-btn');
+    const cosmosToggleText = document.getElementById('cosmos-toggle-text');
+    
+    if (cosmosNetworkDisplay) {
+      if (App.cosmosChainId === 'tellor-1') {
+        cosmosNetworkDisplay.textContent = '*Tellor Layer Mainnet:';
+        cosmosNetworkDisplay.style.color = '#10b981'; // Green for mainnet
+        // Show network toggle for mainnet
+        if (cosmosToggleButton) {
+          cosmosToggleButton.style.display = 'inline-flex';
+          cosmosToggleButton.setAttribute('data-network', 'mainnet');
+          cosmosToggleButton.className = 'toggle-button mainnet';
+          cosmosToggleButton.disabled = false;
+        }
+        if (cosmosToggleText) cosmosToggleText.textContent = 'Switch to Testnet';
+      } else if (App.cosmosChainId === 'layertest-4') {
+        cosmosNetworkDisplay.textContent = '*Tellor Layer Testnet:';
+        cosmosNetworkDisplay.style.color = '#f59e0b'; // Orange for testnet
+        // Show network toggle for testnet
+        if (cosmosToggleButton) {
+          cosmosToggleButton.style.display = 'inline-flex';
+          cosmosToggleButton.setAttribute('data-network', 'testnet');
+          cosmosToggleButton.className = 'toggle-button sepolia';
+          cosmosToggleButton.disabled = false;
+        }
+        if (cosmosToggleText) cosmosToggleText.textContent = 'Switch to Mainnet';
+      } else if (App.cosmosChainId === undefined || App.cosmosChainId === null) {
+        cosmosNetworkDisplay.textContent = '*Connect Cosmos Wallet to Start*';
+        cosmosNetworkDisplay.style.color = '#6b7280'; // Gray for disconnected
+        // Hide network toggle when not connected
+        if (cosmosToggleButton) cosmosToggleButton.style.display = 'none';
+      } else {
+        cosmosNetworkDisplay.textContent = '*Unsupported Cosmos Network*';
+        cosmosNetworkDisplay.style.color = '#ef4444'; // Red for unsupported
+        // Hide network toggle for unsupported networks
+        if (cosmosToggleButton) cosmosToggleButton.style.display = 'none';
+      }
+    }
+  },
+
+  // Switch Cosmos network function
+  switchCosmosNetwork: async function() {
+    if (!App.isKeplrConnected) {
+      alert('Please connect your Cosmos wallet first');
+      return;
+    }
+
+    const cosmosToggleButton = document.getElementById('cosmos-network-toggle-btn');
+    if (cosmosToggleButton) {
+      cosmosToggleButton.disabled = true;
+    }
+
+    try {
+      let targetChainId;
+      if (App.cosmosChainId === 'tellor-1') {
+        // Currently on mainnet, switch to testnet
+        targetChainId = 'layertest-4';
+      } else if (App.cosmosChainId === 'layertest-4') {
+        // Currently on testnet, switch to mainnet
+        targetChainId = 'tellor-1';
+      } else {
+        alert('Cannot switch from unsupported Cosmos network');
+        return;
+      }
+
+      // Disconnect current Cosmos connection
+      await App.disconnectKeplr();
+      
+      // Update App state
+      App.cosmosChainId = targetChainId;
+      
+      // Update UI
+      App.updateCosmosNetworkDisplay();
+      
+      // Reconnect with new network
+      await App.connectKeplr();
+      
+    } catch (error) {
+      // console.error('Error switching Cosmos network:', error);
+      App.handleError(error);
+    } finally {
+      if (cosmosToggleButton) {
+        cosmosToggleButton.disabled = false;
+      }
+    }
+  },
+
+  // Switch network function
+  switchNetwork: async function() {
+    if (!App.isConnected) {
+      alert('Please connect your wallet first');
+      return;
+    }
+
+    const toggleButton = document.getElementById('network-toggle-btn');
+    if (toggleButton) {
+      toggleButton.disabled = true;
+    }
+
+    try {
+      let targetChainId;
+      if (App.chainId === 1) {
+        // Currently on mainnet, switch to Sepolia
+        targetChainId = 11155111;
+      } else if (App.chainId === 11155111) {
+        // Currently on Sepolia, switch to mainnet
+        targetChainId = 1;
+      } else {
+        alert('Cannot switch from unsupported network');
+        return;
+      }
+
+      // Use wallet adapter if available, otherwise use direct ethereum
+      if (window.ethereumWalletAdapter && window.ethereumWalletAdapter.isWalletConnected()) {
+        await window.ethereumWalletAdapter.switchChain(targetChainId);
+      } else if (window.ethereum) {
+        const chainIdHex = '0x' + targetChainId.toString(16);
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: chainIdHex }]
+        });
+      } else {
+        alert('No wallet adapter available for network switching');
+        return;
+      }
+
+      // Update App state
+      App.chainId = targetChainId;
+      
+      // Reinitialize contracts with new network
+      await App.initBridgeContract();
+      await App.initTokenContract();
+      
+      // Update balances and limits
+      await Promise.all([
+        App.updateBalance(),
+        App.fetchDepositLimit()
+      ]);
+      
+      // Update UI
+      App.updateNetworkDisplay();
+      App.setPageParams();
+      
+      console.log(`Successfully switched to ${targetChainId === 1 ? 'Mainnet' : 'Sepolia'}`);
+      
+    } catch (error) {
+      console.error('Error switching network:', error);
+      alert(`Failed to switch network: ${error.message}`);
+    } finally {
+      if (toggleButton) {
+        toggleButton.disabled = false;
+      }
+    }
   },
 
   fetchDepositLimit: async function() {
@@ -1153,25 +1382,18 @@ const App = {
         // Format balance to 6 decimal places consistently
         const readableBalance = (balanceAmount / 1000000).toFixed(6);
 
-        // Update Cosmos wallet balance displays for Ethereum and Delegate sections only
-        // (currentBalance in Bridge to Tellor section is for MetaMask only)
+        // Update Cosmos wallet balance display
         const ethKeplrBalanceElement = document.getElementById("ethKeplrBalance");
-        const delegateKeplrBalanceElement = document.getElementById("delegateKeplrBalance");
         
         if (ethKeplrBalanceElement) {
-            ethKeplrBalanceElement.textContent = `${readableBalance} TRB`;
-        }
-        if (delegateKeplrBalanceElement) {
-            delegateKeplrBalanceElement.textContent = `${readableBalance} TRB`;
+            ethKeplrBalanceElement.textContent = `Balance: ${readableBalance} TRB`;
         }
     } catch (error) {
         // console.error(...);
-        // Set Cosmos wallet balances to 0 on error (excluding currentBalance which is for MetaMask)
+        // Set Cosmos wallet balance to 0 on error
         const ethKeplrBalanceElement = document.getElementById("ethKeplrBalance");
-        const delegateKeplrBalanceElement = document.getElementById("delegateKeplrBalance");
         
-        if (ethKeplrBalanceElement) ethKeplrBalanceElement.textContent = "0.000000 TRB";
-        if (delegateKeplrBalanceElement) delegateKeplrBalanceElement.textContent = "0.000000 TRB";
+        if (ethKeplrBalanceElement) ethKeplrBalanceElement.textContent = "Balance: 0.000000 TRB";
     }
   },
 
@@ -1370,7 +1592,7 @@ const App = {
     // Fetch TRB price from CoinGecko API
     async function updateTrbPrice() {
       try {
-        const response = await fetch('https://node-palmito.tellorlayer.com/tellor-io/layer/oracle/get_current_aggregate_report/5c13cd9c97dbb98f2429c101a2a8150e6c7a0ddaff6124ee176a3a411067ded0', {
+        const response = await fetch(App.getApiEndpoint() + '/tellor-io/layer/oracle/get_current_aggregate_report/5c13cd9c97dbb98f2429c101a2a8150e6c7a0ddaff6124ee176a3a411067ded0', {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
@@ -1546,24 +1768,18 @@ const App = {
         const readableBalance = App.web3.utils.fromWei(balance, 'ether');
         const formattedBalance = parseFloat(readableBalance).toFixed(6);
         
-        // Update both balance displays regardless of current direction
+        // Update balance display
         const layerBalanceElement = document.getElementById("currentBalance");
-        const ethBalanceElement = document.getElementById("ethMetaMaskBalance");
         
         if (layerBalanceElement) {
-            layerBalanceElement.textContent = `${formattedBalance} TRB`;
-        }
-        if (ethBalanceElement) {
-            ethBalanceElement.textContent = `${formattedBalance} TRB`;
+            layerBalanceElement.textContent = `Balance: ${formattedBalance} TRB`;
         }
     } catch (error) {
         // console.error(...);
-        // Set both balances to 0 on error
+        // Set balance to 0 on error
         const layerBalanceElement = document.getElementById("currentBalance");
-        const ethBalanceElement = document.getElementById("ethMetaMaskBalance");
         
-        if (layerBalanceElement) layerBalanceElement.textContent = "0.000000 TRB";
-        if (ethBalanceElement) ethBalanceElement.textContent = "0.000000 TRB";
+        if (layerBalanceElement) layerBalanceElement.textContent = "Balance: 0.000000 TRB";
     }
   },
 
@@ -1714,7 +1930,7 @@ const App = {
             // Verify transaction exists on blockchain
             let transactionConfirmed = false;
             try {
-                const verifyResponse = await fetch(`https://node-palmito.tellorlayer.com/cosmos/tx/v1beta1/txs/${txHash}`);
+                const verifyResponse = await fetch(`${App.getApiEndpoint()}/cosmos/tx/v1beta1/txs/${txHash}`);
                 if (verifyResponse.ok) {
                     const verifyData = await verifyResponse.json();
                     // console.log(...);
@@ -1741,9 +1957,9 @@ const App = {
                         
                         // Try alternative endpoints
                         const altEndpoints = [
-                            `https://node-palmito.tellorlayer.com/rpc/tx?hash=0x${txHash}&prove=false`,
-                            `https://node-palmito.tellorlayer.com/cosmos/tx/v1beta1/txs/${txHash.toUpperCase()}`,
-                            `https://node-palmito.tellorlayer.com/cosmos/tx/v1beta1/txs/${txHash.toLowerCase()}`
+                                        `${App.getApiEndpoint()}/rpc/tx?hash=0x${txHash}&prove=false`,
+            `${App.getApiEndpoint()}/cosmos/tx/v1beta1/txs/${txHash.toUpperCase()}`,
+            `${App.getApiEndpoint()}/cosmos/tx/v1beta1/txs/${txHash.toLowerCase()}`
                         ];
                         
                         for (const endpoint of altEndpoints) {
@@ -1832,7 +2048,7 @@ const App = {
         const cleanAddress = address.toLowerCase().trim();
 
         // Use the correct API endpoint
-        const baseEndpoint = 'https://node-palmito.tellorlayer.com';
+        const baseEndpoint = App.getApiEndpoint();
         
         // Get last withdrawal ID with proper error handling
         const response = await fetch(`${baseEndpoint}/layer/bridge/get_last_withdrawal_id`, {
@@ -1922,7 +2138,7 @@ const App = {
 
   fetchWithdrawalData: async function(queryId, retryCount = 0) {
     try {
-        const endpoint = `https://node-palmito.tellorlayer.com/tellor-io/layer/oracle/get_current_aggregate_report/${queryId}`;
+        const endpoint = `${App.getApiEndpoint()}/tellor-io/layer/oracle/get_current_aggregate_report/${queryId}`;
         
         const response = await fetch(endpoint);
         
@@ -2366,7 +2582,7 @@ const App = {
         const queryId = generateWithdrawalQueryId(withdrawalId);
 
         // Fetch the withdrawal data to get the correct timestamp
-        const response = await fetch(`https://node-palmito.tellorlayer.com/tellor-io/layer/oracle/get_current_aggregate_report/${queryId}`);
+        const response = await fetch(`${App.getApiEndpoint()}/tellor-io/layer/oracle/get_current_aggregate_report/${queryId}`);
         if (!response.ok) {
             throw new Error('Failed to fetch withdrawal data from oracle');
         }
@@ -2581,7 +2797,7 @@ const App = {
     try {
         // Remove 0x prefix for API calls if present
         const apiQueryId = queryId.startsWith('0x') ? queryId.slice(2) : queryId;
-        const baseEndpoint = 'https://node-palmito.tellorlayer.com';
+        const baseEndpoint = App.getApiEndpoint();
         
         // Step 1: Get snapshots for this report
         const snapshotsResponse = await fetch(
@@ -3077,7 +3293,7 @@ const App = {
   // Add new function to fetch validators from Layer network
   fetchValidators: async function() {
     try {
-      const response = await fetch('https://node-palmito.tellorlayer.com/cosmos/staking/v1beta1/validators?status=BOND_STATUS_BONDED&pagination.limit=1000');
+              const response = await fetch(`${App.getApiEndpoint()}/cosmos/staking/v1beta1/validators?status=BOND_STATUS_BONDED&pagination.limit=1000`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch validators: ${response.status}`);
@@ -3247,12 +3463,13 @@ async function checkBalance(amount) {
 }
 
 const SUPPORTED_CHAIN_IDS = {
-    11155111: 'Sepolia'  // Only Sepolia is supported for now
+    11155111: 'Sepolia',
+    1: 'Ethereum Mainnet'
 };
 
 function validateChainId(chainId) {
     if (!chainId || !SUPPORTED_CHAIN_IDS[chainId]) {
-        throw new Error(`Please connect to Sepolia (chain ID: 11155111). Mainnet support coming soon.`);
+        throw new Error(`Please connect to Sepolia (chain ID: 11155111) or Ethereum Mainnet (chain ID: 1).`);
     }
     return true;
 }
