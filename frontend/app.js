@@ -23,7 +23,7 @@ const App = {
   connectedWallet: null,
   keplrAddress: null,
   currentBridgeDirection: 'layer', // 'layer' or 'ethereum'
-  cosmosChainId: 'layertest-4', // Default to testnet
+  cachedCosmosWalletType: null, // Cache the selected Cosmos wallet type
 
   _depositLimit: function() {
     return App.depositLimit;
@@ -49,6 +49,7 @@ const App = {
           .then(() => {
             App.initInputValidation();
             App.initBridgeDirectionUI(); // Initialize bridge direction UI
+            App.initWalletManagerDropdown(); // Initialize wallet manager dropdown
             
             // Initialize network display
             App.updateNetworkDisplay();
@@ -328,6 +329,12 @@ const App = {
             walletButton.innerHTML = `Disconnect <span class="truncated-address">(${truncatedAddress})</span>`;
         }
         
+        // Update wallet manager toggle text
+        App.updateWalletManagerToggleText();
+        
+        // Keep dropdown open after wallet connection
+        App.keepWalletDropdownOpen();
+        
         // Update balances and limits
         await Promise.all([
             App.updateBalance(),
@@ -528,6 +535,12 @@ const App = {
         if (walletButton) {
             walletButton.innerHTML = `Disconnect <span class="truncated-address">(${truncatedAddress})</span>`;
         }
+        
+        // Update wallet manager toggle text
+        App.updateWalletManagerToggleText();
+        
+        // Keep dropdown open after wallet connection
+        App.keepWalletDropdownOpen();
 
         
         // Update balances and limits
@@ -582,8 +595,16 @@ const App = {
             });
         }
 
+        // Set default chain ID if not already set
+        if (!App.cosmosChainId) {
+            App.cosmosChainId = 'layertest-4'; // Default to testnet
+        }
+        
         // Connect to the selected wallet
         const connectionResult = await window.cosmosWalletAdapter.connectToWallet(walletType);
+        
+        // Cache the wallet type for future reconnections
+        App.cachedCosmosWalletType = walletType;
         
         // Set wallet state
         App.keplrAddress = connectionResult.address;
@@ -599,8 +620,17 @@ const App = {
             keplrButton.innerHTML = `Disconnect  <span class="truncated-address">(${truncatedAddress})</span>`;
         }
         
+        // Update wallet manager toggle text
+        App.updateWalletManagerToggleText();
+        
+        // Keep dropdown open after wallet connection
+        App.keepWalletDropdownOpen();
+        
         // Update balance immediately after connection
         await App.updateKeplrBalance();
+        
+        // Update Cosmos network display
+        App.updateCosmosNetworkDisplay();
         
         // Enable action buttons based on current section
         if (App.currentBridgeDirection === 'ethereum') {
@@ -613,6 +643,8 @@ const App = {
             if (delegateButton) {
                 delegateButton.disabled = false;
             }
+            // Refresh validator dropdown when connecting in delegate section
+            await App.populateValidatorDropdown();
         }
         
         App.setPageParams();
@@ -622,6 +654,7 @@ const App = {
         App.keplrAddress = null;
         App.isKeplrConnected = false;
         App.connectedWallet = null;
+        App.cachedCosmosWalletType = null;
         
         throw error;
     }
@@ -631,6 +664,11 @@ const App = {
     try {
         if (!window.keplr) {
             throw new Error('Keplr not installed');
+        }
+        
+        // Set default chain ID if not already set
+        if (!App.cosmosChainId) {
+            App.cosmosChainId = 'layertest-4'; // Default to testnet
         }
         
         // Get the appropriate endpoints based on current Cosmos network
@@ -720,6 +758,12 @@ const App = {
             keplrButton.innerHTML = `Disconnect <span class="truncated-address">(${truncatedAddress})</span>`;
         }
         
+        // Update wallet manager toggle text
+        App.updateWalletManagerToggleText();
+        
+        // Keep dropdown open after wallet connection
+        App.keepWalletDropdownOpen();
+        
         // Update balance immediately after connection
         await App.updateKeplrBalance();
         
@@ -737,6 +781,8 @@ const App = {
             if (delegateButton) {
                 delegateButton.disabled = false;
             }
+            // Refresh validator dropdown when connecting in delegate section
+            await App.populateValidatorDropdown();
         }
         
         App.setPageParams();
@@ -745,6 +791,7 @@ const App = {
         App.keplrAddress = null;
         App.isKeplrConnected = false;
         App.connectedWallet = null;
+        App.cachedCosmosWalletType = null;
         
         throw error;
     }
@@ -773,6 +820,9 @@ const App = {
         if (walletButton) {
             walletButton.innerHTML = 'Connect Ethereum Wallet';
         }
+        
+        // Update wallet manager toggle text
+        App.updateWalletManagerToggleText();
 
         // Update balances
         const currentBalance = document.getElementById('currentBalance');
@@ -780,6 +830,11 @@ const App = {
         if (currentBalance) {
             currentBalance.textContent = 'Balance: 0 TRB';
         }
+
+        // Hide Ethereum network group
+        const networkDisplay = document.getElementById('network-display');
+        const networkGroup = networkDisplay ? networkDisplay.closest('.network-group') : null;
+        if (networkGroup) networkGroup.style.display = 'none';
 
         // Disable action buttons
         const approveButton = document.getElementById('approveButton');
@@ -823,6 +878,7 @@ const App = {
         App.keplrAddress = null;
         App.isKeplrConnected = false;
         App.connectedWallet = null;
+        App.cachedCosmosWalletType = null;
 
         // Update wallet button with generic text
         const keplrButton = document.getElementById('keplrButton');
@@ -830,12 +886,20 @@ const App = {
             keplrButton.innerHTML = 'Connect Cosmos Wallet';
             // console.log(...);
         }
+        
+        // Update wallet manager toggle text
+        App.updateWalletManagerToggleText();
 
         // Update balances
         const ethKeplrBalance = document.getElementById('ethKeplrBalance');
         if (ethKeplrBalance) {
             ethKeplrBalance.textContent = 'Balance: 0 TRB';
         }
+
+        // Hide Cosmos network group
+        const cosmosNetworkDisplay = document.getElementById('cosmos-network-display');
+        const cosmosNetworkGroup = cosmosNetworkDisplay ? cosmosNetworkDisplay.closest('.network-group') : null;
+        if (cosmosNetworkGroup) cosmosNetworkGroup.style.display = 'none';
 
         // Disable action buttons
         const withdrawButton = document.getElementById('withdrawButton');
@@ -906,6 +970,12 @@ const App = {
         
         // Update the wallet button
         document.getElementById('walletButton').innerHTML = `Disconnect <span class="truncated-address">(${truncatedAddress})</span>`;
+        
+        // Update wallet manager toggle text
+        App.updateWalletManagerToggleText();
+        
+        // Keep dropdown open after account change
+        App.keepWalletDropdownOpen();
         
         App.setPageParams();
         this.updateUIForCurrentDirection();
@@ -1075,11 +1145,21 @@ const App = {
     }
   },
 
+  // Get the appropriate Cosmos API endpoint based on current Cosmos network
+  getCosmosApiEndpoint: function() {
+    if (App.cosmosChainId === 'tellor-1') {
+      return 'https://mainnet.tellorlayer.com';
+    } else {
+      return 'https://node-palmito.tellorlayer.com';
+    }
+  },
+
   // Update network display in UI
   updateNetworkDisplay: function() {
     const networkDisplay = document.getElementById('network-display');
     const toggleButton = document.getElementById('network-toggle-btn');
     const toggleText = document.getElementById('toggle-text');
+    const networkGroup = networkDisplay ? networkDisplay.closest('.network-group') : null;
     
     if (networkDisplay) {
       if (App.chainId === 1) {
@@ -1093,6 +1173,7 @@ const App = {
           toggleButton.disabled = false;
         }
         if (toggleText) toggleText.textContent = 'Switch to Sepolia';
+        if (networkGroup) networkGroup.style.display = 'flex';
       } else if (App.chainId === 11155111) {
         networkDisplay.textContent = '*Sepolia Test Network:';
         networkDisplay.style.color = '#f59e0b'; // Orange for testnet
@@ -1104,16 +1185,16 @@ const App = {
           toggleButton.disabled = false;
         }
         if (toggleText) toggleText.textContent = 'Switch to Mainnet';
+        if (networkGroup) networkGroup.style.display = 'flex';
       } else if (App.chainId === undefined || App.chainId === null) {
-        networkDisplay.textContent = '*Connect Wallet to Start*';
-        networkDisplay.style.color = '#6b7280'; // Gray for disconnected
-        // Hide network toggle when not connected
-        if (toggleButton) toggleButton.style.display = 'none';
+        // Hide entire network group when not connected
+        if (networkGroup) networkGroup.style.display = 'none';
       } else {
         networkDisplay.textContent = '*Unsupported Network*';
         networkDisplay.style.color = '#ef4444'; // Red for unsupported
         // Hide network toggle for unsupported networks
         if (toggleButton) toggleButton.style.display = 'none';
+        if (networkGroup) networkGroup.style.display = 'none';
       }
     }
   },
@@ -1123,6 +1204,7 @@ const App = {
     const cosmosNetworkDisplay = document.getElementById('cosmos-network-display');
     const cosmosToggleButton = document.getElementById('cosmos-network-toggle-btn');
     const cosmosToggleText = document.getElementById('cosmos-toggle-text');
+    const cosmosNetworkGroup = cosmosNetworkDisplay ? cosmosNetworkDisplay.closest('.network-group') : null;
     
     if (cosmosNetworkDisplay) {
       if (App.cosmosChainId === 'tellor-1') {
@@ -1136,6 +1218,7 @@ const App = {
           cosmosToggleButton.disabled = false;
         }
         if (cosmosToggleText) cosmosToggleText.textContent = 'Switch to Testnet';
+        if (cosmosNetworkGroup) cosmosNetworkGroup.style.display = 'flex';
       } else if (App.cosmosChainId === 'layertest-4') {
         cosmosNetworkDisplay.textContent = '*Tellor Layer Testnet:';
         cosmosNetworkDisplay.style.color = '#f59e0b'; // Orange for testnet
@@ -1147,18 +1230,131 @@ const App = {
           cosmosToggleButton.disabled = false;
         }
         if (cosmosToggleText) cosmosToggleText.textContent = 'Switch to Mainnet';
+        if (cosmosNetworkGroup) cosmosNetworkGroup.style.display = 'flex';
       } else if (App.cosmosChainId === undefined || App.cosmosChainId === null) {
-        cosmosNetworkDisplay.textContent = '*Connect Cosmos Wallet to Start*';
-        cosmosNetworkDisplay.style.color = '#6b7280'; // Gray for disconnected
-        // Hide network toggle when not connected
-        if (cosmosToggleButton) cosmosToggleButton.style.display = 'none';
+        // Hide entire network group when not connected
+        if (cosmosNetworkGroup) cosmosNetworkGroup.style.display = 'none';
       } else {
         cosmosNetworkDisplay.textContent = '*Unsupported Cosmos Network*';
         cosmosNetworkDisplay.style.color = '#ef4444'; // Red for unsupported
         // Hide network toggle for unsupported networks
         if (cosmosToggleButton) cosmosToggleButton.style.display = 'none';
+        if (cosmosNetworkGroup) cosmosNetworkGroup.style.display = 'none';
       }
     }
+  },
+
+  // Show confirmation modal
+  showConfirmationModal: function(message, onConfirm, onCancel) {
+    const modal = document.createElement('div');
+    modal.id = 'confirmationModal';
+    modal.style.position = 'fixed';
+    modal.style.top = '0';
+    modal.style.left = '0';
+    modal.style.width = '100%';
+    modal.style.height = '100%';
+    modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+    modal.style.zIndex = '1000';
+    modal.style.display = 'flex';
+    modal.style.alignItems = 'center';
+    modal.style.justifyContent = 'center';
+
+    const modalContent = document.createElement('div');
+    modalContent.style.backgroundColor = '#d4d8e3';
+    modalContent.style.color = '#083b44';
+    modalContent.style.borderRadius = '10px';
+    modalContent.style.border = '3px solid black';
+    modalContent.style.padding = '30px';
+    modalContent.style.fontFamily = "'PPNeueMontreal-Book', Arial, sans-serif";
+    modalContent.style.fontSize = "15px";
+    modalContent.style.width = '400px';
+    modalContent.style.textAlign = 'center';
+    modalContent.style.maxWidth = '90vw';
+
+    const messageDiv = document.createElement('div');
+    messageDiv.textContent = message;
+    messageDiv.style.marginBottom = '25px';
+    messageDiv.style.lineHeight = '1.4';
+    modalContent.appendChild(messageDiv);
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.display = 'flex';
+    buttonContainer.style.gap = '15px';
+    buttonContainer.style.justifyContent = 'center';
+
+    const confirmButton = document.createElement('button');
+    confirmButton.textContent = 'Continue';
+    confirmButton.style.padding = '10px 20px';
+    confirmButton.style.backgroundColor = '#10b981';
+    confirmButton.style.color = 'white';
+    confirmButton.style.border = 'none';
+    confirmButton.style.borderRadius = '5px';
+    confirmButton.style.fontFamily = "'PPNeueMontreal-Bold', Arial, sans-serif";
+    confirmButton.style.fontSize = '14px';
+    confirmButton.style.cursor = 'pointer';
+    confirmButton.style.transition = 'background-color 0.2s';
+
+    const cancelButton = document.createElement('button');
+    cancelButton.textContent = 'Cancel';
+    cancelButton.style.padding = '10px 20px';
+    cancelButton.style.backgroundColor = '#6b7280';
+    cancelButton.style.color = 'white';
+    cancelButton.style.border = 'none';
+    cancelButton.style.borderRadius = '5px';
+    cancelButton.style.fontFamily = "'PPNeueMontreal-Bold', Arial, sans-serif";
+    cancelButton.style.fontSize = '14px';
+    cancelButton.style.cursor = 'pointer';
+    cancelButton.style.transition = 'background-color 0.2s';
+
+    // Hover effects
+    confirmButton.onmouseenter = () => {
+      confirmButton.style.backgroundColor = '#059669';
+    };
+    confirmButton.onmouseleave = () => {
+      confirmButton.style.backgroundColor = '#10b981';
+    };
+
+    cancelButton.onmouseenter = () => {
+      cancelButton.style.backgroundColor = '#4b5563';
+    };
+    cancelButton.onmouseleave = () => {
+      cancelButton.style.backgroundColor = '#6b7280';
+    };
+
+    // Event handlers
+    confirmButton.onclick = () => {
+      document.body.removeChild(modal);
+      if (onConfirm) onConfirm();
+    };
+
+    cancelButton.onclick = () => {
+      document.body.removeChild(modal);
+      if (onCancel) onCancel();
+    };
+
+    // Close on overlay click
+    modal.onclick = (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+        if (onCancel) onCancel();
+      }
+    };
+
+    // Close on Escape key
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        document.body.removeChild(modal);
+        document.removeEventListener('keydown', handleEscape);
+        if (onCancel) onCancel();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+
+    buttonContainer.appendChild(cancelButton);
+    buttonContainer.appendChild(confirmButton);
+    modalContent.appendChild(buttonContainer);
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
   },
 
   // Switch Cosmos network function
@@ -1168,10 +1364,19 @@ const App = {
       return;
     }
 
-    const cosmosToggleButton = document.getElementById('cosmos-network-toggle-btn');
-    if (cosmosToggleButton) {
-      cosmosToggleButton.disabled = true;
-    }
+    // Show confirmation dialog
+    const targetNetwork = App.cosmosChainId === 'tellor-1' ? 'testnet' : 'mainnet';
+    const currentNetwork = App.cosmosChainId === 'tellor-1' ? 'mainnet' : 'testnet';
+    
+    const message = `Switching from ${currentNetwork} to ${targetNetwork} requires reconnecting your wallet. Do you want to continue?`;
+    
+         App.showConfirmationModal(message, async () => {
+       // User confirmed - proceed with network switch
+       const cosmosToggleButton = document.getElementById('cosmos-network-toggle-btn');
+       if (cosmosToggleButton) {
+         cosmosToggleButton.disabled = true;
+         cosmosToggleButton.textContent = 'Switching...';
+       }
 
     try {
       let targetChainId;
@@ -1182,7 +1387,7 @@ const App = {
         // Currently on testnet, switch to mainnet
         targetChainId = 'tellor-1';
       } else {
-        alert('Cannot switch from unsupported Cosmos network');
+        App.showValidationErrorPopup('Cannot switch from unsupported Cosmos network');
         return;
       }
 
@@ -1195,8 +1400,34 @@ const App = {
       // Update UI
       App.updateCosmosNetworkDisplay();
       
-      // Reconnect with new network
-      await App.connectKeplr();
+      // Reconnect with new network using cached wallet type if available
+      if (App.cachedCosmosWalletType && window.cosmosWalletAdapter) {
+        // Use the wallet adapter with cached wallet type
+        await App.connectCosmosWallet(App.cachedCosmosWalletType);
+      } else {
+        // Fall back to legacy Keplr connection
+        await App.connectKeplr();
+      }
+      
+      // Refresh validator dropdown if currently in delegate section
+      if (App.currentBridgeDirection === 'delegate') {
+        await App.populateValidatorDropdown();
+      }
+      
+      // Update balance for the new network after a small delay to ensure wallet is ready
+      setTimeout(async () => {
+        try {
+          await App.updateKeplrBalance();
+        } catch (error) {
+          console.error('Error updating balance after network switch:', error);
+        }
+      }, 1000);
+      
+      // Re-enable the toggle button
+      if (cosmosToggleButton) {
+        cosmosToggleButton.disabled = false;
+        cosmosToggleButton.textContent = 'Switch Network';
+      }
       
     } catch (error) {
       // console.error('Error switching Cosmos network:', error);
@@ -1204,8 +1435,10 @@ const App = {
     } finally {
       if (cosmosToggleButton) {
         cosmosToggleButton.disabled = false;
+        cosmosToggleButton.textContent = 'Switch Network';
       }
     }
+  });
   },
 
   // Switch network function
@@ -1229,7 +1462,7 @@ const App = {
         // Currently on Sepolia, switch to mainnet
         targetChainId = 1;
       } else {
-        alert('Cannot switch from unsupported network');
+        App.showValidationErrorPopup('Cannot switch from unsupported network');
         return;
       }
 
@@ -1364,21 +1597,47 @@ const App = {
             offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
         } else {
             // Legacy Keplr method
-            offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+            offlineSigner = window.keplr.getOfflineSigner(App.cosmosChainId);
         }
 
+        // Get the appropriate RPC endpoint based on current Cosmos network
+        let rpcEndpoint;
+        if (App.cosmosChainId === 'tellor-1') {
+            rpcEndpoint = 'https://mainnet.tellorlayer.com/rpc';
+        } else {
+            rpcEndpoint = 'https://node-palmito.tellorlayer.com/rpc';
+        }
+
+
+        
+        // Force a fresh connection by using a new client each time
         const signingClient = await window.cosmjs.stargate.SigningStargateClient.connectWithSigner(
-            'https://node-palmito.tellorlayer.com/rpc',
-            offlineSigner
+            rpcEndpoint,
+            offlineSigner,
+            {
+                gasPrice: "0.025loya"
+            }
         );
 
-        const balance = await signingClient.getBalance(App.keplrAddress, "loya");
 
-        if (!balance || !balance.amount) {
-            throw new Error('Invalid balance response from chain');
+        
+        // Use REST API directly to get the correct balance for the current network
+        let balanceAmount = 0;
+        try {
+            const restUrl = rpcEndpoint.replace('/rpc', '');
+            const restResponse = await fetch(`${restUrl}/cosmos/bank/v1beta1/balances/${App.keplrAddress}`);
+            const restData = await restResponse.json();
+            // Find the loya balance in the response
+            if (restData.balances && Array.isArray(restData.balances)) {
+                const loyaBalance = restData.balances.find(b => b.denom === 'loya');
+                if (loyaBalance) {
+                    balanceAmount = parseInt(loyaBalance.amount);
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching balance from REST API:', error);
         }
-
-        const balanceAmount = parseInt(balance.amount);
+        
         // Format balance to 6 decimal places consistently
         const readableBalance = (balanceAmount / 1000000).toFixed(6);
 
@@ -1389,7 +1648,7 @@ const App = {
             ethKeplrBalanceElement.textContent = `Balance: ${readableBalance} TRB`;
         }
     } catch (error) {
-        // console.error(...);
+        console.error('Error updating Keplr balance:', error);
         // Set Cosmos wallet balance to 0 on error
         const ethKeplrBalanceElement = document.getElementById("ethKeplrBalance");
         
@@ -1506,17 +1765,17 @@ const App = {
         
         // Validate recipient address is not empty and starts with 'tellor1...'
         if (!recipient || recipient.trim() === '') {
-            alert('Recipient address cannot be empty');
+            App.showValidationErrorPopup('Recipient address cannot be empty');
             return;
         }
         
         if (!recipient.startsWith('tellor1')) {
-            alert('Recipient address must start with "tellor1..."');
+            App.showValidationErrorPopup('Recipient address must start with "tellor1..."');
             return;
         }
 
         if (recipient.length !== 45) {
-            alert('Recipient address must be exactly 45 characters long');
+            App.showValidationErrorPopup('Recipient address must be exactly 45 characters long');
             return;
         }
 
@@ -1529,7 +1788,7 @@ const App = {
 
         if (balanceBN.lt(amountBN)) {
             const errorMsg = `Insufficient token balance. You have ${App.web3.utils.fromWei(balance, 'ether')} TRB but trying to deposit ${amount} TRB`;
-            alert(errorMsg);
+            App.showBalanceErrorPopup(errorMsg);
             return;
         }
 
@@ -1794,12 +2053,12 @@ const App = {
         const ethereumAddress = document.getElementById('ethQueryId').value;
 
         if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
-            alert('Please enter a valid amount');
+            App.showValidationErrorPopup('Please enter a valid amount');
             return;
         }
 
         if (!ethereumAddress || !ethereumAddress.startsWith('0x')) {
-            alert('Please enter a valid Ethereum address');
+            App.showValidationErrorPopup('Please enter a valid Ethereum address');
             return;
         }
 
@@ -1808,7 +2067,7 @@ const App = {
         
         // Validate amount is positive and reasonable
         if (parseInt(amountInMicroUnits) <= 0) {
-            alert('Please enter a valid amount greater than 0');
+            App.showValidationErrorPopup('Please enter a valid amount greater than 0');
             return;
         }
 
@@ -1817,12 +2076,20 @@ const App = {
         if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
             offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
         } else {
-            offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+            offlineSigner = window.keplr.getOfflineSigner(App.cosmosChainId);
+        }
+
+        // Get the appropriate RPC endpoint based on current Cosmos network
+        let rpcEndpoint;
+        if (App.cosmosChainId === 'tellor-1') {
+            rpcEndpoint = 'https://mainnet.tellorlayer.com';
+        } else {
+            rpcEndpoint = 'https://node-palmito.tellorlayer.com';
         }
 
         // Create the client using the stargate implementation
         const client = await window.cosmjs.stargate.SigningStargateClient.connectWithSigner(
-            'https://node-palmito.tellorlayer.com',
+            rpcEndpoint,
             offlineSigner
         );
 
@@ -2410,27 +2677,107 @@ const App = {
   },
 
   showBalanceErrorPopup: function(message) {
-    const popup = document.createElement('div');
-    popup.id = 'balanceErrorPopup';
-    popup.className = 'balance-error-popup';
-    popup.textContent = message;
-    
-    document.body.appendChild(popup);
-    
-    // Remove the popup after 3 seconds
-    setTimeout(() => {
-      const popup = document.getElementById('balanceErrorPopup');
-      if (popup) {
-        popup.remove();
+    const modal = document.createElement('div');
+    modal.id = 'balanceErrorModal';
+    modal.style.position = 'fixed';
+    modal.style.top = '0';
+    modal.style.left = '0';
+    modal.style.width = '100%';
+    modal.style.height = '100%';
+    modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+    modal.style.zIndex = '1000';
+    modal.style.display = 'flex';
+    modal.style.alignItems = 'center';
+    modal.style.justifyContent = 'center';
+
+    const modalContent = document.createElement('div');
+    modalContent.style.backgroundColor = '#d4d8e3';
+    modalContent.style.color = '#083b44';
+    modalContent.style.borderRadius = '10px';
+    modalContent.style.border = '3px solid black';
+    modalContent.style.padding = '30px';
+    modalContent.style.fontFamily = "'PPNeueMontreal-Book', Arial, sans-serif";
+    modalContent.style.fontSize = "15px";
+    modalContent.style.width = '400px';
+    modalContent.style.textAlign = 'center';
+    modalContent.style.maxWidth = '90vw';
+
+    const messageDiv = document.createElement('div');
+    messageDiv.textContent = message;
+    messageDiv.style.marginBottom = '25px';
+    messageDiv.style.lineHeight = '1.4';
+    modalContent.appendChild(messageDiv);
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.display = 'flex';
+    buttonContainer.style.justifyContent = 'center';
+
+    const okButton = document.createElement('button');
+    okButton.textContent = 'OK';
+    okButton.style.padding = '10px 30px';
+    okButton.style.backgroundColor = '#10b981';
+    okButton.style.color = 'white';
+    okButton.style.border = 'none';
+    okButton.style.borderRadius = '5px';
+    okButton.style.fontFamily = "'PPNeueMontreal-Bold', Arial, sans-serif";
+    okButton.style.fontSize = '14px';
+    okButton.style.cursor = 'pointer';
+    okButton.style.transition = 'background-color 0.2s';
+
+    // Hover effects
+    okButton.onmouseenter = () => {
+      okButton.style.backgroundColor = '#059669';
+    };
+    okButton.onmouseleave = () => {
+      okButton.style.backgroundColor = '#10b981';
+    };
+
+    // Event handlers
+    okButton.onclick = () => {
+      document.body.removeChild(modal);
+    };
+
+    // Close on overlay click
+    modal.onclick = (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
       }
-    }, 3000);
+    };
+
+    // Close on Escape key
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        document.body.removeChild(modal);
+        document.removeEventListener('keydown', handleEscape);
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+
+    // Auto-close after 5 seconds
+    setTimeout(() => {
+      const modal = document.getElementById('balanceErrorModal');
+      if (modal) {
+        document.body.removeChild(modal);
+        document.removeEventListener('keydown', handleEscape);
+      }
+    }, 5000);
+
+    buttonContainer.appendChild(okButton);
+    modalContent.appendChild(buttonContainer);
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
   },
 
   hideBalanceErrorPopup: function() {
-    const popup = document.getElementById('balanceErrorPopup');
-    if (popup) {
-      popup.remove();
+    const modal = document.getElementById('balanceErrorModal');
+    if (modal) {
+      document.body.removeChild(modal);
     }
+  },
+
+  // Show validation error modal (reuses existing popup structure)
+  showValidationErrorPopup: function(message) {
+    App.showBalanceErrorPopup(message);
   },
 
   // Add new function to handle delegation
@@ -2448,7 +2795,7 @@ const App = {
                 await window.cosmosWalletAdapter.enableChain();
             } else if (window.keplr) {
                 // Fallback to legacy Keplr method
-                await window.keplr.enable('layertest-4');
+                await window.keplr.enable(App.cosmosChainId);
             } else {
                 throw new Error('No wallet available');
             }
@@ -2470,18 +2817,47 @@ const App = {
 
         // Validate inputs
         if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
-            alert('Please enter a valid amount');
+            App.showValidationErrorPopup('Please enter a valid amount');
             return;
         }
 
         if (!validatorAddress || !validatorAddress.trim()) {
-            alert('Please select a validator from the dropdown');
+            App.showValidationErrorPopup('Please select a validator from the dropdown');
             return;
         }
 
         // Validate validator address format (should start with tellorvaloper)
         if (!validatorAddress.startsWith('tellorvaloper')) {
-            alert('Please select a valid validator from the dropdown');
+            App.showValidationErrorPopup('Please select a valid validator from the dropdown');
+            return;
+        }
+
+        // Check if user has sufficient balance
+        const amountInMicroUnits = Math.floor(parseFloat(amount) * 1000000).toString();
+        
+        // Get current balance using the same method as updateKeplrBalance
+        let currentBalance = 0;
+        try {
+            const rpcEndpoint = App.cosmosChainId === 'tellor-1' 
+                ? 'https://mainnet.tellorlayer.com/rpc' 
+                : 'https://node-palmito.tellorlayer.com/rpc';
+            const restUrl = rpcEndpoint.replace('/rpc', '');
+            const restResponse = await fetch(`${restUrl}/cosmos/bank/v1beta1/balances/${App.keplrAddress}`);
+            const restData = await restResponse.json();
+            
+            if (restData.balances && Array.isArray(restData.balances)) {
+                const loyaBalance = restData.balances.find(b => b.denom === 'loya');
+                if (loyaBalance) {
+                    currentBalance = parseInt(loyaBalance.amount);
+                }
+            }
+        } catch (error) {
+            console.error('Error checking balance for delegation:', error);
+        }
+
+        if (currentBalance < parseInt(amountInMicroUnits)) {
+            const readableCurrentBalance = (currentBalance / 1000000).toFixed(6);
+            App.showBalanceErrorPopup(`Insufficient balance. You have ${readableCurrentBalance} TRB but trying to delegate ${amount} TRB.`);
             return;
         }
 
@@ -2498,7 +2874,7 @@ const App = {
         if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
             offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
         } else {
-            offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+            offlineSigner = window.keplr.getOfflineSigner(App.cosmosChainId);
         }
         const accounts = await offlineSigner.getAccounts();
         const layerAccount = accounts[0].address;
@@ -2552,7 +2928,7 @@ const App = {
                 await window.cosmosWalletAdapter.enableChain();
             } else if (window.keplr) {
                 // Fallback to legacy Keplr method
-                await window.keplr.enable('layertest-4');
+                await window.keplr.enable(App.cosmosChainId);
             } else {
                 throw new Error('No wallet available');
             }
@@ -2582,7 +2958,7 @@ const App = {
         const queryId = generateWithdrawalQueryId(withdrawalId);
 
         // Fetch the withdrawal data to get the correct timestamp
-        const response = await fetch(`${App.getApiEndpoint()}/tellor-io/layer/oracle/get_current_aggregate_report/${queryId}`);
+        const response = await fetch(`${App.getCosmosApiEndpoint()}/tellor-io/layer/oracle/get_current_aggregate_report/${queryId}`);
         if (!response.ok) {
             throw new Error('Failed to fetch withdrawal data from oracle');
         }
@@ -2601,7 +2977,7 @@ const App = {
         if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
             offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
         } else {
-            offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+            offlineSigner = window.keplr.getOfflineSigner(App.cosmosChainId);
         }
         const accounts = await offlineSigner.getAccounts();
         const layerAccount = accounts[0].address;
@@ -3182,6 +3558,103 @@ const App = {
     });
   },
 
+  initWalletManagerDropdown: function() {
+    const walletManagerToggle = document.getElementById('walletManagerToggle');
+    const walletManagerDropdown = document.querySelector('.wallet-manager-dropdown');
+    const walletManagerClose = document.getElementById('walletManagerClose');
+    
+    if (walletManagerToggle && walletManagerDropdown) {
+      // Remove any existing event listeners by cloning the button
+      const newToggle = walletManagerToggle.cloneNode(true);
+      walletManagerToggle.parentNode.replaceChild(newToggle, walletManagerToggle);
+      
+      newToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        walletManagerDropdown.classList.toggle('open');
+      });
+      
+      // Close dropdown when clicking close button
+      if (walletManagerClose) {
+        const newClose = walletManagerClose.cloneNode(true);
+        walletManagerClose.parentNode.replaceChild(newClose, walletManagerClose);
+        
+        newClose.addEventListener('click', (e) => {
+          e.stopPropagation();
+          walletManagerDropdown.classList.remove('open');
+        });
+      }
+      
+      // Close dropdown when clicking outside (but not on wallet-related elements)
+      document.addEventListener('click', (e) => {
+        // Don't close if clicking on any wallet-related elements inside the dropdown
+        if (walletManagerDropdown.contains(e.target) || 
+            e.target.closest('.wallet-section') ||
+            e.target.closest('.wallet-group') ||
+            e.target.closest('.network-group') ||
+            e.target.closest('.button-style-1') ||
+            e.target.closest('.button-style-2') ||
+            e.target.closest('.toggle-button')) {
+          return;
+        }
+        
+        // Only close if clicking truly outside the dropdown
+        if (!walletManagerDropdown.contains(e.target)) {
+          walletManagerDropdown.classList.remove('open');
+        }
+      });
+      
+      // Close dropdown on escape key
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          walletManagerDropdown.classList.remove('open');
+        }
+      });
+      
+      // Initial update of toggle text
+      this.updateWalletManagerToggleText();
+    } else {
+      // Try again after a short delay
+      setTimeout(() => {
+        this.initWalletManagerDropdown();
+      }, 1000);
+    }
+  },
+
+  updateWalletManagerToggleText: function() {
+    const walletManagerText = document.querySelector('.wallet-manager-text');
+    if (!walletManagerText) return;
+    
+    const isEthereumConnected = App.isConnected && App.account !== '0x0';
+    const isCosmosConnected = App.isKeplrConnected && App.keplrAddress;
+    
+    if (isEthereumConnected && isCosmosConnected) {
+      const ethTruncatedAddress = `${App.account.substring(0, 6)}...${App.account.substring(App.account.length - 4)}`;
+      const cosmosTruncatedAddress = `${App.keplrAddress.substring(0, 6)}...${App.keplrAddress.substring(App.keplrAddress.length - 4)}`;
+      walletManagerText.textContent = `Ethereum: ${ethTruncatedAddress} | Cosmos: ${cosmosTruncatedAddress}`;
+    } else if (isEthereumConnected) {
+      const truncatedAddress = `${App.account.substring(0, 6)}...${App.account.substring(App.account.length - 4)}`;
+      walletManagerText.textContent = `Ethereum: ${truncatedAddress} | Cosmos: Not Connected`;
+    } else if (isCosmosConnected) {
+      const truncatedAddress = `${App.keplrAddress.substring(0, 6)}...${App.keplrAddress.substring(App.keplrAddress.length - 4)}`;
+      walletManagerText.textContent = `Ethereum: Not Connected | Cosmos: ${truncatedAddress}`;
+    } else {
+      walletManagerText.textContent = 'Wallet Manager';
+    }
+  },
+
+  keepWalletDropdownOpen: function() {
+    const walletManagerDropdown = document.querySelector('.wallet-manager-dropdown');
+    if (walletManagerDropdown) {
+      // Ensure dropdown stays open after wallet operations
+      // Use a small delay to ensure it works after any UI updates
+      setTimeout(() => {
+        if (!walletManagerDropdown.classList.contains('open')) {
+          walletManagerDropdown.classList.add('open');
+        }
+      }, 100);
+    }
+  },
+
   switchBridgeDirection: function(direction) {
     if (direction !== 'layer' && direction !== 'ethereum' && direction !== 'delegate') {
         // console.error(...);
@@ -3293,7 +3766,7 @@ const App = {
   // Add new function to fetch validators from Layer network
   fetchValidators: async function() {
     try {
-              const response = await fetch(`${App.getApiEndpoint()}/cosmos/staking/v1beta1/validators?status=BOND_STATUS_BONDED&pagination.limit=1000`);
+              const response = await fetch(`${App.getCosmosApiEndpoint()}/cosmos/staking/v1beta1/validators?status=BOND_STATUS_BONDED&pagination.limit=1000`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch validators: ${response.status}`);
@@ -3434,6 +3907,17 @@ $(function () {
             }
         }
     });
+});
+
+// Fallback initialization for wallet manager dropdown
+$(document).ready(function() {
+    console.log('jQuery document ready - checking wallet manager dropdown...');
+    setTimeout(() => {
+        if (window.App && window.App.initWalletManagerDropdown) {
+            console.log('Running fallback wallet manager dropdown initialization...');
+            window.App.initWalletManagerDropdown();
+        }
+    }, 3000);
 });
 
 $(document).ready(function() {

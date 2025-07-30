@@ -30,31 +30,47 @@
   <body>
     <header>
       <div class="top-right">
-        <!-- Wallet Connection Buttons -->
-        <div class="wallet-connection-top">
-          <div class="wallet-group">
-            <button id="walletButton" class="button-style-1" disabled>Connect Ethereum Wallet</button>
-            <p class="wallet-balance" id="currentBalance">Balance: 0 TRB</p>
-          </div>
-          <!-- Network Display and Toggle -->
-          <div class="network-group">
-            <span class="network-display" id="network-display">*Connect Wallet to Start*</span>
-            <button id="network-toggle-btn" class="toggle-button" style="display: none;">
-              <span id="toggle-text">Switch to Mainnet</span>
-              <span class="toggle-icon">↻</span>
-            </button>
-          </div>
-          <div class="wallet-group">
-            <button id="keplrButton" class="button-style-2" disabled>Connect Cosmos Wallet</button>
-            <p class="wallet-balance" id="ethKeplrBalance">Balance: 0 TRB</p>
-          </div>
-          <!-- Cosmos Network Display and Toggle -->
-          <div class="network-group">
-            <span class="network-display" id="cosmos-network-display">*Connect Cosmos Wallet to Start*</span>
-            <button id="cosmos-network-toggle-btn" class="toggle-button" style="display: none;">
-              <span id="cosmos-toggle-text">Switch to Mainnet</span>
-              <span class="toggle-icon">↻</span>
-            </button>
+        <!-- Wallet Manager Dropdown -->
+        <div class="wallet-manager-dropdown">
+          <button id="walletManagerToggle" class="wallet-manager-toggle">
+            <span class="wallet-manager-text">Wallet Manager</span>
+            <span class="wallet-manager-arrow">▼</span>
+          </button>
+          <div id="walletManagerContent" class="wallet-manager-content">
+            <button class="wallet-manager-close" id="walletManagerClose">×</button>
+            <!-- Ethereum Wallet Section -->
+            <div class="wallet-section">
+              <h4 class="wallet-section-title">Ethereum Wallet</h4>
+              <div class="wallet-group">
+                <button id="walletButton" class="button-style-1" disabled>Connect Ethereum Wallet</button>
+                <p class="wallet-balance" id="currentBalance">Balance: 0 TRB</p>
+              </div>
+              <!-- Network Display and Toggle -->
+              <div class="network-group" style="display: none;">
+                <span class="network-display" id="network-display">*Connect Wallet to Start*</span>
+                <button id="network-toggle-btn" class="toggle-button" style="display: none;">
+                  <span id="toggle-text">Switch to Mainnet</span>
+                  <span class="toggle-icon">↻</span>
+                </button>
+              </div>
+            </div>
+            
+            <!-- Cosmos Wallet Section -->
+            <div class="wallet-section">
+              <h4 class="wallet-section-title">Cosmos Wallet</h4>
+              <div class="wallet-group">
+                <button id="keplrButton" class="button-style-2" disabled>Connect Cosmos Wallet</button>
+                <p class="wallet-balance" id="ethKeplrBalance">Balance: 0 TRB</p>
+              </div>
+              <!-- Cosmos Network Display and Toggle -->
+              <div class="network-group" style="display: none;">
+                <span class="network-display" id="cosmos-network-display">*Connect Cosmos Wallet to Start*</span>
+                <button id="cosmos-network-toggle-btn" class="toggle-button" style="display: none;">
+                  <span id="cosmos-toggle-text">Switch to Mainnet</span>
+                  <span class="toggle-icon">↻</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -332,6 +348,19 @@
         });
     </script>
     <script>
+      // Simple test to see if the button exists
+      document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM Content Loaded - testing wallet manager button...');
+        const testButton = document.getElementById('walletManagerToggle');
+        console.log('Wallet manager button found:', !!testButton);
+        if (testButton) {
+          console.log('Button text:', testButton.textContent);
+          testButton.addEventListener('click', function() {
+            console.log('Button clicked via DOMContentLoaded handler');
+          });
+        }
+      });
+      
       document.addEventListener('DOMContentLoaded', function() {
         const infoIcons = document.querySelectorAll('.info-icon');
         let tooltipTimer;
