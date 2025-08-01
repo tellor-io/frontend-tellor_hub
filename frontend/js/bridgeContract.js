@@ -1,8 +1,7 @@
 // Bridge contract interface for Layer Bridge
 // Mirrors the functionality from the bridge explorer implementation
 
-// Constants
-export const BRIDGE_CONTRACT_ADDRESS = '0x5acb5977f35b1A91C4fE0F4386eB669E046776F2';
+
 
 // Helper function to convert BigInt to string for JSON serialization
 const bigIntToString = (obj) => {
@@ -66,21 +65,32 @@ export class Deposit {
     }
 }
 
+// Helper function to get API endpoint based on current network
+const getApiEndpoint = () => {
+    // Check if App is available and has chainId
+    if (typeof window !== 'undefined' && window.App && window.App.chainId) {
+        if (window.App.chainId === 1) {
+            return 'https://mainnet.tellorlayer.com';
+        }
+    }
+    return 'https://node-palmito.tellorlayer.com';
+};
+
 // API functions
 export const getDeposits = async () => {
-    const response = await fetch('https://node-palmito.tellorlayer.com/layer/bridge/get_deposits');
+    const response = await fetch(`${getApiEndpoint()}/layer/bridge/get_deposits`);
     const data = await response.json();
     return data.map(deposit => Deposit.fromJSON(deposit));
 };
 
 export const getDepositId = async () => {
-    const response = await fetch('https://node-palmito.tellorlayer.com/layer/bridge/get_last_deposit_id');
+    const response = await fetch(`${getApiEndpoint()}/layer/bridge/get_last_deposit_id`);
     const data = await response.json();
     return Number(data.deposit_id);
 };
 
 export const isWithdrawClaimed = async (id) => {
-    const response = await fetch(`https://node-palmito.tellorlayer.com/layer/bridge/is_withdrawal_claimed/${id}`);
+    const response = await fetch(`${getApiEndpoint()}/layer/bridge/is_withdrawal_claimed/${id}`);
     const data = await response.json();
     return data.claimed;
 };
@@ -130,7 +140,6 @@ export const generateWithdrawalQueryId = (withdrawalId) => {
 
 // Export all functions and classes
 export default {
-    BRIDGE_CONTRACT_ADDRESS,
     Deposit,
     getDeposits,
     getDepositId,

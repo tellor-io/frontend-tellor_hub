@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validator List Update Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .test-section {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .status-success {
+            color: #059669;
+            font-weight: bold;
+        }
+        .status-error {
+            color: #dc2626;
+            font-weight: bold;
+        }
+        .status-info {
+            color: #2563eb;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="p-8 bg-gray-50">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6">Validator List Update Test</h1>
+        
+        <div class="test-section">
+            <h2 class="text-xl font-semibold mb-4">Test Description</h2>
+            <p class="mb-4">This test verifies that the validator list updates correctly when switching between Cosmos networks (mainnet and testnet).</p>
+            
+            <div class="bg-blue-50 p-4 rounded-lg mb-4">
+                <h3 class="font-semibold mb-2">What was fixed:</h3>
+                <ul class="list-disc list-inside space-y-1 text-sm">
+                    <li>Added <code>getCosmosApiEndpoint()</code> function that returns the correct API endpoint based on <code>App.cosmosChainId</code></li>
+                    <li>Updated <code>fetchValidators()</code> to use <code>getCosmosApiEndpoint()</code> instead of <code>getApiEndpoint()</code></li>
+                    <li>Added validator dropdown refresh when switching Cosmos networks</li>
+                    <li>Added validator dropdown refresh when connecting to Cosmos wallet in delegate section</li>
+                    <li>Updated all hardcoded chain IDs to use <code>App.cosmosChainId</code></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2 class="text-xl font-semibold mb-4">Current Network Status</h2>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Ethereum Network:</label>
+                    <div id="ethereumNetwork" class="status-info">Not connected</div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2">Cosmos Network:</label>
+                    <div id="cosmosNetwork" class="status-info">Not connected</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2 class="text-xl font-semibold mb-4">Validator List Test</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Validator Dropdown:</label>
+                    <select id="testValidatorDropdown" class="w-full p-2 border border-gray-300 rounded-md">
+                        <option value="">Select a validator...</option>
+                    </select>
+                    <button id="refreshValidatorsBtn" class="mt-2 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
+                        Refresh Validators
+                    </button>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">API Endpoint Used:</label>
+                    <div id="apiEndpoint" class="font-mono text-sm bg-gray-100 p-2 rounded"></div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Test Results:</label>
+                    <div id="testResults" class="space-y-2"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2 class="text-xl font-semibold mb-4">Manual Test Steps</h2>
+            <ol class="list-decimal list-inside space-y-2">
+                <li>Connect your Cosmos wallet (Keplr)</li>
+                <li>Switch to the "Delegate" section in the main app</li>
+                <li>Switch between mainnet and testnet using the Cosmos network toggle</li>
+                <li>Verify that the validator list updates with different validators</li>
+                <li>Click the refresh button (↻) to manually refresh the list</li>
+                <li>Verify that the list updates correctly for the current network</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        // Mock App object for testing
+        const mockApp = {
+            cosmosChainId: 'layertest-4', // Default to testnet
+            chainId: 11155111, // Default to Sepolia
+            
+            getCosmosApiEndpoint: function() {
+                if (this.cosmosChainId === 'tellor-1') {
+                    return 'https://mainnet.tellorlayer.com';
+                } else {
+                    return 'https://node-palmito.tellorlayer.com';
+                }
+            },
+            
+            getApiEndpoint: function() {
+                if (this.chainId === 1) {
+                    return 'https://mainnet.tellorlayer.com';
+                } else {
+                    return 'https://node-palmito.tellorlayer.com';
+                }
+            },
+            
+            fetchValidators: async function() {
+                try {
+                    const response = await fetch(`${this.getCosmosApiEndpoint()}/cosmos/staking/v1beta1/validators?status=BOND_STATUS_BONDED&pagination.limit=1000`);
+                    
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch validators: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (!data.validators || !Array.isArray(data.validators)) {
+                        throw new Error('Invalid validators response format');
+                    }
+                    
+                    // Sort validators by voting power (descending)
+                    const sortedValidators = data.validators.sort((a, b) => {
+                        const powerA = parseInt(a.tokens || '0');
+                        const powerB = parseInt(b.tokens || '0');
+                        return powerB - powerA;
+                    });
+                    
+                    return sortedValidators.map(validator => ({
+                        address: validator.operator_address,
+                        moniker: validator.description?.moniker || 'Unknown Validator',
+                        votingPower: validator.tokens || '0',
+                        commission: validator.commission?.commission_rates?.rate || '0',
+                        jailed: validator.jailed || false
+                    }));
+                } catch (error) {
+                    console.error('Error fetching validators:', error);
+                    throw error;
+                }
+            },
+            
+            populateValidatorDropdown: async function() {
+                try {
+                    const dropdown = document.getElementById('testValidatorDropdown');
+                    if (!dropdown) {
+                        console.error('Validator dropdown not found');
+                        return;
+                    }
+                    
+                    // Show loading state
+                    dropdown.innerHTML = '<option value="">Loading validators...</option>';
+                    dropdown.disabled = true;
+                    
+                    const validators = await this.fetchValidators();
+                    
+                    // Clear loading state and populate dropdown
+                    dropdown.innerHTML = '<option value="">Select a validator...</option>';
+                    
+                    validators.forEach(validator => {
+                        if (!validator.jailed) { // Only show non-jailed validators
+                            const votingPower = (parseInt(validator.votingPower) / 1000000).toFixed(2);
+                            const commission = (parseFloat(validator.commission) * 100).toFixed(2);
+                            
+                            // Truncate moniker if it's too long
+                            let displayMoniker = validator.moniker;
+                            if (displayMoniker.length > 20) {
+                                displayMoniker = displayMoniker.substring(0, 17) + '...';
+                            }
+                            
+                            const option = document.createElement('option');
+                            option.value = validator.address;
+                            option.textContent = `${displayMoniker} (${votingPower} TRB, ${commission}%)`;
+                            option.title = `${validator.moniker} (${votingPower} TRB, ${commission}% commission)`;
+                            dropdown.appendChild(option);
+                        }
+                    });
+                    
+                    dropdown.disabled = false;
+                    
+                    // Update API endpoint display
+                    document.getElementById('apiEndpoint').textContent = this.getCosmosApiEndpoint();
+                    
+                    // Update test results
+                    this.addTestResult('success', `Successfully loaded ${validators.filter(v => !v.jailed).length} validators from ${this.cosmosChainId === 'tellor-1' ? 'mainnet' : 'testnet'}`);
+                    
+                } catch (error) {
+                    console.error('Error populating validator dropdown:', error);
+                    const dropdown = document.getElementById('testValidatorDropdown');
+                    if (dropdown) {
+                        dropdown.innerHTML = '<option value="">Error loading validators</option>';
+                        dropdown.disabled = true;
+                    }
+                    this.addTestResult('error', `Failed to load validators: ${error.message}`);
+                }
+            },
+            
+            addTestResult: function(type, message) {
+                const resultsDiv = document.getElementById('testResults');
+                const resultDiv = document.createElement('div');
+                resultDiv.className = `status-${type}`;
+                resultDiv.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                resultsDiv.appendChild(resultDiv);
+            },
+            
+            switchCosmosNetwork: function() {
+                if (this.cosmosChainId === 'tellor-1') {
+                    this.cosmosChainId = 'layertest-4';
+                } else {
+                    this.cosmosChainId = 'tellor-1';
+                }
+                
+                // Update network display
+                document.getElementById('cosmosNetwork').textContent = 
+                    this.cosmosChainId === 'tellor-1' ? 'Tellor Layer Mainnet' : 'Tellor Layer Testnet';
+                document.getElementById('cosmosNetwork').className = 
+                    this.cosmosChainId === 'tellor-1' ? 'status-success' : 'status-info';
+                
+                // Refresh validator dropdown
+                this.populateValidatorDropdown();
+                
+                this.addTestResult('info', `Switched to ${this.cosmosChainId === 'tellor-1' ? 'mainnet' : 'testnet'}`);
+            }
+        };
+
+        // Initialize the test
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up network displays
+            document.getElementById('ethereumNetwork').textContent = 'Sepolia Testnet';
+            document.getElementById('cosmosNetwork').textContent = 'Tellor Layer Testnet';
+            
+            // Set up refresh button
+            document.getElementById('refreshValidatorsBtn').addEventListener('click', async function() {
+                this.disabled = true;
+                this.textContent = 'Refreshing...';
+                try {
+                    await mockApp.populateValidatorDropdown();
+                } catch (error) {
+                    console.error('Error refreshing validators:', error);
+                } finally {
+                    this.disabled = false;
+                    this.textContent = 'Refresh Validators';
+                }
+            });
+            
+            // Add network toggle button
+            const toggleButton = document.createElement('button');
+            toggleButton.textContent = 'Switch Cosmos Network';
+            toggleButton.className = 'px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600';
+            toggleButton.addEventListener('click', () => mockApp.switchCosmosNetwork());
+            document.querySelector('.test-section:last-child').appendChild(toggleButton);
+            
+            // Load initial validators
+            mockApp.populateValidatorDropdown();
+        });
+    </script>
+</body>
+</html> 
