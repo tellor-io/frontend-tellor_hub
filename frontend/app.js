@@ -1163,7 +1163,7 @@ const App = {
     
     if (networkDisplay) {
       if (App.chainId === 1) {
-        networkDisplay.textContent = '*Ethereum Mainnet:';
+        networkDisplay.textContent = '*Ethereum Mainnet';
         networkDisplay.style.color = '#10b981'; // Green for mainnet
         // Show network toggle for mainnet
         if (toggleButton) {
@@ -1175,7 +1175,7 @@ const App = {
         if (toggleText) toggleText.textContent = 'Switch to Sepolia';
         if (networkGroup) networkGroup.style.display = 'flex';
       } else if (App.chainId === 11155111) {
-        networkDisplay.textContent = '*Sepolia Test Network:';
+        networkDisplay.textContent = '*Sepolia Test Network';
         networkDisplay.style.color = '#f59e0b'; // Orange for testnet
         // Show network toggle for sepolia
         if (toggleButton) {
@@ -1208,7 +1208,7 @@ const App = {
     
     if (cosmosNetworkDisplay) {
       if (App.cosmosChainId === 'tellor-1') {
-        cosmosNetworkDisplay.textContent = '*Tellor Layer Mainnet:';
+        cosmosNetworkDisplay.textContent = '*Tellor Mainnet';
         cosmosNetworkDisplay.style.color = '#10b981'; // Green for mainnet
         // Show network toggle for mainnet
         if (cosmosToggleButton) {
@@ -1220,7 +1220,7 @@ const App = {
         if (cosmosToggleText) cosmosToggleText.textContent = 'Switch to Testnet';
         if (cosmosNetworkGroup) cosmosNetworkGroup.style.display = 'flex';
       } else if (App.cosmosChainId === 'layertest-4') {
-        cosmosNetworkDisplay.textContent = '*Tellor Layer Testnet:';
+        cosmosNetworkDisplay.textContent = '*Palmito Testnet';
         cosmosNetworkDisplay.style.color = '#f59e0b'; // Orange for testnet
         // Show network toggle for testnet
         if (cosmosToggleButton) {
@@ -1426,7 +1426,7 @@ const App = {
       // Re-enable the toggle button
       if (cosmosToggleButton) {
         cosmosToggleButton.disabled = false;
-        cosmosToggleButton.textContent = 'Switch Network';
+        cosmosToggleButton.textContent = 'Switch to Mainnet';
       }
       
     } catch (error) {
@@ -1435,7 +1435,7 @@ const App = {
     } finally {
       if (cosmosToggleButton) {
         cosmosToggleButton.disabled = false;
-        cosmosToggleButton.textContent = 'Switch Network';
+        cosmosToggleButton.textContent = 'Switch to Palmito (test)';
       }
     }
   });
@@ -1519,7 +1519,37 @@ const App = {
             throw new Error("depositLimit method not found");
         }
 
-        const result = await App.contracts.Bridge.methods.depositLimit().call();
+        let result;
+        
+        // Temporary fix for Mainnet: Calculate dynamic deposit limit
+        if (App.chainId === 1) { // Mainnet
+            try {
+                const depositLimitRecord = await App.contracts.Bridge.methods.depositLimitRecord().call();
+                const depositLimitUpdateTime = await App.contracts.Bridge.methods.depositLimitUpdateTime().call();
+                
+                const currentTime = Math.floor(Date.now() / 1000);
+                const timeSinceUpdate = currentTime - depositLimitUpdateTime;
+                const hoursSinceUpdate = timeSinceUpdate / 3600;
+                
+                if (hoursSinceUpdate < 12) {
+                    // If < 12 hours since update, use depositLimitRecord
+                    result = depositLimitRecord;
+                } else {
+                    // If ≥ 12 hours since update, use bridgeBalance/5
+                    const bridgeBalance = await App.contracts.Token.methods.balanceOf(App.contracts.Bridge.options.address).call();
+                    const balanceBN = new App.web3.utils.BN(bridgeBalance);
+                    result = balanceBN.div(new App.web3.utils.BN(5)).toString();
+                }
+            } catch (dynamicError) {
+                console.warn('Dynamic deposit limit calculation failed, falling back to original:', dynamicError);
+                // Fallback to original method
+                result = await App.contracts.Bridge.methods.depositLimit().call();
+            }
+        } else {
+            // For all other networks, use the original method
+            result = await App.contracts.Bridge.methods.depositLimit().call();
+        }
+        //replace lines 1525-1551 with *const result = await App.contracts.Bridge.methods.depositLimit().call();* once minting begins
         App.depositLimit = result;
         
         const readableLimit = App.web3.utils.fromWei(App.depositLimit, 'ether');
@@ -1781,8 +1811,15 @@ const App = {
 
         const amountToSend = App.web3.utils.toWei(amount, 'ether');
         
+        // Validate minimum deposit amount (greater than 0.1 TRB)
+        const minimumAmount = 0.1;
+        if (parseFloat(amount) <= minimumAmount) {
+            App.showValidationErrorPopup(`Minimum deposit amount must be greater than ${minimumAmount} TRB. You entered ${amount} TRB.`);
+            return;
+        }
+        
+        // Check balance first
         const balance = await App.contracts.Token.methods.balanceOf(App.account).call();
-
         const balanceBN = new App.web3.utils.BN(balance);
         const amountBN = new App.web3.utils.BN(amountToSend);
 
@@ -1791,12 +1828,31 @@ const App = {
             App.showBalanceErrorPopup(errorMsg);
             return;
         }
+        
+        // Check deposit limit using the currently displayed limit
+        if (App.depositLimit) {
+            const depositLimitBN = new App.web3.utils.BN(App.depositLimit);
+            
+            if (amountBN.gt(depositLimitBN)) {
+                const readableLimit = App.web3.utils.fromWei(App.depositLimit, 'ether');
+                const errorMsg = `Deposit amount exceeds deposit limit. You can deposit up to ${readableLimit} TRB, but you're trying to deposit ${amount} TRB.`;
+                App.showValidationErrorPopup(errorMsg);
+                return;
+            }
+        }
 
         // Only reach here if balance is sufficient
         App.showPendingPopup("Deposit transaction pending...");
         const tipToSend = App.web3.utils.toWei(tip, 'ether');
+        
+        // Use fixed gas limit instead of estimation to avoid simulation failures
+        const gasLimit = 500000; // 500k gas should be sufficient for bridge deposits
+        
         const tx = await App.contracts.Bridge.methods.depositToLayer(amountToSend, tipToSend, recipient)
-            .send({ from: App.account });
+            .send({ 
+                from: App.account,
+                gas: gasLimit
+            });
         
         App.hidePendingPopup();
         await App.updateBalance();
