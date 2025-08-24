@@ -4,8 +4,9 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Layer Bridge</title>
+    <title>Tellor Hub - Space Station</title>
     <link rel="stylesheet" href="main.css" />
+    <link rel="stylesheet" href="space-station.css" />
     <link rel="icon" type="image/x-icon" href="/drkgrnswsh.png">
 
     <!-- Load protobuf.js first -->
@@ -33,7 +34,7 @@
         <!-- Wallet Manager Dropdown -->
         <div class="wallet-manager-dropdown">
           <button id="walletManagerToggle" class="wallet-manager-toggle">
-            <span class="wallet-manager-text">Wallet Manager</span>
+            <span class="wallet-manager-text">Connect Wallets</span>
             <span class="wallet-manager-arrow">▼</span>
           </button>
           <div id="walletManagerContent" class="wallet-manager-content">
@@ -74,140 +75,240 @@
           </div>
         </div>
       </div>
-      <div class="header-content">
-        <h1 style="display: flex; align-items: center; justify-content: center; margin: 0; padding: 12px 0 0 0;">
-          <img src="bridge-title.png" alt="Bridge Title" style="max-width:500px;width:100%;height:auto;display:block;margin:0 auto;">
-        </h1>
-      </div>
+
     </header>
-    <div class="box-wrapper">
-      <div class="main-content">
-        <div class="bridge-buttons-container">
-          <div class="bridge-direction-selector">
-            <button id="bridgeToLayerBtn" class="bridge-direction-btn active">Bridge to Tellor</button>
-            <button id="bridgeToEthBtn" class="bridge-direction-btn">Bridge to Ethereum</button>
-            <button id="delegateBtn" class="bridge-direction-btn">Delegate Tokens</button>
-          </div>
 
-          <!-- Bridge to Layer Section -->
-          <div id="bridgeToLayerSection" class="bridge-section active">
-            <div class="wallet-disclaimer">*Please connect your Ethereum wallet to bridge tokens*</div>
-            <w3m-button></w3m-button>
-            <div class="balance-info">
-            
-              <div class="input-button-container">
-                <div class="input-with-label">
-                  <span class="input-label">TRB</span>
-                  <input class="input" type="text" id="stakeAmount" placeholder="0" />
-                </div>
-               
-              </div>
-              <div class="Deposit-limit">
-                <p class="info-text">(Deposit limit: <span id="depositLimit"></span>)</p>
-              </div>
-              <div class="input-button-container">
-                <div class="input-with-label">
-                  <input class="input-address" type="text" id="_queryId" placeholder="To address (e.g. tellor1py3fs...)" />
-                  <span class="info-icon" data-tooltip="Don't have a tellor prefix address? <a href='https://docs.tellor.io/layer-docs/running-tellor-layer/node-setup' target='_blank'>Click here</a> to learn how to create one">ⓘ</span>
-                </div>
-              </div>
+    <!-- Space Station Hub Container -->
+    <div class="space-station-container" id="spaceStationContainer">
+      <!-- Initial Hub State -->
+      <div class="hub-only-state" id="hubOnlyState">
+        <!-- Central Hub -->
+        <div class="central-hub">
+                  <div class="hub-core">
+          <img src="tellor_hub.png" alt="Tellor Hub" class="hub-logo">
+        </div>
+        </div>
 
-              <div class="bridge-direction">
-                <button id="approveButton" class="button-style-1" onclick="App.approveDeposit()">Approve Deposit</button>
-                <button id="depositButton" class="button-style-3" onclick="App.depositToLayer()">Bridge to Layer</button>
-              </div>
+        <!-- Orbiting Pods -->
+        <div class="orbit-container">
+          <!-- One Continuous Diagonal Line -->
+          <div class="spoke-line spoke-diagonal"></div>
+          
+          <!-- Bridge to Layer Pod -->
+          <div class="orbiting-pod" data-function="bridgeToLayer">
+            <div class="pod-content">
+              <img src="finales_bridge_tellor.png" alt="Bridge to Layer" class="pod-icon">
             </div>
           </div>
 
-          <!-- Bridge to Ethereum Section -->
-          <div id="bridgeToEthSection" class="bridge-section">
-            <div class="wallet-disclaimer">*Please connect both wallets to bridge to Ethereum*</div>
-            <div class="wallet-connection-container">
-            </div>
-            <div class="balance-info">
-                <div class="input-button-container">
-                    <div class="input-with-label">
-                        <span class="input-label">TRB</span>
-                        <input class="input" type="text" id="ethStakeAmount" placeholder="0" />
-                    </div>
-                </div>
-
-                <div class="input-button-container">
-                    <div class="input-with-label">
-                        <input class="input-address" type="text" id="ethQueryId" placeholder="To address (e.g. 0x...)" />
-                        <span class="info-icon" data-tooltip="Enter your Ethereum address (0x...)">ⓘ</span>
-                    </div>
-                </div>
-
-                <div class="bridge-direction">
-                    <button id="withdrawButton" class="button-style-3" onclick="App.withdrawFromLayer()">1. Request Withdrawal</button>
-                </div>
+          <!-- Bridge to Ethereum Pod -->
+          <div class="orbiting-pod" data-function="bridgeToEth">
+            <div class="pod-content">
+              <img src="finales_bridge_eth.png" alt="Bridge to Ethereum" class="pod-icon">
             </div>
           </div>
 
-          <!-- Delegate Section -->
-          <div id="delegateSection" class="bridge-section">
-            <div class="wallet-disclaimer">*Please connect your Cosmos wallet to delegate tokens*</div>
-            <div class="wallet-connection-container">
+          <!-- Delegate Pod -->
+          <div class="orbiting-pod" data-function="delegate">
+            <div class="pod-content">
+              <img src="finales_delegate.png" alt="Delegate" class="pod-icon">
             </div>
-            <div class="balance-info">
-                <div class="input-button-container">
-                    <div class="input-with-label">
-                        <span class="input-label">TRB</span>
-                        <input class="input" type="text" id="delegateStakeAmount" placeholder="0" />
-                    </div>
-                </div>
+          </div>
 
-                <div class="input-button-container">
-                    <div class="input-with-label">
-                        <select class="input-address" id="delegateValidatorDropdown">
-                            <option value="">Select a validator...</option>
-                        </select>
-                        <input type="hidden" id="delegateValidatorAddress" />
-                        <button type="button" id="refreshValidatorsBtn" class="refresh-btn" title="Refresh validator list">↻</button>
-                        <span class="info-icon" data-tooltip="Select a validator from the list to delegate your tokens to">ⓘ</span>
-                    </div>
-                </div>
-
-                <div class="bridge-direction">
-                    <button id="delegateButton" class="button-style-3" onclick="App.delegateTokens()">Delegate Tokens</button>
-                </div>
+          <!-- No-Stake Report Pod -->
+          <div class="orbiting-pod" data-function="noStakeReport">
+            <div class="pod-content">
+              <img src="finales_report.png" alt="Report" class="pod-icon">
             </div>
           </div>
         </div>
       </div>
-      <a target="_blank" href="https://github.com/tellor-io/frontend-layerbridgebutton" class="frontend-code-link">Front-End code</a>
-      <div id="bridgeTransactionsContainer" class="transactions-container">
-        <div class="history-header">
-          <h3>Withdrawal Transactions</h3>
-          <div class="history-subtitle">View & Claim your withdrawal requests and their status</div>
+
+      <!-- Function Focus State -->
+      <div class="function-focus-state" id="functionFocusState" style="display: none;">
+        <!-- Side Navigation Menu -->
+        <div class="side-nav-menu">
+          <div class="side-nav-header">
+            <button class="back-to-hub-btn" id="backToHubBtn">
+              <span class="back-icon">←</span>
+              <span class="back-text">Back to Hub</span>
+            </button>
+          </div>
+          
+          <div class="side-nav-options">
+            <div class="nav-option" data-function="bridgeToLayer">
+              <div class="nav-option-icon">🌉</div>
+              <div class="nav-option-title">Bridge to Tellor</div>
+            </div>
+            
+            <div class="nav-option" data-function="bridgeToEth">
+              <div class="nav-option-icon">🔗</div>
+              <div class="nav-option-title">Bridge to Ethereum</div>
+            </div>
+            
+            <div class="nav-option" data-function="delegate">
+              <div class="nav-option-icon">⚡</div>
+              <div class="nav-option-title">Delegate Tokens</div>
+            </div>
+            
+            <div class="nav-option" data-function="noStakeReport">
+              <div class="nav-option-icon">📊</div>
+              <div class="nav-option-title">No-Stake Report</div>
+            </div>
+          </div>
         </div>
-        <div class="withdrawal-table-container">
-          <table id="withdrawal-history" class="withdrawal-table">
-            <thead>
-              <tr>
-                <th>Actions</th>
-                <th>ID</th>
-                <th>Sender</th>
-                <th>Recipient</th>
-                <th class="amount-column">Amount (TRB)</th>
-                <th>Time</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td colspan="7" class="loading-message">Waiting for wallet connections...</td>
-              </tr>
-            </tbody>
-          </table>
+
+        <!-- Function Display Area -->
+        <div class="function-display-area">
+          <div class="function-container">
+            <!-- Bridge to Layer Section -->
+            <div id="bridgeToLayerSection" class="function-section">
+              <div class="section-header">
+                <h2>🌉 Bridge to Tellor Layer</h2>
+                <p class="section-description">Transfer your TRB tokens from Ethereum to the Tellor Layer</p>
+              </div>
+              <div class="wallet-disclaimer">*Please connect your Ethereum wallet to bridge tokens*</div>
+              <w3m-button></w3m-button>
+              <div class="balance-info">
+                <div class="input-button-container">
+                  <div class="input-with-label">
+                    <span class="input-label">TRB</span>
+                    <input class="input" type="text" id="stakeAmount" placeholder="0" />
+                  </div>
+                </div>
+                <div class="Deposit-limit">
+                  <p class="info-text">(Deposit limit: <span id="depositLimit"></span>)</p>
+                </div>
+                <div class="input-button-container">
+                  <div class="input-with-label">
+                    <input class="input-address" type="text" id="_queryId" placeholder="To address (e.g. tellor1py3fs...)" />
+                    <span class="info-icon" data-tooltip="Don't have a tellor prefix address? <a href='https://docs.tellor.io/layer-docs/running-tellor-layer/node-setup' target='_blank'>Click here</a> to learn how to create one">ⓘ</span>
+                  </div>
+                </div>
+                <div class="bridge-direction">
+                  <button id="approveButton" class="button-style-1" onclick="App.approveDeposit()">Approve Deposit</button>
+                  <button id="depositButton" class="button-style-3" onclick="App.depositToLayer()">Bridge to Layer</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bridge to Ethereum Section -->
+            <div id="bridgeToEthSection" class="function-section">
+              <div class="section-header">
+                <h2>🔗 Bridge to Ethereum</h2>
+                <p class="section-description">Withdraw your TRB tokens from Tellor Layer back to Ethereum</p>
+              </div>
+              <div class="wallet-disclaimer">*Please connect both wallets to bridge to Ethereum*</div>
+              <div class="wallet-connection-container">
+              </div>
+              <div class="balance-info">
+                  <div class="input-button-container">
+                      <div class="input-with-label">
+                          <span class="input-label">TRB</span>
+                          <input class="input" type="text" id="ethStakeAmount" placeholder="0" />
+                      </div>
+                  </div>
+                  <div class="input-button-container">
+                      <div class="input-with-label">
+                          <input class="input-address" type="text" id="ethQueryId" placeholder="To address (e.g. 0x...)" />
+                          <span class="info-icon" data-tooltip="Enter your Ethereum address (0x...)">ⓘ</span>
+                      </div>
+                  </div>
+                  <div class="bridge-direction">
+                      <button id="withdrawButton" class="button-style-3" onclick="App.withdrawFromLayer()">1. Request Withdrawal</button>
+                  </div>
+              </div>
+            </div>
+
+            <!-- Delegate Section -->
+            <div id="delegateSection" class="function-section">
+              <div class="section-header">
+                <h2>⚡ Delegate Tokens</h2>
+                <p class="section-description">Stake your TRB tokens with validators to earn rewards</p>
+              </div>
+              <div class="wallet-disclaimer">*Please connect your Cosmos wallet to delegate tokens*</div>
+              <div class="wallet-connection-container">
+              </div>
+              <div class="balance-info">
+                  <div class="input-button-container">
+                      <div class="input-with-label">
+                          <span class="input-label">TRB</span>
+                          <input class="input" type="text" id="delegateStakeAmount" placeholder="0" />
+                      </div>
+                  </div>
+                  <div class="input-button-container">
+                      <div class="input-with-label">
+                          <select class="input-address" id="delegateValidatorDropdown">
+                              <option value="">Select a validator...</option>
+                          </select>
+                          <input type="hidden" id="delegateValidatorAddress" />
+                          <button type="button" id="refreshValidatorsBtn" class="refresh-btn" title="Refresh validator list">↻</button>
+                          <span class="info-icon" data-tooltip="Select a validator from the list to delegate your tokens to">ⓘ</span>
+                      </div>
+                  </div>
+                  <div class="bridge-direction">
+                      <button id="delegateButton" class="button-style-3" onclick="App.delegateTokens()">Delegate Tokens</button>
+                  </div>
+              </div>
+            </div>
+
+            <!-- No-Stake Report Section -->
+            <div id="noStakeReportSection" class="function-section">
+              <div class="section-header">
+                <h2>📊 No-Stake Report</h2>
+                <p class="section-description">Submit data reports without requiring staked tokens</p>
+              </div>
+              <div class="wallet-disclaimer">*Please use the wallet manager above to connect your Cosmos wallet*</div>
+              <div class="balance-info">
+                  <div class="input-button-container full-width">
+                      <div class="input-with-label no-stake-query-container">
+                          <span class="input-label">Query Data (Hex)</span>
+                          <textarea class="no-stake-input" id="noStakeQueryData" placeholder="0x..." rows="10"></textarea>
+                      </div>
+                  </div>
+                  <div class="input-button-container full-width">
+                      <div class="input-with-label no-stake-value-container">
+                          <span class="input-label">Value (Hex)</span>
+                          <input class="no-stake-input" type="text" id="noStakeValue" placeholder="0x..." />
+                      </div>
+                  </div>
+                  <div class="bridge-direction">
+                      <button id="submitNoStakeReportBtn" class="button-style-3" onclick="App.submitNoStakeReport()">Submit Report</button>
+                  </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-    <p style= "text-align: center"></p>
-      <footer>
 
-      </footer>
+    <a target="_blank" href="https://github.com/tellor-io/frontend-layerbridgebutton" class="frontend-code-link">Front-End code</a>
+    
+    <div id="bridgeTransactionsContainer" class="transactions-container">
+      <div class="history-header">
+        <h3>Withdrawal Transactions</h3>
+        <div class="history-subtitle">View & Claim your withdrawal requests and their status</div>
+      </div>
+      <div class="withdrawal-table-container">
+        <table id="withdrawal-history" class="withdrawal-table">
+          <thead>
+            <tr>
+              <th>Actions</th>
+              <th>ID</th>
+              <th>Sender</th>
+              <th>Recipient</th>
+              <th class="amount-column">Amount (TRB)</th>
+              <th>Time</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="7" class="loading-message">Waiting for wallet connections...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
     <script src="./extensions/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.10.0/web3.min.js"></script>
@@ -365,14 +466,104 @@
             });
         }
         
-        // Add tab switch handlers
-        const bridgeToLayerBtn = document.getElementById('bridgeToLayerBtn');
-        const bridgeToEthBtn = document.getElementById('bridgeToEthBtn');
-        const delegateBtn = document.getElementById('delegateBtn');
+        // Add pod navigation handlers
+        const orbitingPods = document.querySelectorAll('.orbiting-pod');
+        const orbitContainer = document.querySelector('.orbit-container');
         
-        bridgeToLayerBtn.addEventListener('click', hideAllTooltips);
-        bridgeToEthBtn.addEventListener('click', hideAllTooltips);
-        delegateBtn.addEventListener('click', hideAllTooltips);
+        orbitingPods.forEach(pod => {
+          // Add hover events to pause/resume space station
+          pod.addEventListener('mouseenter', function() {
+            orbitContainer.classList.add('paused');
+          });
+          
+          pod.addEventListener('mouseleave', function() {
+            orbitContainer.classList.remove('paused');
+          });
+          
+          pod.addEventListener('click', function() {
+            const functionType = this.getAttribute('data-function');
+            
+            // Switch to function focus state
+            document.getElementById('hubOnlyState').style.display = 'none';
+            document.getElementById('functionFocusState').style.display = 'flex';
+            
+            // Show corresponding section
+            let sectionId = '';
+            switch(functionType) {
+              case 'bridgeToLayer':
+                sectionId = 'bridgeToLayerSection';
+                break;
+              case 'bridgeToEth':
+                sectionId = 'bridgeToEthSection';
+                break;
+              case 'delegate':
+                sectionId = 'delegateSection';
+                break;
+              case 'noStakeReport':
+                sectionId = 'noStakeReportSection';
+                break;
+            }
+            
+            if (sectionId) {
+              document.querySelectorAll('.function-section').forEach(s => s.classList.remove('active'));
+              document.getElementById(sectionId).classList.add('active');
+            }
+            
+            // Update side nav active state
+            document.querySelectorAll('.nav-option').forEach(opt => opt.classList.remove('active'));
+            document.querySelector(`.nav-option[data-function="${functionType}"]`).classList.add('active');
+            
+            // Hide all tooltips when switching functions
+            hideAllTooltips();
+          });
+        });
+        
+        // Add back to hub button handler
+        document.getElementById('backToHubBtn').addEventListener('click', function() {
+          document.getElementById('hubOnlyState').style.display = 'flex';
+          document.getElementById('functionFocusState').style.display = 'none';
+          
+          // Reset all active states
+          document.querySelectorAll('.orbiting-pod').forEach(p => p.classList.remove('active'));
+          document.querySelectorAll('.function-section').forEach(s => s.classList.remove('active'));
+          document.querySelectorAll('.nav-option').forEach(opt => opt.classList.remove('active'));
+        });
+        
+        // Add side nav option handlers
+        document.querySelectorAll('.nav-option').forEach(option => {
+          option.addEventListener('click', function() {
+            const functionType = this.getAttribute('data-function');
+            
+            // Update active nav option
+            document.querySelectorAll('.nav-option').forEach(opt => opt.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Show corresponding section
+            let sectionId = '';
+            switch(functionType) {
+              case 'bridgeToLayer':
+                sectionId = 'bridgeToLayerSection';
+                break;
+              case 'bridgeToEth':
+                sectionId = 'bridgeToEthSection';
+                break;
+              case 'delegate':
+                sectionId = 'delegateSection';
+                break;
+              case 'noStakeReport':
+                sectionId = 'noStakeReportSection';
+                break;
+            }
+            
+            if (sectionId) {
+              document.querySelectorAll('.function-section').forEach(s => s.classList.remove('active'));
+              document.getElementById(sectionId).classList.add('active');
+            }
+            
+            // Hide all tooltips when switching functions
+            hideAllTooltips();
+          });
+        });
         
         infoIcons.forEach(icon => {
             // Add tooltip functionality to icons in the Bridge to Layer section and Delegate section
@@ -615,7 +806,10 @@
 
         // Initial checks
         checkAllowance();
+
+        // No-stake reporting is now integrated with the existing wallet manager
       });
     </script>
+    <script src="./js/noStake.js"></script>
   </body>
 </html>

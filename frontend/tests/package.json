@@ -1,0 +1,23 @@
+{
+  "name": "layer-bridge-tests",
+  "version": "1.0.0",
+  "description": "Test suite for Layer Bridge frontend application",
+  "main": "test-runner.js",
+  "scripts": {
+    "test": "echo 'Open test-suite.html in a browser to run tests'",
+    "test:unit": "echo 'Run unit tests only'",
+    "test:integration": "echo 'Run integration tests only'",
+    "test:watch": "echo 'Watch mode not implemented yet'"
+  },
+  "keywords": [
+    "testing",
+    "cosmos",
+    "ethereum",
+    "bridge",
+    "frontend"
+  ],
+  "author": "Layer Bridge Team",
+  "license": "MIT",
+  "devDependencies": {},
+  "dependencies": {}
+}

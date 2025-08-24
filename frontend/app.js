@@ -50,6 +50,7 @@ const App = {
             App.initInputValidation();
             App.initBridgeDirectionUI(); // Initialize bridge direction UI
             App.initWalletManagerDropdown(); // Initialize wallet manager dropdown
+            App.initNoStakeReporting(); // Initialize no-stake reporting
             
             // Initialize network display
             App.updateNetworkDisplay();
@@ -3612,6 +3613,12 @@ const App = {
             this.switchBridgeDirection('delegate');
         }
     });
+
+    noStakeReportBtn.addEventListener('click', () => {
+        if (this.currentBridgeDirection !== 'noStakeReport') {
+            this.switchBridgeDirection('noStakeReport');
+        }
+    });
   },
 
   initWalletManagerDropdown: function() {
@@ -3694,7 +3701,7 @@ const App = {
       const truncatedAddress = `${App.keplrAddress.substring(0, 6)}...${App.keplrAddress.substring(App.keplrAddress.length - 4)}`;
       walletManagerText.textContent = `Ethereum: Not Connected | Cosmos: ${truncatedAddress}`;
     } else {
-      walletManagerText.textContent = 'Wallet Manager';
+      walletManagerText.textContent = 'Connect Wallets';
     }
   },
 
@@ -3712,7 +3719,7 @@ const App = {
   },
 
   switchBridgeDirection: function(direction) {
-    if (direction !== 'layer' && direction !== 'ethereum' && direction !== 'delegate') {
+    if (direction !== 'layer' && direction !== 'ethereum' && direction !== 'delegate' && direction !== 'noStakeReport') {
         // console.error(...);
         return;
     }
@@ -3720,13 +3727,15 @@ const App = {
     const bridgeToLayerBtn = document.getElementById('bridgeToLayerBtn');
     const bridgeToEthBtn = document.getElementById('bridgeToEthBtn');
     const delegateBtn = document.getElementById('delegateBtn');
+    const noStakeReportBtn = document.getElementById('noStakeReportBtn');
     const bridgeToLayerSection = document.getElementById('bridgeToLayerSection');
     const bridgeToEthSection = document.getElementById('bridgeToEthSection');
     const delegateSection = document.getElementById('delegateSection');
+    const noStakeReportSection = document.getElementById('noStakeReportSection');
     const transactionsContainer = document.getElementById('bridgeTransactionsContainer');
     const boxWrapper = document.querySelector('.box-wrapper');
 
-    if (!bridgeToLayerBtn || !bridgeToEthBtn || !delegateBtn || !bridgeToLayerSection || !bridgeToEthSection || !delegateSection) {
+    if (!bridgeToLayerBtn || !bridgeToEthBtn || !delegateBtn || !noStakeReportBtn || !bridgeToLayerSection || !bridgeToEthSection || !delegateSection || !noStakeReportSection) {
         // console.error(...);
         return;
     }
@@ -3735,19 +3744,23 @@ const App = {
     bridgeToLayerBtn.classList.toggle('active', direction === 'layer');
     bridgeToEthBtn.classList.toggle('active', direction === 'ethereum');
     delegateBtn.classList.toggle('active', direction === 'delegate');
+    noStakeReportBtn.classList.toggle('active', direction === 'noStakeReport');
     bridgeToLayerSection.classList.toggle('active', direction === 'layer');
     bridgeToEthSection.classList.toggle('active', direction === 'ethereum');
     delegateSection.classList.toggle('active', direction === 'delegate');
+    noStakeReportSection.classList.toggle('active', direction === 'noStakeReport');
     
     // Update box wrapper classes for animation
     if (boxWrapper) {
-        boxWrapper.classList.remove('layer-direction', 'ethereum-direction', 'delegate-direction');
+        boxWrapper.classList.remove('layer-direction', 'ethereum-direction', 'delegate-direction', 'noStakeReport-direction');
         if (direction === 'layer') {
             boxWrapper.classList.add('layer-direction');
         } else if (direction === 'ethereum') {
             boxWrapper.classList.add('ethereum-direction');
         } else if (direction === 'delegate') {
             boxWrapper.classList.add('delegate-direction');
+        } else if (direction === 'noStakeReport') {
+            boxWrapper.classList.add('noStakeReport-direction');
         }
     }
     
@@ -3927,12 +3940,101 @@ const App = {
       }
     }
   },
+
+  // No-Stake Reporting Functions
+  initNoStakeReporting: async function() {
+    try {
+      // Initialize the no-stake reporter
+      if (window.noStakeReporter) {
+        await window.noStakeReporter.init();
+        console.log('No-stake reporting initialized successfully');
+      } else {
+        console.error('NoStakeReporter not found');
+      }
+    } catch (error) {
+      console.error('Failed to initialize no-stake reporting:', error);
+    }
+  },
+
+  // Check wallet connection status for no-stake reporting
+  checkNoStakeWalletStatus: async function() {
+    try {
+      if (!window.noStakeReporter) {
+        throw new Error('NoStakeReporter not initialized');
+      }
+
+      const walletStatus = await window.noStakeReporter.getWalletStatus();
+      return walletStatus;
+    } catch (error) {
+      console.error('Failed to check no-stake wallet status:', error);
+      return { isConnected: false, address: null, walletType: null };
+    }
+  },
+
+  // Update wallet info display
+  updateNoStakeWalletInfo: function(address) {
+    // You can add wallet info display here if needed
+    console.log('No-stake wallet connected:', address);
+  },
+
+  // Submit a no-stake report
+  submitNoStakeReport: async function() {
+    try {
+      if (!window.noStakeReporter) {
+        throw new Error('NoStakeReporter not initialized');
+      }
+
+      // Get form values
+      const queryData = document.getElementById('noStakeQueryData').value.trim();
+      const value = document.getElementById('noStakeValue').value.trim();
+
+      // Validate inputs
+      if (!queryData) {
+        throw new Error('Please enter query data');
+      }
+      if (!value) {
+        throw new Error('Please enter a value');
+      }
+      if (!window.noStakeReporter.validateQueryData(queryData)) {
+        throw new Error('Invalid query data format. Must be a valid hex string.');
+      }
+      if (!window.noStakeReporter.validateValue(value)) {
+        throw new Error('Invalid value format. Must be a valid hex string.');
+      }
+
+      // Show pending popup
+      App.showPendingPopup("Submitting no-stake report...");
+
+      // Submit the report (network is automatically detected from wallet manager)
+      const result = await window.noStakeReporter.submitNoStakeReport(queryData, value);
+      
+      // Hide pending popup
+      App.hidePendingPopup();
+      
+      if (result.success) {
+        // Show success popup with transaction hash and block explorer link
+        App.showSuccessPopup("No-stake report submitted successfully!", result.transactionHash, 'cosmos');
+        
+        // Clear form
+        document.getElementById('noStakeQueryData').value = '';
+        document.getElementById('noStakeValue').value = '';
+      } else {
+        throw new Error('Failed to submit report');
+      }
+    } catch (error) {
+      console.error('Failed to submit no-stake report:', error);
+      App.hidePendingPopup();
+      App.showErrorPopup(error.message || 'Failed to submit no-stake report');
+    }
+  },
 };
 
 // Export App to window object for global access
 window.App = App;
 window.App.claimWithdrawal = App.claimWithdrawal;  // Explicitly expose claimWithdrawal
 window.App.requestAttestation = App.requestAttestation;  // Also explicitly expose requestAttestation
+window.App.submitNoStakeReport = App.submitNoStakeReport;  // Expose no-stake report function
+window.App.checkNoStakeWalletStatus = App.checkNoStakeWalletStatus;  // Expose wallet status check
 
 // Export App as default for module usage
 export default App;

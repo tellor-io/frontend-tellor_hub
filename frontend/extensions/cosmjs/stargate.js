@@ -289,6 +289,24 @@
                             }
                         };
                         encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
+                    } else if (message.typeUrl === '/layer.oracle.MsgNoStakeReport') {
+                        // Encode no-stake report message
+                        const MsgNoStakeReport = new protobuf.Type("MsgNoStakeReport")
+                            .add(new protobuf.Field("creator", 1, "string"))
+                            .add(new protobuf.Field("query_data", 2, "bytes"))
+                            .add(new protobuf.Field("value", 3, "string"));
+                        
+                        root.add(MsgNoStakeReport);
+                        const MsgType = root.lookupType("MsgNoStakeReport");
+                        
+                        const msgValue = {
+                            creator: message.value.creator,
+                            query_data: message.value.query_data,
+                            value: message.value.value
+                        };
+                        
+                        console.log('Encoding MsgNoStakeReport:', msgValue);
+                        encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else {
                         throw new Error(`Unsupported message type: ${message.typeUrl}`);
                     }

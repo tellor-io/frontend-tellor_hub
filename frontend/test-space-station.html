@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Space Station Layout Test</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="main.css" />
+  <link rel="stylesheet" href="space-station.css" />
+</head>
+<body>
+        <div class="p-4">
+        <h1 class="text-2xl font-bold mb-4">Tellor Hub - Space Station Test</h1>
+    
+    <!-- Test the space station container -->
+    <div class="space-station-container" id="spaceStationContainer">
+      <!-- Initial Hub State -->
+      <div class="hub-only-state" id="hubOnlyState">
+        <!-- Central Hub -->
+        <div class="central-hub">
+                  <div class="hub-core">
+          <img src="tellor_hub.png" alt="Tellor Hub" class="hub-logo">
+        </div>
+        </div>
+
+        <!-- Orbiting Pods -->
+        <div class="orbit-container">
+          <!-- One Continuous Diagonal Line -->
+          <div class="spoke-line spoke-diagonal"></div>
+          
+          <!-- Bridge to Layer Pod -->
+          <div class="orbiting-pod" data-function="bridgeToLayer">
+            <div class="pod-content">
+              <img src="finales_bridge_tellor.png" alt="Bridge to Layer" class="pod-icon">
+            </div>
+          </div>
+
+          <!-- Bridge to Ethereum Pod -->
+          <div class="orbiting-pod" data-function="bridgeToEth">
+            <div class="pod-content">
+              <img src="finales_bridge_eth.png" alt="Bridge to Ethereum" class="pod-icon">
+            </div>
+          </div>
+
+          <!-- Delegate Pod -->
+          <div class="orbiting-pod" data-function="delegate">
+            <div class="pod-content">
+              <img src="finales_delegate.png" alt="Delegate" class="pod-icon">
+            </div>
+          </div>
+
+          <!-- No-Stake Report Pod -->
+          <div class="orbiting-pod" data-function="noStakeReport">
+            <div class="pod-content">
+              <img src="finales_report.png" alt="Report" class="pod-icon">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Function Focus State -->
+      <div class="function-focus-state" id="functionFocusState" style="display: none;">
+        <!-- Side Navigation Menu -->
+        <div class="side-nav-menu">
+          <div class="side-nav-header">
+            <button class="back-to-hub-btn" id="backToHubBtn">
+              <span class="back-icon">←</span>
+              <span class="back-text">Back to Hub</span>
+            </button>
+          </div>
+          
+          <div class="side-nav-options">
+            <div class="nav-option" data-function="bridgeToLayer">
+              <div class="nav-option-icon">🌉</div>
+              <div class="nav-option-title">Bridge to Tellor</div>
+            </div>
+            
+            <div class="nav-option" data-function="bridgeToEth">
+              <div class="nav-option-icon">🔗</div>
+              <div class="nav-option-title">Bridge to Ethereum</div>
+            </div>
+            
+            <div class="nav-option" data-function="delegate">
+              <div class="nav-option-icon">⚡</div>
+              <div class="nav-option-title">Delegate Tokens</div>
+            </div>
+            
+            <div class="nav-option" data-function="noStakeReport">
+              <div class="nav-option-icon">📊</div>
+              <div class="nav-option-title">No-Stake Report</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Function Display Area -->
+        <div class="function-display-area">
+          <div class="function-container">
+            <!-- Test Section -->
+            <div class="function-section active">
+              <div class="section-header">
+                <h2>🌉 Test Section</h2>
+                <p class="section-description">This is a test section to verify the layout</p>
+              </div>
+              <div class="balance-info">
+                <div class="input-button-container">
+                  <div class="input-with-label">
+                    <span class="input-label">TRB</span>
+                    <input class="input" type="text" placeholder="0" />
+                  </div>
+                </div>
+                <div class="bridge-direction">
+                  <button class="button-style-1">Test Button 1</button>
+                  <button class="button-style-3">Test Button 2</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Test Controls -->
+    <div class="mt-8 p-4 bg-gray-100 rounded">
+      <h2 class="text-lg font-semibold mb-2">Test Controls</h2>
+      <button onclick="testPodClick()" class="bg-blue-500 text-white px-4 py-2 rounded mr-2">
+        Test Pod Click
+      </button>
+      <button onclick="testSectionSwitch()" class="bg-green-500 text-white px-4 py-2 rounded mr-2">
+        Test Section Switch
+      </button>
+      <button onclick="testBackToHub()" class="bg-yellow-500 text-white px-4 py-2 rounded mr-2">
+        Test Back to Hub
+      </button>
+      <button onclick="resetLayout()" class="bg-red-500 text-white px-4 py-2 rounded">
+        Reset Layout
+      </button>
+    </div>
+
+    <!-- Test Results -->
+    <div id="test-results" class="mt-4 p-4 bg-gray-100 rounded">
+      <h3 class="font-semibold">Test Results:</h3>
+      <div id="results-content">No tests run yet.</div>
+    </div>
+  </div>
+
+  <script>
+    function logTest(message) {
+      const resultsContent = document.getElementById('results-content');
+      const timestamp = new Date().toLocaleTimeString();
+      resultsContent.innerHTML += `<div class="mt-2"><strong>[${timestamp}]</strong> ${message}</div>`;
+    }
+
+    function testPodClick() {
+      logTest('Testing pod click functionality...');
+      
+      const pods = document.querySelectorAll('.orbiting-pod');
+      pods.forEach((pod, index) => {
+        setTimeout(() => {
+          pod.click();
+          logTest(`Clicked pod ${index + 1}: ${pod.getAttribute('data-function')}`);
+        }, index * 500);
+      });
+    }
+
+    function testSectionSwitch() {
+      logTest('Testing section switching...');
+      
+      const sections = ['bridgeToLayer', 'bridgeToEth', 'delegate', 'noStakeReport'];
+      sections.forEach((section, index) => {
+        setTimeout(() => {
+          const navOption = document.querySelector(`.nav-option[data-function="${section}"]`);
+          if (navOption) {
+            navOption.click();
+            logTest(`Switched to section: ${section}`);
+          }
+        }, index * 1000);
+      });
+    }
+
+    function testBackToHub() {
+      logTest('Testing back to hub functionality...');
+      
+      const backBtn = document.getElementById('backToHubBtn');
+      if (backBtn) {
+        backBtn.click();
+        logTest('Clicked back to hub button');
+      }
+    }
+
+    function resetLayout() {
+      logTest('Resetting layout...');
+      
+      // Show hub only state
+      document.getElementById('hubOnlyState').style.display = 'flex';
+      document.getElementById('functionFocusState').style.display = 'none';
+      
+      // Reset all active states
+      document.querySelectorAll('.function-section').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.nav-option').forEach(opt => opt.classList.remove('active'));
+      
+      // Set default active section
+      document.querySelector('.function-section').classList.add('active');
+      
+      logTest('Layout reset complete');
+    }
+
+    // Add click handlers for pods
+    document.addEventListener('DOMContentLoaded', function() {
+      const pods = document.querySelectorAll('.orbiting-pod');
+      
+      pods.forEach(pod => {
+        pod.addEventListener('click', function() {
+          const functionType = this.getAttribute('data-function');
+          logTest(`Pod clicked: ${functionType}`);
+          
+          // Switch to function focus state
+          document.getElementById('hubOnlyState').style.display = 'none';
+          document.getElementById('functionFocusState').style.display = 'flex';
+          
+          // Update side nav active state
+          document.querySelectorAll('.nav-option').forEach(opt => opt.classList.remove('active'));
+          document.querySelector(`.nav-option[data-function="${functionType}"]`).classList.add('active');
+        });
+      });
+      
+      // Add back to hub button handler
+      document.getElementById('backToHubBtn').addEventListener('click', function() {
+        logTest('Back to hub button clicked');
+        document.getElementById('hubOnlyState').style.display = 'flex';
+        document.getElementById('functionFocusState').style.display = 'none';
+      });
+      
+      // Add side nav option handlers
+      document.querySelectorAll('.nav-option').forEach(option => {
+        option.addEventListener('click', function() {
+          const functionType = this.getAttribute('data-function');
+          logTest(`Nav option clicked: ${functionType}`);
+          
+          // Update active nav option
+          document.querySelectorAll('.nav-option').forEach(opt => opt.classList.remove('active'));
+          this.classList.add('active');
+        });
+      });
+      
+      logTest('Test page loaded successfully');
+    });
+  </script>
+</body>
+</html>
