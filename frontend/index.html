@@ -30,6 +30,9 @@
 
   <body>
     <header>
+      <div class="top-left">
+        <img src="ellor_hubz.png" alt="Tellor Hub Logo" class="top-left-logo">
+      </div>
       <div class="top-right">
         <!-- Wallet Manager Dropdown -->
         <div class="wallet-manager-dropdown">
@@ -84,15 +87,16 @@
       <div class="hub-only-state" id="hubOnlyState">
         <!-- Central Hub -->
         <div class="central-hub">
-                  <div class="hub-core">
-          <img src="tellor_hub.png" alt="Tellor Hub" class="hub-logo">
-        </div>
+          <div class="hub-core">
+            <img src="drkgrnswsh.png" alt="Dark Green Swoosh Hub" class="hub-logo">
+          </div>
         </div>
 
         <!-- Orbiting Pods -->
         <div class="orbit-container">
-          <!-- One Continuous Diagonal Line -->
-          <div class="spoke-line spoke-diagonal"></div>
+          <!-- Two Continuous Diagonal Lines -->
+          <div class="spoke-line spoke-diagonal-1"></div>
+          <div class="spoke-line spoke-diagonal-2"></div>
           
           <!-- Bridge to Layer Pod -->
           <div class="orbiting-pod" data-function="bridgeToLayer">
@@ -198,25 +202,59 @@
                 <h2>🔗 Bridge to Ethereum</h2>
                 <p class="section-description">Withdraw your TRB tokens from Tellor Layer back to Ethereum</p>
               </div>
-              <div class="wallet-disclaimer">*Please connect both wallets to bridge to Ethereum*</div>
-              <div class="wallet-connection-container">
-              </div>
-              <div class="balance-info">
-                  <div class="input-button-container">
-                      <div class="input-with-label">
-                          <span class="input-label">TRB</span>
-                          <input class="input" type="text" id="ethStakeAmount" placeholder="0" />
+              
+              <div class="bridge-eth-layout">
+                <!-- Left side: Withdrawal Form -->
+                <div class="withdrawal-form-container">
+                  <div class="wallet-disclaimer">*Please connect both wallets to bridge to Ethereum*</div>
+                  <div class="wallet-connection-container">
+                  </div>
+                  <div class="balance-info compact">
+                      <div class="input-button-container">
+                          <div class="input-with-label">
+                              <span class="input-label">TRB</span>
+                              <input class="input" type="text" id="ethStakeAmount" placeholder="0" />
+                          </div>
+                      </div>
+                      <div class="input-button-container">
+                          <div class="input-with-label">
+                              <input class="input-address" type="text" id="ethQueryId" placeholder="To address (e.g. 0x...)" />
+                              <span class="info-icon" data-tooltip="Enter your Ethereum address (0x...)">ⓘ</span>
+                          </div>
+                      </div>
+                      <div class="bridge-direction">
+                          <button id="withdrawButton" class="button-style-3" onclick="App.withdrawFromLayer()">1. Request Withdrawal</button>
                       </div>
                   </div>
-                  <div class="input-button-container">
-                      <div class="input-with-label">
-                          <input class="input-address" type="text" id="ethQueryId" placeholder="To address (e.g. 0x...)" />
-                          <span class="info-icon" data-tooltip="Enter your Ethereum address (0x...)">ⓘ</span>
-                      </div>
+                </div>
+                
+                <!-- Right side: Withdrawal Table -->
+                <div class="withdrawal-table-sidebar">
+                  <div class="history-header">
+                    <h3>Withdrawal Transactions</h3>
+                    <div class="history-subtitle">View & Claim your withdrawal requests and their status</div>
                   </div>
-                  <div class="bridge-direction">
-                      <button id="withdrawButton" class="button-style-3" onclick="App.withdrawFromLayer()">1. Request Withdrawal</button>
+                  <div class="withdrawal-table-container">
+                    <table id="withdrawal-history" class="withdrawal-table">
+                      <thead>
+                        <tr>
+                          <th>Actions</th>
+                          <th>ID</th>
+                          <th>Sender</th>
+                          <th>Recipient</th>
+                          <th class="amount-column">Amount (TRB)</th>
+                          <th>Time</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td colspan="7" class="loading-message">Waiting for wallet connections...</td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
+                </div>
               </div>
             </div>
 
@@ -284,32 +322,7 @@
 
     <a target="_blank" href="https://github.com/tellor-io/frontend-layerbridgebutton" class="frontend-code-link">Front-End code</a>
     
-    <div id="bridgeTransactionsContainer" class="transactions-container">
-      <div class="history-header">
-        <h3>Withdrawal Transactions</h3>
-        <div class="history-subtitle">View & Claim your withdrawal requests and their status</div>
-      </div>
-      <div class="withdrawal-table-container">
-        <table id="withdrawal-history" class="withdrawal-table">
-          <thead>
-            <tr>
-              <th>Actions</th>
-              <th>ID</th>
-              <th>Sender</th>
-              <th>Recipient</th>
-              <th class="amount-column">Amount (TRB)</th>
-              <th>Time</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td colspan="7" class="loading-message">Waiting for wallet connections...</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+
     <script src="./extensions/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.10.0/web3.min.js"></script>
     <!-- Load app.js as a module only once -->
@@ -507,6 +520,16 @@
             if (sectionId) {
               document.querySelectorAll('.function-section').forEach(s => s.classList.remove('active'));
               document.getElementById(sectionId).classList.add('active');
+              
+              // Update withdrawal history when bridge to ethereum section is shown
+              if (functionType === 'bridgeToEth') {
+                // Update the withdrawal history in the integrated table
+                if (window.App && window.App.updateWithdrawalHistory) {
+                  setTimeout(() => {
+                    window.App.updateWithdrawalHistory();
+                  }, 100);
+                }
+              }
             }
             
             // Update side nav active state
@@ -558,6 +581,16 @@
             if (sectionId) {
               document.querySelectorAll('.function-section').forEach(s => s.classList.remove('active'));
               document.getElementById(sectionId).classList.add('active');
+              
+              // Update withdrawal history when bridge to ethereum section is shown
+              if (functionType === 'bridgeToEth') {
+                // Update the withdrawal history in the integrated table
+                if (window.App && window.App.updateWithdrawalHistory) {
+                  setTimeout(() => {
+                    window.App.updateWithdrawalHistory();
+                  }, 100);
+                }
+              }
             }
             
             // Hide all tooltips when switching functions

@@ -56,6 +56,9 @@ const App = {
             App.updateNetworkDisplay();
             App.updateCosmosNetworkDisplay();
             
+            // Initialize withdrawal history table
+            App.updateWithdrawalHistory();
+            
             // Remove any existing event listeners
             const walletButton = document.getElementById('walletButton');
             const keplrButton = document.getElementById('keplrButton');
@@ -4027,6 +4030,8 @@ const App = {
       App.showErrorPopup(error.message || 'Failed to submit no-stake report');
     }
   },
+
+
 };
 
 // Export App to window object for global access
@@ -4035,6 +4040,7 @@ window.App.claimWithdrawal = App.claimWithdrawal;  // Explicitly expose claimWit
 window.App.requestAttestation = App.requestAttestation;  // Also explicitly expose requestAttestation
 window.App.submitNoStakeReport = App.submitNoStakeReport;  // Expose no-stake report function
 window.App.checkNoStakeWalletStatus = App.checkNoStakeWalletStatus;  // Expose wallet status check
+
 
 // Export App as default for module usage
 export default App;
@@ -4083,6 +4089,8 @@ $(document).ready(function() {
     if (depositButton) {
         depositButton.disabled = true;
     }
+    
+
 });
 
 async function checkBalance(amount) {

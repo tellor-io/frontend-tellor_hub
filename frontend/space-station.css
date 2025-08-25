@@ -8,6 +8,8 @@
   padding: 20px;
   position: relative;
   overflow: visible;
+  margin-top: 40px; /* Reduced: just enough space for header logo */
+  margin-bottom: 60px; /* Reduced: just enough space for footer */
 }
 
 /* Hub Only State - Initial View */
@@ -28,6 +30,9 @@
   max-width: 1200px;
   gap: 30px;
   min-height: 80vh;
+  max-height: calc(100vh - 120px); /* Adjusted for reduced margins */
+  overflow-y: auto; /* Allow scrolling if content is too tall */
+  margin-top: 60px; /* Push down to avoid header overlap */
 }
 
 /* Central Hub */
@@ -43,62 +48,29 @@
 }
 
 .hub-core {
-  background: radial-gradient(circle, #003734 0%, #001a18 70%, #000f0e 100%);
-  border: 3px solid #38A8A3;
-  border-radius: 50%;
-  width: 180px;
-  height: 180px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  width: 140px;
+  height: 140px;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  box-shadow: 
-    0 0 30px rgba(56, 168, 163, 0.6),
-    inset 0 0 30px rgba(0, 55, 52, 0.8);
-  animation: hubPulse 4s ease-in-out infinite;
   position: relative;
-  padding: 20px;
+  padding: 0;
   box-sizing: border-box;
 }
 
 .hub-logo {
-  max-width: 130px;
+  max-width: 140px;
   width: 100%;
   height: auto;
-  margin-bottom: 15px;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
 }
 
-.hub-title {
-  font-family: 'PPNeueMontreal-Bold', monospace;
-  font-size: 24px;
-  color: #eefffb;
-  text-align: center;
-  margin-bottom: 8px;
-  text-shadow: 0 0 10px rgba(238, 255, 251, 0.8);
-}
+/* Hub title and subtitle removed for swoosh design */
 
-.hub-subtitle {
-  font-family: 'PPNeueMontreal-Book', monospace;
-  font-size: 16px;
-  color: #88FFEC;
-  text-align: center;
-  opacity: 0.9;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-}
-
-@keyframes hubPulse {
-  0%, 100% { 
-    box-shadow: 
-      0 0 30px rgba(56, 168, 163, 0.6),
-      inset 0 0 30px rgba(0, 55, 52, 0.8);
-  }
-  50% { 
-    box-shadow: 
-      0 0 50px rgba(56, 168, 163, 0.8),
-      inset 0 0 50px rgba(0, 55, 52, 1);
-  }
-}
+/* Hub pulse animation removed for swoosh design */
 
 /* Floating Pods Container */
 .orbit-container {
@@ -204,34 +176,26 @@
   }
 }
 
-/* Add connection lines (spokes) */
-.orbit-container::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 240px;
-  height: 240px;
-  border: 2px solid rgba(56, 168, 163, 0.3);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 0;
-}
+/* Connection circle removed for cleaner look */
 
-/* One continuous diagonal line connecting opposite pods through the hub */
+/* Two continuous diagonal lines connecting opposite pods through the hub */
 .spoke-line {
   position: absolute;
   top: 50%;
   left: 50%;
   width: 3px;
   height: 400px;
-  background: linear-gradient(to bottom, rgba(56, 168, 163, 0.8), rgba(56, 168, 163, 0.4));
+  background: linear-gradient(to bottom, rgba(0, 55, 52, 0.8), rgba(0, 55, 52, 0.4));
   transform-origin: center center;
-  z-index: 1;
+  z-index: -1;
 }
 
-.spoke-diagonal {
+.spoke-diagonal-1 {
   transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.spoke-diagonal-2 {
+  transform: translate(-50%, -50%) rotate(135deg);
 }
 
 /* Individual spoke lines connecting hub center to each pod */
@@ -242,7 +206,7 @@
   left: 50%;
   width: 3px;
   height: 120px;
-  background: linear-gradient(to bottom, rgba(56, 168, 163, 0.8), rgba(56, 168, 163, 0.4));
+  background: linear-gradient(to bottom, rgba(0, 55, 52, 0.8), rgba(0, 55, 52, 0.4));
   transform-origin: bottom center;
   z-index: 1;
   display: none;
@@ -297,6 +261,20 @@
   }
 }
 
+/* Top Left Logo */
+.top-left {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 1000;
+}
+
+.top-left-logo {
+  width: 300px;
+  height: auto;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
 /* Side Navigation Menu */
 .side-nav-menu {
   width: 250px;
@@ -310,7 +288,7 @@
   backdrop-filter: blur(10px);
   height: fit-content;
   position: sticky;
-  top: 20px;
+  top: 100px; /* Align with top of function container (60px margin + 40px buffer) */
 }
 
 .side-nav-header {
@@ -393,18 +371,28 @@
 .function-display-area {
   flex: 1;
   min-height: 400px;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding-left: 20px;
+  margin-top: 0; /* Remove top margin since function-focus-state handles spacing */
+  margin-bottom: 20px; /* Reduced: minimal space above footer */
 }
+
+
 
 .function-container {
   background: rgba(196, 237, 235, 0.95);
   border: 3px solid #003734;
   border-radius: 20px;
-  padding: 30px;
+  padding: 25px;
   box-shadow: 
     0 10px 30px rgba(0, 55, 52, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);
   height: fit-content;
+  margin-top: 0; /* Remove top margin since function-display-area handles spacing */
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .function-section {
@@ -744,6 +732,239 @@
 
 .function-display-area {
   z-index: 15;
+}
+
+/* Bridge to Ethereum side-by-side layout */
+.bridge-eth-layout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  max-width: 100%;
+  margin-top: 0; /* Remove top margin since parent handles spacing */
+  max-height: calc(100vh - 140px); /* Adjusted for reduced margins */
+  overflow-y: auto; /* Allow scrolling if content is too tall */
+}
+
+.withdrawal-form-container {
+  flex: 0 0 320px;
+  min-width: 320px;
+  max-width: 320px;
+}
+
+.withdrawal-table-sidebar {
+  flex: 1;
+  min-width: 500px;
+  max-width: calc(100% - 360px);
+  background-color: #C4EDEB;
+  border: 3px solid black;
+  border-radius: 10px;
+  padding: 15px;
+  max-height: calc(100vh - 200px); /* Adjusted for reduced margins */
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.withdrawal-table-sidebar .withdrawal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  table-layout: fixed;
+  min-width: 600px;
+}
+
+.withdrawal-table-sidebar .withdrawal-table th {
+  background-color: #f8f9fa;
+  padding: 8px 6px;
+  text-align: left;
+  border-bottom: 2px solid #e2e8f0;
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.withdrawal-table-sidebar .withdrawal-table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: middle;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.withdrawal-table-sidebar .withdrawal-table tr:last-child td {
+  border-bottom: none;
+}
+
+.withdrawal-table-sidebar .withdrawal-table tr:hover {
+  background-color: #f8f9fa;
+}
+
+.withdrawal-table-sidebar .amount-column {
+  text-align: right;
+}
+
+.withdrawal-table-sidebar .address-cell {
+  font-family: monospace;
+  color: #4a5568;
+  font-size: 12px;
+}
+
+/* Column width management */
+.withdrawal-table-sidebar .withdrawal-table th:nth-child(1),
+.withdrawal-table-sidebar .withdrawal-table td:nth-child(1) {
+  width: 120px; /* Actions column */
+}
+
+.withdrawal-table-sidebar .withdrawal-table th:nth-child(2),
+.withdrawal-table-sidebar .withdrawal-table td:nth-child(2) {
+  width: 50px; /* ID column */
+}
+
+.withdrawal-table-sidebar .withdrawal-table th:nth-child(3),
+.withdrawal-table-sidebar .withdrawal-table td:nth-child(3) {
+  width: 100px; /* Sender column */
+}
+
+.withdrawal-table-sidebar .withdrawal-table th:nth-child(4),
+.withdrawal-table-sidebar .withdrawal-table td:nth-child(4) {
+  width: 100px; /* Recipient column */
+}
+
+.withdrawal-table-sidebar .withdrawal-table th:nth-child(5),
+.withdrawal-table-sidebar .withdrawal-table td:nth-child(5) {
+  width: 80px; /* Amount column */
+}
+
+.withdrawal-table-sidebar .withdrawal-table th:nth-child(6),
+.withdrawal-table-sidebar .withdrawal-table td:nth-child(6) {
+  width: 120px; /* Time column */
+}
+
+.withdrawal-table-sidebar .withdrawal-table th:nth-child(7),
+.withdrawal-table-sidebar .withdrawal-table td:nth-child(7) {
+  width: 80px; /* Status column */
+}
+
+.withdrawal-table-sidebar .status-true {
+  color: #38a169;
+  font-weight: 500;
+}
+
+.withdrawal-table-sidebar .status-false {
+  color: #e53e3e;
+  font-weight: 500;
+}
+
+.withdrawal-table-sidebar .attest-button,
+.withdrawal-table-sidebar .claim-button {
+  margin: 0 2px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+
+.withdrawal-table-sidebar .attest-button:hover,
+.withdrawal-table-sidebar .claim-button:hover {
+  opacity: 0.9;
+}
+
+.withdrawal-table-sidebar .attest-button:disabled,
+.withdrawal-table-sidebar .claim-button:disabled {
+  background-color: #cbd5e0 !important;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.withdrawal-table-sidebar .attest-button.disconnected {
+  background-color: #cbd5e0 !important;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.withdrawal-form-container .balance-info.compact {
+  max-width: 100%;
+  margin: 0;
+}
+
+.withdrawal-form-container .input-button-container {
+  margin-bottom: 15px;
+}
+
+.withdrawal-form-container .bridge-direction {
+  margin-top: 20px;
+}
+
+/* Responsive design for side-by-side layout */
+@media (max-width: 1200px) {
+  .bridge-eth-layout {
+    flex-direction: column;
+    gap: 20px;
+  }
+  
+  .withdrawal-form-container {
+    flex: none;
+    min-width: 100%;
+    max-width: 100%;
+  }
+  
+  .withdrawal-table-sidebar {
+    min-width: 100%;
+    max-width: 100%;
+    max-height: 400px;
+  }
+}
+
+/* Specific adjustments for smaller viewports */
+@media (max-width: 1400px) {
+  .withdrawal-form-container {
+    flex: 0 0 300px;
+    min-width: 300px;
+    max-width: 300px;
+  }
+  
+  .withdrawal-table-sidebar {
+    min-width: 450px;
+    max-width: calc(100% - 340px);
+  }
+  
+  .bridge-eth-layout {
+    gap: 15px;
+  }
+}
+
+/* Specific adjustments for your viewport size (1344x616px) */
+@media (max-width: 1344px) {
+  .space-station-container {
+    margin-top: 30px; /* Minimal top margin for smaller viewport */
+    margin-bottom: 40px; /* Minimal bottom margin for smaller viewport */
+  }
+  
+  .function-focus-state {
+    margin-top: 40px; /* Reduced top margin for smaller viewport */
+  }
+  
+  .side-nav-menu {
+    top: 80px; /* Adjust for smaller viewport (40px margin + 40px buffer) */
+  }
+  
+  .function-display-area {
+    margin-top: 0; /* Remove top margin since function-focus-state handles spacing */
+    margin-bottom: 15px; /* Minimal bottom margin for smaller viewport */
+  }
+  
+  .bridge-eth-layout {
+    max-height: calc(100vh - 100px); /* Adjust for minimal margins */
+  }
+  
+  .withdrawal-table-sidebar {
+    max-height: calc(100vh - 150px); /* Adjust for minimal margins */
+  }
 }
 
 /* Preserve existing transaction container positioning */
