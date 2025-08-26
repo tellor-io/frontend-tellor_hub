@@ -27,12 +27,16 @@
 .function-focus-state {
   display: flex;
   width: 100%;
-  max-width: 1200px;
+  max-width: 100vw; /* Ensure it never exceeds viewport width */
   gap: 30px;
   min-height: 80vh;
   max-height: calc(100vh - 120px); /* Adjusted for reduced margins */
   overflow-y: auto; /* Allow scrolling if content is too tall */
+  overflow-x: hidden; /* Prevent horizontal overflow */
   margin-top: 60px; /* Push down to avoid header overlap */
+  box-sizing: border-box;
+  padding-right: 20px; /* Ensure right side doesn't overflow */
+  padding-left: 20px; /* Ensure left side doesn't overflow */
 }
 
 /* Central Hub */
@@ -287,8 +291,8 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);
   height: fit-content;
-  position: sticky;
-  top: 100px; /* Align with top of function container (60px margin + 40px buffer) */
+  position: relative; /* Remove sticky positioning to flow naturally */
+  margin-top: 0; /* Remove any top margin */
 }
 
 .side-nav-header {
@@ -391,8 +395,11 @@
   backdrop-filter: blur(10px);
   height: fit-content;
   margin-top: 0; /* Remove top margin since function-display-area handles spacing */
+  width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  overflow: hidden; /* Prevent content from overflowing */
+  overflow-x: hidden; /* Specifically prevent horizontal overflow */
 }
 
 .function-section {
@@ -420,22 +427,22 @@
 
 .section-header {
   text-align: center;
-  margin-bottom: 30px;
-  padding-bottom: 20px;
-  border-bottom: 2px solid #38A8A3;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #38A8A3;
 }
 
 .section-header h2 {
   font-family: 'PPNeueMontreal-Bold', monospace;
-  font-size: 28px;
+  font-size: 16px;
   color: #003734;
-  margin: 0 0 10px 0;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin: 0 0 3px 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .section-description {
   font-family: 'PPNeueMontreal-Book', monospace;
-  font-size: 16px;
+  font-size: 12px;
   color: #004d47;
   margin: 0;
   opacity: 0.9;
@@ -446,6 +453,9 @@
   .function-focus-state {
     flex-direction: column;
     gap: 20px;
+    overflow-x: hidden !important; /* Force prevent horizontal overflow */
+    max-width: 100vw !important; /* Force ensure container stays within viewport */
+    width: 100vw !important; /* Force width to viewport */
   }
   
   .side-nav-menu {
@@ -462,6 +472,41 @@
   .nav-option {
     min-width: 200px;
     justify-content: center;
+  }
+  
+  /* CRITICAL: Override main.css .box-wrapper rules that are causing the issue */
+  .box-wrapper {
+    overflow-x: hidden !important; /* Override main.css overflow-x: auto */
+    overflow: hidden !important; /* Override main.css overflow: visible at 1024px */
+    max-width: 100vw !important; /* Force viewport containment */
+    width: 100vw !important; /* Force viewport width */
+  }
+  
+  /* Force override main.css problematic rules for Bridge to Ethereum section */
+  .function-container {
+    overflow-x: hidden !important; /* Force prevent horizontal overflow */
+    max-width: 100vw !important; /* Force ensure container stays within viewport */
+    width: 100vw !important; /* Force width to viewport */
+  }
+  
+  .bridge-eth-vertical-layout {
+    overflow-x: hidden !important; /* Force prevent horizontal overflow */
+    max-width: 100vw !important; /* Force ensure container stays within viewport */
+    width: 100vw !important; /* Force width to viewport */
+  }
+  
+  .withdrawal-table-full {
+    overflow-x: hidden !important; /* Force prevent horizontal overflow */
+    max-width: 100vw !important; /* Force ensure container stays within viewport */
+    width: 100vw !important; /* Force width to viewport */
+  }
+  
+  /* Force override any conflicting table rules */
+  .withdrawal-table-full table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    overflow-x: hidden !important;
   }
 }
 
@@ -612,7 +657,7 @@
 .function-section .balance-info,
 .function-section .input-button-container,
 .function-section .bridge-direction {
-  margin-bottom: 20px;
+  margin-bottom: 6px;
 }
 
 .function-section .input,
@@ -734,34 +779,207 @@
   z-index: 15;
 }
 
-/* Bridge to Ethereum side-by-side layout */
-.bridge-eth-layout {
+/* Bridge to Ethereum vertical layout */
+#bridgeToEthSection .bridge-eth-vertical-layout {
   display: flex;
-  gap: 20px;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 15px !important;
+  width: 100%;
   max-width: 100%;
-  margin-top: 0; /* Remove top margin since parent handles spacing */
-  max-height: calc(100vh - 140px); /* Adjusted for reduced margins */
-  overflow-y: auto; /* Allow scrolling if content is too tall */
+  box-sizing: border-box;
+  overflow-x: hidden; /* Prevent horizontal overflow */
 }
 
-.withdrawal-form-container {
-  flex: 0 0 320px;
-  min-width: 320px;
-  max-width: 320px;
+/* Force viewport containment for Bridge to Ethereum section */
+#bridgeToEthSection {
+  overflow-x: hidden !important;
+  max-width: 100vw !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
 }
 
-.withdrawal-table-sidebar {
+#bridgeToEthSection .withdrawal-form-top {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  background: rgba(196, 237, 235, 0.95);
+  border: 2px solid #003734;
+  border-radius: 10px;
+  padding: 8px !important;
+  box-shadow: 
+    0 3px 10px rgba(0, 55, 52, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+}
+
+.withdrawal-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.input-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.input-row .input-with-label {
   flex: 1;
-  min-width: 500px;
-  max-width: calc(100% - 360px);
+  min-width: 300px;
+}
+
+.input-row .input-with-label:first-child {
+  flex: 0 0 200px; /* TRB input gets fixed width */
+}
+
+.withdraw-button-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 0;
+}
+
+#bridgeToEthSection .withdraw-button-container .button-style-3 {
+  font-size: 14px !important;
+  padding: 10px 16px !important;
+  white-space: nowrap;
+}
+
+/* Enhanced TRB input field - no more conflicts with main.css */
+.trb-input {
+  width: 120px !important;
+  min-width: 120px !important;
+  font-size: 14px !important;
+  padding: 10px 12px !important;
+  height: 43px !important;
+  box-sizing: border-box !important;
+  background-color: #f0f0f0 !important;
+  border: 1px solid #7FAFB1 !important;
+  border-radius: 0px 12px 12px 0px !important;
+  margin-top: 12px !important;
+  line-height: 1 !important;
+}
+
+/* Address input field - no more conflicts with main.css */
+.address-input {
+  width: 200px !important;
+  min-width: 400px !important;
+  flex-shrink: 0;
+  font-size: 14px !important;
+  padding: 10px 12px !important;
+  height: 43px !important;
+  box-sizing: border-box !important;
+  background-color: #f0f0f0 !important;
+  border: 1px solid #7FAFB1 !important;
+  border-radius: 12px !important;
+  margin-top: 12px !important;
+  line-height: 1.2 !important;
+  color: #008D8B !important;
+}
+
+/* Override container constraints for Bridge to Ethereum */
+#bridgeToEthSection .input-button-container {
+  max-width: 600px !important; /* Increased from 340px to accommodate all elements */
+  width: 100% !important;
+  justify-content: flex-start !important; /* Left-align instead of space-between */
+  gap: 15px !important; /* Increased gap between elements */
+  margin: 0 !important; /* Remove auto centering */
+  padding: 0 !important; /* Remove any padding */
+}
+
+/* Ensure function container stays within viewport */
+#bridgeToEthSection {
+  max-height: calc(100vh - 200px) !important; /* Keep container within viewport */
+  overflow: hidden !important; /* Prevent container overflow */
+}
+
+/* Make transactions table scrollable within container */
+#bridgeToEthSection .transactions-container {
+  max-height: calc(100vh - 350px) !important; /* Reserve space for form above */
+  overflow-y: auto !important; /* Enable vertical scrolling */
+  overflow-x: hidden !important; /* Prevent horizontal overflow */
+}
+
+/* Override input-with-label width constraints for Bridge to Ethereum */
+#bridgeToEthSection .input-button-container .input-with-label {
+  width: auto !important; /* Override 100% width */
+  flex-shrink: 0 !important; /* Prevent shrinking */
+  margin: 0 !important; /* Remove any margins */
+}
+
+/* Override balance-info centering for Bridge to Ethereum */
+#bridgeToEthSection .balance-info {
+  align-items: flex-start !important; /* Left-align instead of center */
+  margin: 0 !important; /* Remove auto centering */
+  max-width: none !important; /* Remove width constraint */
+}
+
+/* Ensure proper spacing and viewport containment */
+#bridgeToEthSection .balance-info {
+  margin-bottom: 20px !important; /* Space between form and table */
+}
+
+/* Make table container properly scrollable */
+#bridgeToEthSection .transactions-container {
+  flex: 1 !important; /* Take remaining space */
+  min-height: 0 !important; /* Allow shrinking */
+  overflow: hidden !important; /* Container overflow control */
+}
+
+/* Ensure table container has proper scrolling */
+#bridgeToEthSection .withdrawal-table-container {
+  overflow-y: auto !important; /* Enable vertical scrolling */
+  max-height: calc(100vh - 400px) !important; /* Reserve space for headers and form */
+  border: 1px solid #e2e8f0 !important; /* Visual boundary for scrollable area */
+  border-radius: 8px !important;
+}
+
+/* Enable withdraw button when Bridge to Ethereum section is active */
+#bridgeToEthSection.active #withdrawButton {
+  background-color: #003734 !important;
+  color: #eefffb !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
+}
+
+#bridgeToEthSection.active #withdrawButton:disabled {
+  background-color: #003734 !important;
+  color: #eefffb !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
+}
+
+/* Compact wallet disclaimer */
+.withdrawal-form-top .wallet-disclaimer {
+  font-size: 11px;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+.withdrawal-form-top .wallet-connection-container {
+  margin-bottom: 4px;
+}
+
+.withdrawal-table-full {
+  width: 100%;
+  max-width: 100%;
   background-color: #C4EDEB;
   border: 3px solid black;
   border-radius: 10px;
   padding: 15px;
-  max-height: calc(100vh - 200px); /* Adjusted for reduced margins */
-  overflow-y: auto;
-  overflow-x: auto;
+  box-sizing: border-box;
+  overflow: hidden; /* Prevent content from overflowing viewport */
+}
+
+/* Ensure table doesn't cause horizontal overflow */
+#bridgeToEthSection .withdrawal-table-full table {
+  width: 100% !important;
+  max-width: 100% !important;
+  table-layout: fixed !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box !important;
 }
 
 .withdrawal-table-sidebar .withdrawal-table {
@@ -774,22 +992,22 @@
 
 .withdrawal-table-sidebar .withdrawal-table th {
   background-color: #f8f9fa;
-  padding: 8px 6px;
+  padding: 6px 4px;
   text-align: left;
   border-bottom: 2px solid #e2e8f0;
   font-weight: 600;
   color: #2d3748;
-  font-size: 12px;
+  font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .withdrawal-table-sidebar .withdrawal-table td {
-  padding: 8px 6px;
+  padding: 6px 4px;
   border-bottom: 1px solid #e2e8f0;
   vertical-align: middle;
-  font-size: 12px;
+  font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -900,23 +1118,41 @@
   margin-top: 20px;
 }
 
-/* Responsive design for side-by-side layout */
+/* Responsive design for vertical layout */
 @media (max-width: 1200px) {
-  .bridge-eth-layout {
+  .input-row {
     flex-direction: column;
-    gap: 20px;
+    gap: 15px;
   }
   
-  .withdrawal-form-container {
+  .input-row .input-with-label {
+    min-width: 100%;
+  }
+  
+  .input-row .input-with-label:first-child {
     flex: none;
     min-width: 100%;
-    max-width: 100%;
+  }
+}
+
+/* Additional breakpoint for very small viewports */
+@media (max-width: 800px) {
+  .function-focus-state {
+    padding-left: 10px;
+    padding-right: 10px;
+    gap: 15px;
   }
   
-  .withdrawal-table-sidebar {
-    min-width: 100%;
-    max-width: 100%;
-    max-height: 400px;
+  .bridge-eth-vertical-layout {
+    gap: 15px;
+  }
+  
+  .withdrawal-form-top {
+    padding: 8px;
+  }
+  
+  .withdrawal-table-full {
+    padding: 15px;
   }
 }
 
@@ -930,7 +1166,7 @@
   
   .withdrawal-table-sidebar {
     min-width: 450px;
-    max-width: calc(100% - 340px);
+    max-width: calc(100% - 360px); /* Increased buffer for smaller viewports */
   }
   
   .bridge-eth-layout {
@@ -949,22 +1185,14 @@
     margin-top: 40px; /* Reduced top margin for smaller viewport */
   }
   
-  .side-nav-menu {
-    top: 80px; /* Adjust for smaller viewport (40px margin + 40px buffer) */
-  }
+
   
   .function-display-area {
     margin-top: 0; /* Remove top margin since function-focus-state handles spacing */
     margin-bottom: 15px; /* Minimal bottom margin for smaller viewport */
   }
   
-  .bridge-eth-layout {
-    max-height: calc(100vh - 100px); /* Adjust for minimal margins */
-  }
-  
-  .withdrawal-table-sidebar {
-    max-height: calc(100vh - 150px); /* Adjust for minimal margins */
-  }
+
 }
 
 /* Preserve existing transaction container positioning */

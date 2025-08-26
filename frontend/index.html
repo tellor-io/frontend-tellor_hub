@@ -203,57 +203,51 @@
                 <p class="section-description">Withdraw your TRB tokens from Tellor Layer back to Ethereum</p>
               </div>
               
-              <div class="bridge-eth-layout">
-                <!-- Left side: Withdrawal Form -->
-                <div class="withdrawal-form-container">
-                  <div class="wallet-disclaimer">*Please connect both wallets to bridge to Ethereum*</div>
-                  <div class="wallet-connection-container">
-                  </div>
-                  <div class="balance-info compact">
-                      <div class="input-button-container">
-                          <div class="input-with-label">
-                              <span class="input-label">TRB</span>
-                              <input class="input" type="text" id="ethStakeAmount" placeholder="0" />
-                          </div>
-                      </div>
-                      <div class="input-button-container">
-                          <div class="input-with-label">
-                              <input class="input-address" type="text" id="ethQueryId" placeholder="To address (e.g. 0x...)" />
-                              <span class="info-icon" data-tooltip="Enter your Ethereum address (0x...)">ⓘ</span>
-                          </div>
-                      </div>
-                      <div class="bridge-direction">
-                          <button id="withdrawButton" class="button-style-3" onclick="App.withdrawFromLayer()">1. Request Withdrawal</button>
-                      </div>
-                  </div>
+              <!-- Use standard classes like other sections -->
+              <div class="balance-info">
+                <div class="wallet-disclaimer">*Please connect both wallets to bridge to Ethereum*</div>
+                <div class="wallet-connection-container">
                 </div>
                 
-                <!-- Right side: Withdrawal Table -->
-                <div class="withdrawal-table-sidebar">
-                  <div class="history-header">
-                    <h3>Withdrawal Transactions</h3>
-                    <div class="history-subtitle">View & Claim your withdrawal requests and their status</div>
+                <!-- Form using standard input-button-container structure -->
+                <div class="input-button-container">
+                  <div class="input-with-label">
+                    <span class="input-label">TRB</span>
+                    <input class="trb-input" type="text" id="ethStakeAmount" placeholder="0" />
                   </div>
-                  <div class="withdrawal-table-container">
-                    <table id="withdrawal-history" class="withdrawal-table">
-                      <thead>
-                        <tr>
-                          <th>Actions</th>
-                          <th>ID</th>
-                          <th>Sender</th>
-                          <th>Recipient</th>
-                          <th class="amount-column">Amount (TRB)</th>
-                          <th>Time</th>
-                          <th>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td colspan="7" class="loading-message">Waiting for wallet connections...</td>
-                        </tr>
-                      </tbody>
-                    </table>
+                  <div class="input-with-label">
+                    <input class="address-input" type="text" id="ethQueryId" placeholder="To address (e.g. 0x...)" />
+                    <span class="info-icon" data-tooltip="Enter your Ethereum address (0x...)">ⓘ</span>
                   </div>
+                  <button id="withdrawButton" class="button-style-3" onclick="App.withdrawFromLayer()">1. Request Withdrawal</button>
+                </div>
+              </div>
+              
+              <!-- Table using standard transactions-container structure -->
+              <div class="transactions-container active">
+                <div class="history-header">
+                  <h3>Withdrawal Transactions</h3>
+                  <div class="history-subtitle">View & Claim your withdrawal requests and their status</div>
+                </div>
+                <div class="withdrawal-table-container">
+                  <table id="withdrawal-history" class="withdrawal-table">
+                    <thead>
+                      <tr>
+                        <th>Actions</th>
+                        <th>ID</th>
+                        <th>Sender</th>
+                        <th>Recipient</th>
+                        <th class="amount-column">Amount (TRB)</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td colspan="7" class="loading-message">Waiting for wallet connections...</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
