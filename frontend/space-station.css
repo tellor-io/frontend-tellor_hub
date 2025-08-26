@@ -240,8 +240,8 @@
   font-size: 32px;
   margin-bottom: 0;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
-  width: 240px;
-  height: 240px;
+  width: 200px;
+  height: 200px;
   object-fit: contain;
 }
 
@@ -393,13 +393,15 @@
     0 10px 30px rgba(0, 55, 52, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);
-  height: fit-content;
+  height: calc(100vh - 165px); /* Fixed height to align with side-nav-menu */
   margin-top: 0; /* Remove top margin since function-display-area handles spacing */
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
   overflow: hidden; /* Prevent content from overflowing */
   overflow-x: hidden; /* Specifically prevent horizontal overflow */
+  display: flex;
+  flex-direction: column;
 }
 
 .function-section {
@@ -681,14 +683,16 @@
 .function-section .input-label {
   background: #003734;
   color: #eefffb;
-  padding: 8px 12px;
+  padding: 12px 4px;
   border-radius: 8px 0 0 8px;
   font-family: 'PPNeueMontreal-Book', monospace;
-  font-size: 14px;
+  font-size: 20px;
   font-weight: bold;
   display: inline-block;
   min-width: 60px;
   text-align: center;
+  height: 45px !important; /* ← Add this to make it shorter */
+
 }
 
 /* Additional space station enhancements */
@@ -711,12 +715,12 @@
 .orbiting-pod::before {
   content: '';
   position: absolute;
-  top: -10px;
-  left: -10px;
-  right: -10px;
-  bottom: -10px;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
   border: 2px solid transparent;
-  border-radius: 25px;
+  border-radius: 200px;
   background: linear-gradient(45deg, #38A8A3, #88FFEC, #38A8A3);
   background-size: 200% 200%;
   animation: borderGlow 3s ease-in-out infinite;
@@ -738,29 +742,7 @@
   }
 }
 
-/* Enhanced function container */
-.function-container::before {
-  content: '';
-  position: absolute;
-  top: -2px;
-  left: -2px;
-  right: -2px;
-  bottom: -2px;
-  background: linear-gradient(45deg, #003734, #38A8A3, #88FFEC, #38A8A3, #003734);
-  background-size: 400% 400%;
-  border-radius: 22px;
-  animation: containerGlow 8s ease-in-out infinite;
-  z-index: -1;
-}
-
-@keyframes containerGlow {
-  0%, 100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-}
+/* Enhanced function container - glow effect removed */
 
 /* Ensure proper z-indexing */
 .space-station-container {
@@ -842,9 +824,17 @@
 }
 
 #bridgeToEthSection .withdraw-button-container .button-style-3 {
-  font-size: 14px !important;
+  font-size: 24px !important;
   padding: 10px 16px !important;
-  white-space: nowrap;
+  white-space: nowrap !important;
+  width: auto !important; /* Override 400px width */
+  min-width: fit-content !important; /* Allow button to size to content */
+  max-width: none !important; /* Remove any max-width constraints */
+  display: inline-block !important; /* Override block display */
+  margin: 0 !important; /* Remove auto centering */
+  height: auto !important; /* Allow natural height */
+  line-height: 1.2 !important; /* Control line height */
+  box-sizing: border-box !important; /* Ensure padding is included in width */
 }
 
 /* Enhanced TRB input field - no more conflicts with main.css */
@@ -853,7 +843,7 @@
   min-width: 120px !important;
   font-size: 14px !important;
   padding: 10px 12px !important;
-  height: 43px !important;
+  height: 45px !important;
   box-sizing: border-box !important;
   background-color: #f0f0f0 !important;
   border: 1px solid #7FAFB1 !important;
@@ -869,7 +859,7 @@
   flex-shrink: 0;
   font-size: 14px !important;
   padding: 10px 12px !important;
-  height: 43px !important;
+  height: 45px !important;
   box-sizing: border-box !important;
   background-color: #f0f0f0 !important;
   border: 1px solid #7FAFB1 !important;
@@ -891,8 +881,10 @@
 
 /* Ensure function container stays within viewport */
 #bridgeToEthSection {
-  max-height: calc(100vh - 200px) !important; /* Keep container within viewport */
+  height: 100% !important; /* Take full height of parent function-container */
   overflow: hidden !important; /* Prevent container overflow */
+  display: flex;
+  flex-direction: column;
 }
 
 /* Make transactions table scrollable within container */
@@ -900,6 +892,9 @@
   max-height: calc(100vh - 350px) !important; /* Reserve space for form above */
   overflow-y: auto !important; /* Enable vertical scrolling */
   overflow-x: hidden !important; /* Prevent horizontal overflow */
+  width: 100% !important; /* Take full width */
+  max-width: 100% !important; /* Ensure no width constraints */
+  min-width: 100% !important; /* Force minimum width */
 }
 
 /* Override input-with-label width constraints for Bridge to Ethereum */
@@ -931,9 +926,145 @@
 /* Ensure table container has proper scrolling */
 #bridgeToEthSection .withdrawal-table-container {
   overflow-y: auto !important; /* Enable vertical scrolling */
-  max-height: calc(100vh - 400px) !important; /* Reserve space for headers and form */
+  height: 100% !important; /* Take full height of transactions-container */
+  width: 100% !important; /* Take full width */
+  max-width: 100% !important; /* Ensure no width constraints */
   border: 1px solid #e2e8f0 !important; /* Visual boundary for scrollable area */
   border-radius: 8px !important;
+}
+
+/* No-Stake Stacked Layout */
+.no-stake-horizontal-layout {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.no-stake-row {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 20px !important;
+  align-items: flex-start !important;
+  width: 100% !important;
+}
+
+/* Left side: Stacked Value and Query Data */
+.no-stake-left-column {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1px !important;
+  flex: 1 !important; /* Take remaining space */
+  min-width: 0 !important; /* Allow shrinking */
+}
+
+.no-stake-value-container {
+  width: 100% !important; /* Full width of left column */
+  min-width: 0 !important; /* Allow shrinking */
+}
+
+.no-stake-query-container {
+  width: 100% !important; /* Full width of left column */
+  min-width: 0 !important; /* Allow shrinking */
+}
+
+.no-stake-submit-container {
+  flex: 0 0 auto !important; /* Don't grow or shrink, stay at natural size */
+  display: flex !important;
+  align-items: flex-start !important; /* Align to top */
+  padding-top: 45px !important; /* Move button down by 20px */
+}
+
+/* Adjust textarea height for horizontal layout */
+.no-stake-horizontal-layout .no-stake-input {
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Ensure submit button fits properly */
+.no-stake-submit-container .button-style-3 {
+  white-space: nowrap !important;
+  min-width: fit-content !important;
+}
+
+/* Specific styling for no-stake reporting input labels */
+#noStakeReportSection .input-label {
+  height: 35px !important; /* Adjust this value as needed */
+  padding: 8px 4px !important; /* Adjust padding if needed */
+  margin-top: 0 !important; /* Remove top margin */
+}
+
+/* Hide empty wallet connection containers that cause spacing issues */
+.wallet-connection-container:empty {
+  display: none !important;
+}
+
+/* Force Delegate section to be properly positioned and isolated */
+#delegateSection {
+  position: relative !important;
+  z-index: 1 !important;
+  overflow: visible !important;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+#delegateSection .section-header {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+/* Ensure Bridge to Ethereum section doesn't interfere with others */
+#bridgeToEthSection:not(.active) {
+  display: none !important;
+  position: absolute !important;
+  left: -9999px !important;
+  top: -9999px !important;
+  z-index: -1 !important;
+}
+
+/* Universal button hover effects - consistent across all buttons */
+.button-style-1:hover,
+.button-style-2:hover,
+.button-style-3:hover,
+.wallet-manager-toggle:hover,
+.refresh-btn:hover {
+  background: linear-gradient(135deg, #004d47 0%, #38A8A3 100%) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(56, 168, 163, 0.4) !important;
+  color: #eefffb !important;
+  transition: all 0.3s ease !important;
+}
+
+/* Ensure disabled buttons don't get hover effects */
+.button-style-1:disabled:hover,
+.button-style-2:disabled:hover,
+.button-style-3:disabled:hover {
+  background: #cccccc !important;
+  color: #666666 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Force button to single line - highest specificity override */
+#bridgeToEthSection button#withdrawButton.button-style-3 {
+  width: auto !important;
+  min-width: fit-content !important;
+  max-width: none !important;
+  display: inline-block !important;
+  padding: 10px 16px !important;
+  margin-top: 12px !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.2 !important;
+  height: auto !important;
+  box-sizing: border-box !important;
+  background-color: #003734 !important;
+  color: #eefffb !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 10 !important;
 }
 
 /* Enable withdraw button when Bridge to Ethereum section is active */
@@ -947,6 +1078,13 @@
 #bridgeToEthSection.active #withdrawButton:disabled {
   background-color: #003734 !important;
   color: #eefffb !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
+}
+
+/* Force enable withdrawal button for Bridge to Ethereum section */
+#bridgeToEthSection #withdrawButton {
+  pointer-events: auto !important;
   cursor: pointer !important;
   opacity: 1 !important;
 }
@@ -997,7 +1135,7 @@
   border-bottom: 2px solid #e2e8f0;
   font-weight: 600;
   color: #2d3748;
-  font-size: 11px;
+  font-size: 11px !important; 
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1035,6 +1173,21 @@
 .withdrawal-table-sidebar .withdrawal-table th:nth-child(1),
 .withdrawal-table-sidebar .withdrawal-table td:nth-child(1) {
   width: 120px; /* Actions column */
+}
+
+/* Maximum specificity override */
+#bridgeToEthSection .withdrawal-table-container .withdrawal-table th:nth-child(1),
+#bridgeToEthSection .withdrawal-table-container .withdrawal-table th:nth-child(2),
+#bridgeToEthSection .withdrawal-table-container .withdrawal-table th:nth-child(3),
+#bridgeToEthSection .withdrawal-table-container .withdrawal-table th:nth-child(4),
+#bridgeToEthSection .withdrawal-table-container .withdrawal-table th:nth-child(5),
+#bridgeToEthSection .withdrawal-table-container .withdrawal-table th:nth-child(6),
+#bridgeToEthSection .withdrawal-table-container .withdrawal-table th:nth-child(7) {
+  font-size: 11px !important;
+}
+/* Make TRB input field 100px wider */
+#bridgeToLayerSection #stakeAmount {
+  width: 300px !important; /* Increase from 400px to 500px */
 }
 
 .withdrawal-table-sidebar .withdrawal-table th:nth-child(2),

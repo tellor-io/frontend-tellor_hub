@@ -2618,16 +2618,13 @@ const App = {
         if (!App.isConnected) {
             tableBody.innerHTML = `
                 <tr>
-                    <td colspan="7" style="padding: 40px 20px; text-align: center; border: none;">
-                        <div style="background-color: #f8f9fa; border-radius: 8px; padding: 30px; margin: 20px 0;">
-                            <h4 style="margin: 0 0 15px 0; color: #2d3748; font-size: 18px;">
-                                Connect MetaMask to View Withdrawals
+                    <td colspan="7" style=" text-align: center; border: none;">
+                        <div style="background-color: #f8f9fa; border-radius: 8px;">
+                            <h4 style=" color: #2d3748; font-size: 18px;">
+                                Connect Ethereum wallet to View Withdrawals
                             </h4>
                             <p style="margin: 0 0 10px 0; color: #4a5568; font-size: 16px;">
-                                Please connect your MetaMask wallet to view and manage your withdrawal transactions.
-                            </p>
-                            <p style="margin: 0; color: #718096; font-size: 14px;">
-                                Note: You need MetaMask connected to claim your withdrawals on Ethereum.
+                                Note: You need your Ethereum wallet connected to claim your withdrawals on Ethereum.
                             </p>
                         </div>
                     </td>
@@ -4061,6 +4058,16 @@ $(function () {
                 // console.error(...);
                 App.handleError(error);
             });
+            
+            // Initialize withdrawal button functionality
+            setTimeout(() => {
+                const withdrawButton = document.getElementById('withdrawButton');
+                if (withdrawButton) {
+                    // Force enable the withdrawal button for Bridge to Ethereum section
+                    withdrawButton.disabled = false;
+                }
+            }, 1000); // Wait 1 second for App.init to complete
+            
         } catch (error) {
             // console.error(...);
             // Show user-friendly error message but keep button enabled

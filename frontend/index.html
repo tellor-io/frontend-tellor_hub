@@ -141,22 +141,22 @@
           
           <div class="side-nav-options">
             <div class="nav-option" data-function="bridgeToLayer">
-              <div class="nav-option-icon">🌉</div>
+              <img class="nav-option-icon" src="./symbol_bridge_tellor.png" alt="Bridge to Tellor"/>
               <div class="nav-option-title">Bridge to Tellor</div>
             </div>
             
             <div class="nav-option" data-function="bridgeToEth">
-              <div class="nav-option-icon">🔗</div>
+              <img class="nav-option-icon"src="./symbol_bridge_eth.png" alt="Bridge to Ethereum"/>
               <div class="nav-option-title">Bridge to Ethereum</div>
             </div>
             
             <div class="nav-option" data-function="delegate">
-              <div class="nav-option-icon">⚡</div>
+              <img class="nav-option-icon"src="./symbol_delegate.png" alt="Delegate tokens"/>
               <div class="nav-option-title">Delegate Tokens</div>
             </div>
             
             <div class="nav-option" data-function="noStakeReport">
-              <div class="nav-option-icon">📊</div>
+              <img class="nav-option-icon"src="./symbol_report.png" alt="Bridge to Ethereum"/>
               <div class="nav-option-title">No-Stake Report</div>
             </div>
           </div>
@@ -168,7 +168,7 @@
             <!-- Bridge to Layer Section -->
             <div id="bridgeToLayerSection" class="function-section">
               <div class="section-header">
-                <h2>🌉 Bridge to Tellor Layer</h2>
+                <h2>Bridge to Tellor </h2>
                 <p class="section-description">Transfer your TRB tokens from Ethereum to the Tellor Layer</p>
               </div>
               <div class="wallet-disclaimer">*Please connect your Ethereum wallet to bridge tokens*</div>
@@ -199,7 +199,7 @@
             <!-- Bridge to Ethereum Section -->
             <div id="bridgeToEthSection" class="function-section">
               <div class="section-header">
-                <h2>🔗 Bridge to Ethereum</h2>
+                <h2>Bridge to Ethereum</h2>
                 <p class="section-description">Withdraw your TRB tokens from Tellor Layer back to Ethereum</p>
               </div>
               
@@ -226,8 +226,7 @@
               <!-- Table using standard transactions-container structure -->
               <div class="transactions-container active">
                 <div class="history-header">
-                  <h3>Withdrawal Transactions</h3>
-                  <div class="history-subtitle">View & Claim your withdrawal requests and their status</div>
+                  <h3>Withdrawal Transactions: View & Claim your withdrawal requests and their status</h3>
                 </div>
                 <div class="withdrawal-table-container">
                   <table id="withdrawal-history" class="withdrawal-table">
@@ -255,12 +254,11 @@
             <!-- Delegate Section -->
             <div id="delegateSection" class="function-section">
               <div class="section-header">
-                <h2>⚡ Delegate Tokens</h2>
+                <h2>Delegate Tokens</h2>
                 <p class="section-description">Stake your TRB tokens with validators to earn rewards</p>
               </div>
               <div class="wallet-disclaimer">*Please connect your Cosmos wallet to delegate tokens*</div>
-              <div class="wallet-connection-container">
-              </div>
+
               <div class="balance-info">
                   <div class="input-button-container">
                       <div class="input-with-label">
@@ -287,27 +285,27 @@
             <!-- No-Stake Report Section -->
             <div id="noStakeReportSection" class="function-section">
               <div class="section-header">
-                <h2>📊 No-Stake Report</h2>
+                <h2>No-Stake Report</h2>
                 <p class="section-description">Submit data reports without requiring staked tokens</p>
               </div>
-              <div class="wallet-disclaimer">*Please use the wallet manager above to connect your Cosmos wallet*</div>
-              <div class="balance-info">
-                  <div class="input-button-container full-width">
-                      <div class="input-with-label no-stake-query-container">
-                          <span class="input-label">Query Data (Hex)</span>
-                          <textarea class="no-stake-input" id="noStakeQueryData" placeholder="0x..." rows="10"></textarea>
-                      </div>
-                  </div>
-                  <div class="input-button-container full-width">
-                      <div class="input-with-label no-stake-value-container">
-                          <span class="input-label">Value (Hex)</span>
-                          <input class="no-stake-input" type="text" id="noStakeValue" placeholder="0x..." />
-                      </div>
-                  </div>
-                  <div class="bridge-direction">
-                      <button id="submitNoStakeReportBtn" class="button-style-3" onclick="App.submitNoStakeReport()">Submit Report</button>
-                  </div>
-              </div>
+              <div class="wallet-disclaimer">*Please connect your Cosmos wallet*</div>
+                              <div class="balance-info no-stake-horizontal-layout">
+                    <div class="no-stake-row">
+                        <div class="no-stake-left-column">
+                            <div class="input-with-label no-stake-value-container">
+                                <span class="input-label">Value (Hex)</span>
+                                <input class="no-stake-input" type="text" id="noStakeValue" placeholder="0x..." />
+                            </div>
+                            <div class="input-with-label no-stake-query-container">
+                                <span class="input-label">Query Data (Hex)</span>
+                                <textarea class="no-stake-input" id="noStakeQueryData" placeholder="0x..." rows="6"></textarea>
+                            </div>
+                        </div>
+                        <div class="no-stake-submit-container">
+                            <button id="submitNoStakeReportBtn" class="button-style-3" onclick="App.submitNoStakeReport()">Submit Report</button>
+                        </div>
+                    </div>
+                </div>
             </div>
           </div>
         </div>
@@ -831,10 +829,19 @@
           });
         }
 
-        // Initial checks
-        checkAllowance();
-
         // No-stake reporting is now integrated with the existing wallet manager
+        
+        // Wait for App to be initialized before checking allowance
+        function waitForAppAndInitialize() {
+            if (window.App && typeof window.App.getAllowance === 'function') {
+                checkAllowance();
+            } else {
+                setTimeout(waitForAppAndInitialize, 500);
+            }
+        }
+        
+        // Start waiting for App
+        waitForAppAndInitialize();
       });
     </script>
     <script src="./js/noStake.js"></script>
