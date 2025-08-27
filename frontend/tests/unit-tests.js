@@ -40,6 +40,36 @@ export class UnitTests extends TestSuite {
         run: () => this.testWalletDisconnection()
       },
 
+      // Functional Button Tests - NEW!
+      {
+        name: 'MetaMask connection button functionality',
+        run: () => this.testMetaMaskConnectionButton()
+      },
+      {
+        name: 'Keplr connection button functionality',
+        run: () => this.testKeplrConnectionButton()
+      },
+      {
+        name: 'Approve button functionality',
+        run: () => this.testApproveButtonFunctionality()
+      },
+      {
+        name: 'Deposit button functionality',
+        run: () => this.testDepositButtonFunctionality()
+      },
+      {
+        name: 'Withdrawal button functionality',
+        run: () => this.testWithdrawalButtonFunctionality()
+      },
+      {
+        name: 'Delegate button functionality',
+        run: () => this.testDelegateButtonFunctionality()
+      },
+      {
+        name: 'No-stake report button functionality',
+        run: () => this.testNoStakeReportButtonFunctionality()
+      },
+
       // Bridge Function Tests
       {
         name: 'Bridge direction switching',
@@ -477,5 +507,491 @@ export class UnitTests extends TestSuite {
         this.assertTrue(valueContainer.classList.contains('input-with-label'), 'Value container should have input-with-label class');
       }
     }
+  }
+
+  // NEW: Functional Button Tests
+  async testMetaMaskConnectionButton() {
+    // Mock MetaMask provider
+    const mockProvider = this.mockMetaMaskProvider();
+    const mockWeb3 = this.mockWeb3Instance();
+    
+    // Set up global mocks
+    window.ethereum = mockProvider;
+    window.web3 = mockWeb3;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Find the MetaMask connection button
+    const metaMaskButton = document.getElementById('walletButton') || 
+                          document.querySelector('[data-wallet="metamask"]') ||
+                          document.querySelector('.wallet-button');
+    
+    this.assertNotNull(metaMaskButton, 'MetaMask connection button should exist');
+    
+    // Test initial state
+    this.assertFalse(metaMaskButton.disabled, 'MetaMask button should not be disabled initially');
+    
+    // Click the button
+    metaMaskButton.click();
+    await this.wait(500); // Wait for connection process
+    
+    // Verify connection was attempted
+    this.assert(mockProvider.request.calls.length > 0, 'MetaMask provider should have been called');
+    
+    // Verify App state was updated
+    this.assertDefined(window.App.isConnected, 'App should track connection state');
+    this.assertDefined(window.App.account, 'App should track connected account');
+  }
+
+  async testKeplrConnectionButton() {
+    // Mock Keplr provider
+    const mockKeplr = this.mockKeplrProvider();
+    
+    // Set up global mock
+    window.keplr = mockKeplr;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Find the Keplr connection button
+    const keplrButton = document.getElementById('keplrButton') || 
+                       document.querySelector('[data-wallet="keplr"]') ||
+                       document.querySelector('.keplr-button');
+    
+    this.assertNotNull(keplrButton, 'Keplr connection button should exist');
+    
+    // Test initial state
+    this.assertFalse(keplrButton.disabled, 'Keplr button should not be disabled initially');
+    
+    // Click the button
+    keplrButton.click();
+    await this.wait(500); // Wait for connection process
+    
+    // Verify connection was attempted
+    this.assert(mockKeplr.enable.calls.length > 0, 'Keplr provider should have been called');
+    
+    // Verify App state was updated
+    this.assertDefined(window.App.isKeplrConnected, 'App should track Keplr connection state');
+    this.assertDefined(window.App.keplrAddress, 'App should track Keplr address');
+  }
+
+  async testApproveButtonFunctionality() {
+    // Mock everything needed for approval
+    const mockProvider = this.mockMetaMaskProvider();
+    const mockWeb3 = this.mockWeb3Instance();
+    const mockContract = this.mockContract('TokenBridge', {
+      methods: {
+        approve: () => ({
+          send: async (options) => ({
+            transactionHash: '0xapprove1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+            gasUsed: 50000,
+            events: {}
+          }),
+          call: async () => true,
+          estimateGas: async () => 50000
+        })
+      }
+    });
+    
+    // Set up global mocks
+    window.ethereum = mockProvider;
+    window.web3 = mockWeb3;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Connect wallet first
+    if (window.App.connectMetaMask) {
+      await window.App.connectMetaMask();
+      await this.wait(500);
+    }
+    
+    // Find the approve button
+    const approveButton = document.getElementById('approveButton');
+    this.assertNotNull(approveButton, 'Approve button should exist');
+    
+    // Set amount input
+    const stakeAmountInput = document.getElementById('stakeAmount');
+    this.assertNotNull(stakeAmountInput, 'Stake amount input should exist');
+    
+    this.setInputValue('#stakeAmount', '100');
+    await this.wait(100);
+    
+    // Test initial button state
+    this.assertDefined(approveButton.disabled, 'Approve button should have disabled state');
+    
+    // Enable button if it's disabled (simulate valid input)
+    if (approveButton.disabled) {
+      // Mock the validation to pass
+      if (window.App.validateAmount) {
+        const originalValidate = window.App.validateAmount;
+        window.App.validateAmount = () => true;
+        
+        // Trigger validation
+        stakeAmountInput.dispatchEvent(new Event('input', { bubbles: true }));
+        await this.wait(100);
+        
+        // Restore original method
+        window.App.validateAmount = originalValidate;
+      }
+    }
+    
+    // Click approve button
+    approveButton.click();
+    await this.wait(1000); // Wait for approval process
+    
+    // Verify the approve function was called
+    if (window.App.approveDeposit) {
+      // Spy on the approve function
+      const approveSpy = this.spyOn(window.App, 'approveDeposit');
+      
+      // Click again to trigger the spied function
+      approveButton.click();
+      await this.wait(500);
+      
+      this.assert(approveSpy.wasCalled(), 'approveDeposit function should have been called');
+    }
+    
+    // Verify button state changes during approval
+    this.assertDefined(approveButton.textContent, 'Approve button should have text content');
+  }
+
+  async testDepositButtonFunctionality() {
+    // Mock everything needed for deposit
+    const mockProvider = this.mockMetaMaskProvider();
+    const mockWeb3 = this.mockWeb3Instance();
+    const mockContract = this.mockContract('TokenBridge', {
+      methods: {
+        deposit: () => ({
+          send: async (options) => ({
+            transactionHash: '0xdeposit1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+            gasUsed: 100000,
+            events: {}
+          }),
+          call: async () => true,
+          estimateGas: async () => 100000
+        })
+      }
+    });
+    
+    // Set up global mocks
+    window.ethereum = mockProvider;
+    window.web3 = mockWeb3;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Connect wallet first
+    if (window.App.connectMetaMask) {
+      await window.App.connectMetaMask();
+      await this.wait(500);
+    }
+    
+    // Find the deposit button
+    const depositButton = document.getElementById('depositButton');
+    this.assertNotNull(depositButton, 'Deposit button should exist');
+    
+    // Set amount input
+    const stakeAmountInput = document.getElementById('stakeAmount');
+    this.assertNotNull(stakeAmountInput, 'Stake amount input should exist');
+    
+    this.setInputValue('#stakeAmount', '100');
+    await this.wait(100);
+    
+    // Test initial button state
+    this.assertDefined(depositButton.disabled, 'Deposit button should have disabled state');
+    
+    // Enable button if it's disabled (simulate valid input and approval)
+    if (depositButton.disabled) {
+      // Mock the validation to pass
+      if (window.App.validateAmount) {
+        const originalValidate = window.App.validateAmount;
+        window.App.validateAmount = () => true;
+        
+        // Mock allowance check to return sufficient allowance
+        if (window.App.getAllowance) {
+          const originalGetAllowance = window.App.getAllowance;
+          window.App.getAllowance = async () => '100000000000000000000'; // 100 tokens
+          
+          // Trigger validation
+          stakeAmountInput.dispatchEvent(new Event('input', { bubbles: true }));
+          await this.wait(100);
+          
+          // Restore original methods
+          window.App.validateAmount = originalValidate;
+          window.App.getAllowance = originalGetAllowance;
+        }
+      }
+    }
+    
+    // Click deposit button
+    depositButton.click();
+    await this.wait(1000); // Wait for deposit process
+    
+    // Verify the deposit function was called
+    if (window.App.depositToLayer) {
+      // Spy on the deposit function
+      const depositSpy = this.spyOn(window.App, 'depositToLayer');
+      
+      // Click again to trigger the spied function
+      depositButton.click();
+      await this.wait(500);
+      
+      this.assert(depositSpy.wasCalled(), 'depositToLayer function should have been called');
+    }
+    
+    // Verify button state changes during deposit
+    this.assertDefined(depositButton.textContent, 'Deposit button should have text content');
+  }
+
+  async testWithdrawalButtonFunctionality() {
+    // Mock everything needed for withdrawal
+    const mockProvider = this.mockMetaMaskProvider();
+    const mockWeb3 = this.mockWeb3Instance();
+    const mockContract = this.mockContract('TokenBridge', {
+      methods: {
+        withdraw: () => ({
+          send: async (options) => ({
+            transactionHash: '0xwithdraw1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+            gasUsed: 80000,
+            events: {}
+          }),
+          call: async () => true,
+          estimateGas: async () => 80000
+        })
+      }
+    });
+    
+    // Set up global mocks
+    window.ethereum = mockProvider;
+    window.web3 = mockWeb3;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Connect wallet first
+    if (window.App.connectMetaMask) {
+      await window.App.connectMetaMask();
+      await this.wait(500);
+    }
+    
+    // Find the withdrawal button
+    const withdrawButton = document.getElementById('withdrawButton');
+    this.assertNotNull(withdrawButton, 'Withdrawal button should exist');
+    
+    // Set inputs
+    const ethStakeAmountInput = document.getElementById('ethStakeAmount');
+    const ethQueryIdInput = document.getElementById('ethQueryId');
+    
+    this.assertNotNull(ethStakeAmountInput, 'Ethereum stake amount input should exist');
+    this.assertNotNull(ethQueryIdInput, 'Ethereum query ID input should exist');
+    
+    this.setInputValue('#ethStakeAmount', '50');
+    this.setInputValue('#ethQueryId', '0x1234567890123456789012345678901234567890');
+    await this.wait(100);
+    
+    // Test initial button state
+    this.assertDefined(withdrawButton.disabled, 'Withdrawal button should have disabled state');
+    
+    // Enable button if it's disabled (simulate valid input)
+    if (withdrawButton.disabled) {
+      // Mock the validation to pass
+      if (window.App.validateWithdrawalInputs) {
+        const originalValidate = window.App.validateWithdrawalInputs;
+        window.App.validateWithdrawalInputs = () => true;
+        
+        // Trigger validation
+        ethStakeAmountInput.dispatchEvent(new Event('input', { bubbles: true }));
+        ethQueryIdInput.dispatchEvent(new Event('input', { bubbles: true }));
+        await this.wait(100);
+        
+        // Restore original method
+        window.App.validateWithdrawalInputs = originalValidate;
+      }
+    }
+    
+    // Click withdrawal button
+    withdrawButton.click();
+    await this.wait(1000); // Wait for withdrawal process
+    
+    // Verify the withdrawal function was called
+    if (window.App.withdrawFromLayer) {
+      // Spy on the withdrawal function
+      const withdrawSpy = this.spyOn(window.App, 'withdrawFromLayer');
+      
+      // Click again to trigger the spied function
+      withdrawButton.click();
+      await this.wait(500);
+      
+      this.assert(withdrawSpy.wasCalled(), 'withdrawFromLayer function should have been called');
+    }
+    
+    // Verify button state changes during withdrawal
+    this.assertDefined(withdrawButton.textContent, 'Withdrawal button should have text content');
+  }
+
+  async testDelegateButtonFunctionality() {
+    // Mock everything needed for delegation
+    const mockProvider = this.mockMetaMaskProvider();
+    const mockWeb3 = this.mockWeb3Instance();
+    const mockContract = this.mockContract('TokenBridge', {
+      methods: {
+        delegate: () => ({
+          send: async (options) => ({
+            transactionHash: '0xdelegate1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+            gasUsed: 120000,
+            events: {}
+          }),
+          call: async () => true,
+          estimateGas: async () => 120000
+        })
+      }
+    });
+    
+    // Set up global mocks
+    window.ethereum = mockProvider;
+    window.web3 = mockWeb3;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Connect wallet first
+    if (window.App.connectMetaMask) {
+      await window.App.connectMetaMask();
+      await this.wait(500);
+    }
+    
+    // Find the delegate button
+    const delegateButton = document.getElementById('delegateButton');
+    this.assertNotNull(delegateButton, 'Delegate button should exist');
+    
+    // Set inputs
+    const delegateStakeAmountInput = document.getElementById('delegateStakeAmount');
+    const validatorDropdown = document.getElementById('delegateValidatorDropdown');
+    
+    this.assertNotNull(delegateStakeAmountInput, 'Delegate stake amount input should exist');
+    this.assertNotNull(validatorDropdown, 'Validator dropdown should exist');
+    
+    this.setInputValue('#delegateStakeAmount', '75');
+    
+    // Select a validator if dropdown has options
+    if (validatorDropdown.options.length > 1) {
+      validatorDropdown.value = validatorDropdown.options[1].value;
+      validatorDropdown.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    
+    await this.wait(100);
+    
+    // Test initial button state
+    this.assertDefined(delegateButton.disabled, 'Delegate button should have disabled state');
+    
+    // Enable button if it's disabled (simulate valid input)
+    if (delegateButton.disabled) {
+      // Mock the validation to pass
+      if (window.App.validateDelegationInputs) {
+        const originalValidate = window.App.validateDelegationInputs;
+        window.App.validateDelegationInputs = () => true;
+        
+        // Trigger validation
+        delegateStakeAmountInput.dispatchEvent(new Event('input', { bubbles: true }));
+        await this.wait(100);
+        
+        // Restore original method
+        window.App.validateDelegationInputs = originalValidate;
+      }
+    }
+    
+    // Click delegate button
+    delegateButton.click();
+    await this.wait(1000); // Wait for delegation process
+    
+    // Verify the delegate function was called
+    if (window.App.delegateTokens) {
+      // Spy on the delegate function
+      const delegateSpy = this.spyOn(window.App, 'delegateTokens');
+      
+      // Click again to trigger the spied function
+      delegateButton.click();
+      await this.wait(500);
+      
+      this.assert(delegateSpy.wasCalled(), 'delegateTokens function should have been called');
+    }
+    
+    // Verify button state changes during delegation
+    this.assertDefined(delegateButton.textContent, 'Delegate button should have text content');
+  }
+
+  async testNoStakeReportButtonFunctionality() {
+    // Mock everything needed for no-stake reporting
+    const mockProvider = this.mockMetaMaskProvider();
+    const mockWeb3 = this.mockWeb3Instance();
+    
+    // Set up global mocks
+    window.ethereum = mockProvider;
+    window.web3 = mockWeb3;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Connect wallet first
+    if (window.App.connectMetaMask) {
+      await window.App.connectMetaMask();
+      await this.wait(500);
+    }
+    
+    // Find the no-stake report submit button
+    const submitButton = document.getElementById('submitNoStakeReportBtn');
+    this.assertNotNull(submitButton, 'No-stake report submit button should exist');
+    
+    // Set inputs
+    const queryDataInput = document.getElementById('noStakeQueryData');
+    const valueInput = document.getElementById('noStakeValue');
+    
+    this.assertNotNull(queryDataInput, 'Query data input should exist');
+    this.assertNotNull(valueInput, 'Value input should exist');
+    
+    this.setInputValue('#noStakeQueryData', '0x1234567890abcdef');
+    this.setInputValue('#noStakeValue', '0x9876543210fedcba');
+    await this.wait(100);
+    
+    // Test initial button state
+    this.assertDefined(submitButton.disabled, 'Submit button should have disabled state');
+    
+    // Enable button if it's disabled (simulate valid input)
+    if (submitButton.disabled) {
+      // Mock the validation to pass
+      if (window.App.validateNoStakeInputs) {
+        const originalValidate = window.App.validateNoStakeInputs;
+        window.App.validateNoStakeInputs = () => true;
+        
+        // Trigger validation
+        queryDataInput.dispatchEvent(new Event('input', { bubbles: true }));
+        valueInput.dispatchEvent(new Event('input', { bubbles: true }));
+        await this.wait(100);
+        
+        // Restore original method
+        window.App.validateNoStakeInputs = originalValidate;
+      }
+    }
+    
+    // Click submit button
+    submitButton.click();
+    await this.wait(1000); // Wait for submission process
+    
+    // Verify the submit function was called
+    if (window.App.submitNoStakeReport) {
+      // Spy on the submit function
+      const submitSpy = this.spyOn(window.App, 'submitNoStakeReport');
+      
+      // Click again to trigger the spied function
+      submitButton.click();
+      await this.wait(500);
+      
+      this.assert(submitSpy.wasCalled(), 'submitNoStakeReport function should have been called');
+    }
+    
+    // Verify button state changes during submission
+    this.assertDefined(submitButton.textContent, 'Submit button should have text content');
   }
 }

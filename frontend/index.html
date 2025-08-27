@@ -412,8 +412,9 @@
         loadWalletAdapters()
       ])
         .then(([cosmjsSuccess, adapterSuccess]) => {
+          // Allow app to initialize even if CosmJS fails (delegate section doesn't need it)
           if (!cosmjsSuccess) {
-            throw new Error('Failed to load CosmJS');
+            console.warn('CosmJS failed to load - some Cosmos functions may not work, but app will continue');
           }
           
           // Load app.js as a module
@@ -469,6 +470,10 @@
             document.querySelectorAll('.tooltip').forEach(tooltip => {
                 tooltip.style.display = 'none';
             });
+            // Reset the TRB price tooltip using the global function
+            if (window.resetTrbPriceTooltip) {
+                window.resetTrbPriceTooltip();
+            }
         }
         
         // Add pod navigation handlers
@@ -513,6 +518,28 @@
               document.querySelectorAll('.function-section').forEach(s => s.classList.remove('active'));
               document.getElementById(sectionId).classList.add('active');
               
+              // Hide TRB price tooltip immediately when switching sections
+              if (window.hideTrbPriceTooltip) {
+                window.hideTrbPriceTooltip();
+              }
+              
+              // For relevant sections, check if there's a value and show tooltip if appropriate
+              if (functionType !== 'noStakeReport') {
+                setTimeout(() => {
+                  if (window.App && window.App.currentBridgeDirection) {
+                    const activeInput = window.App.currentBridgeDirection === 'layer' ? 
+                      document.getElementById('stakeAmount') : 
+                      document.getElementById('ethStakeAmount');
+                    if (activeInput && activeInput.value && parseFloat(activeInput.value) > 0) {
+                      // Trigger tooltip update if there's a value
+                      if (window.App.updateTooltip) {
+                        window.App.updateTooltip();
+                      }
+                    }
+                  }
+                }, 200);
+              }
+              
               // Update withdrawal history when bridge to ethereum section is shown
               if (functionType === 'bridgeToEth') {
                 // Update the withdrawal history in the integrated table
@@ -542,6 +569,11 @@
           document.querySelectorAll('.orbiting-pod').forEach(p => p.classList.remove('active'));
           document.querySelectorAll('.function-section').forEach(s => s.classList.remove('active'));
           document.querySelectorAll('.nav-option').forEach(opt => opt.classList.remove('active'));
+          
+          // Hide TRB price tooltip when going back to hub
+          if (window.hideTrbPriceTooltip) {
+            window.hideTrbPriceTooltip();
+          }
         });
         
         // Add side nav option handlers
@@ -573,6 +605,28 @@
             if (sectionId) {
               document.querySelectorAll('.function-section').forEach(s => s.classList.remove('active'));
               document.getElementById(sectionId).classList.add('active');
+              
+              // Hide TRB price tooltip immediately when switching sections
+              if (window.hideTrbPriceTooltip) {
+                window.hideTrbPriceTooltip();
+              }
+              
+              // For relevant sections, check if there's a value and show tooltip if appropriate
+              if (functionType !== 'noStakeReport') {
+                setTimeout(() => {
+                  if (window.App && window.App.currentBridgeDirection) {
+                    const activeInput = window.App.currentBridgeDirection === 'layer' ? 
+                      document.getElementById('stakeAmount') : 
+                      document.getElementById('ethStakeAmount');
+                    if (activeInput && activeInput.value && parseFloat(activeInput.value) > 0) {
+                      // Trigger tooltip update if there's a value
+                      if (window.App.updateTooltip) {
+                        window.App.updateTooltip();
+                      }
+                    }
+                  }
+                }, 200);
+              }
               
               // Update withdrawal history when bridge to ethereum section is shown
               if (functionType === 'bridgeToEth') {

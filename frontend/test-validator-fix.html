@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validator Dropdown Fix Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-8">
+    <h1 class="text-2xl font-bold mb-4">Validator Dropdown Fix Test</h1>
+    
+    <div class="mb-4">
+        <p>This test verifies that the validator dropdown is properly initialized on page load.</p>
+    </div>
+    
+    <div class="input-button-container mb-4">
+        <div class="input-with-label">
+            <select class="input-address border border-gray-300 rounded px-3 py-2" id="delegateValidatorDropdown">
+                <option value="">Select a validator...</option>
+            </select>
+            <input type="hidden" id="delegateValidatorAddress" />
+            <button type="button" id="refreshValidatorsBtn" class="refresh-btn ml-2 px-3 py-2 bg-blue-500 text-white rounded" title="Refresh validator list">↻</button>
+        </div>
+    </div>
+    
+    <div id="status" class="mt-4 p-4 bg-gray-100 rounded"></div>
+    
+    <div class="mt-4">
+        <button id="testInitBtn" class="px-4 py-2 bg-green-500 text-white rounded">Test Initialization</button>
+        <button id="testFetchBtn" class="px-4 py-2 bg-blue-500 text-white rounded ml-2">Test Fetch Validators</button>
+    </div>
+
+    <script>
+        // Mock App object for testing
+        const App = {
+            cosmosChainId: 'layertest-4', // Default to testnet
+            
+            getCosmosApiEndpoint: function() {
+                if (this.cosmosChainId === 'tellor-1') {
+                    return 'https://mainnet.tellorlayer.com';
+                } else {
+                    return 'https://node-palmito.tellorlayer.com';
+                }
+            },
+            
+            fetchValidators: async function() {
+                try {
+                    const response = await fetch(`${this.getCosmosApiEndpoint()}/cosmos/staking/v1beta1/validators?status=BOND_STATUS_BONDED&pagination.limit=1000`);
+                    
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch validators: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (!data.validators || !Array.isArray(data.validators)) {
+                        throw new Error('Invalid validators response format');
+                    }
+                    
+                    // Sort validators by voting power (descending)
+                    const sortedValidators = data.validators.sort((a, b) => {
+                        const powerA = parseInt(a.tokens || '0');
+                        const powerB = parseInt(b.tokens || '0');
+                        return powerB - powerA;
+                    });
+                    
+                    return sortedValidators.map(validator => ({
+                        address: validator.operator_address,
+                        moniker: validator.description?.moniker || 'Unknown Validator',
+                        votingPower: validator.tokens || '0',
+                        commission: validator.commission?.commission_rates?.rate || '0',
+                        jailed: validator.jailed || false
+                    }));
+                } catch (error) {
+                    console.error('Error fetching validators:', error);
+                    throw error;
+                }
+            },
+            
+            populateValidatorDropdown: async function() {
+                try {
+                    const dropdown = document.getElementById('delegateValidatorDropdown');
+                    if (!dropdown) {
+                        console.error('Validator dropdown not found');
+                        return;
+                    }
+                    
+                    // Show loading state
+                    dropdown.innerHTML = '<option value="">Loading validators...</option>';
+                    dropdown.disabled = true;
+                    
+                    const validators = await this.fetchValidators();
+                    
+                    // Clear loading state and populate dropdown
+                    dropdown.innerHTML = '<option value="">Select a validator...</option>';
+                    
+                    validators.forEach(validator => {
+                        if (!validator.jailed) { // Only show non-jailed validators
+                            const votingPower = (parseInt(validator.votingPower) / 1000000).toFixed(2);
+                            const commission = (parseFloat(validator.commission) * 100).toFixed(2);
+                            
+                            // Truncate moniker if it's too long
+                            let displayMoniker = validator.moniker;
+                            if (displayMoniker.length > 20) {
+                                displayMoniker = displayMoniker.substring(0, 17) + '...';
+                            }
+                            
+                            const option = document.createElement('option');
+                            option.value = validator.address;
+                            option.textContent = `${displayMoniker} (${votingPower} TRB, ${commission}%)`;
+                            option.title = `${validator.moniker} (${votingPower} TRB, ${commission}% commission)`;
+                            dropdown.appendChild(option);
+                        }
+                    });
+                    
+                    dropdown.disabled = false;
+                    
+                    return validators.length;
+                } catch (error) {
+                    console.error('Error populating validator dropdown:', error);
+                    const dropdown = document.getElementById('delegateValidatorDropdown');
+                    if (dropdown) {
+                        dropdown.innerHTML = '<option value="">Error loading validators</option>';
+                        dropdown.disabled = true;
+                    }
+                    throw error;
+                }
+            },
+            
+            initDelegateSection: function() {
+                // Initialize validator dropdown
+                this.populateValidatorDropdown().then(count => {
+                    document.getElementById('status').innerHTML = `<div class="text-green-600">✅ Successfully loaded ${count} validators!</div>`;
+                }).catch(error => {
+                    document.getElementById('status').innerHTML = `<div class="text-red-600">❌ Failed to initialize delegate section: ${error.message}</div>`;
+                });
+                
+                // Add change event listener to update the hidden input
+                const dropdown = document.getElementById('delegateValidatorDropdown');
+                if (dropdown && !dropdown.hasAttribute('data-initialized')) {
+                    dropdown.setAttribute('data-initialized', 'true');
+                    dropdown.addEventListener('change', function() {
+                        const hiddenInput = document.getElementById('delegateValidatorAddress');
+                        if (hiddenInput) {
+                            hiddenInput.value = this.value;
+                        }
+                        document.getElementById('status').innerHTML = `<div class="text-blue-600">Selected validator: ${this.value}</div>`;
+                    });
+                }
+                
+                // Add refresh button event listener if not already added
+                const refreshBtn = document.getElementById('refreshValidatorsBtn');
+                if (refreshBtn && !refreshBtn.hasAttribute('data-initialized')) {
+                    refreshBtn.setAttribute('data-initialized', 'true');
+                    refreshBtn.addEventListener('click', async function() {
+                        this.disabled = true;
+                        this.textContent = '⟳';
+                        try {
+                            const count = await App.populateValidatorDropdown();
+                            document.getElementById('status').innerHTML = `<div class="text-green-600">✅ Refreshed! Loaded ${count} validators.</div>`;
+                        } catch (error) {
+                            document.getElementById('status').innerHTML = `<div class="text-red-600">❌ Error refreshing validators: ${error.message}</div>`;
+                        } finally {
+                            this.disabled = false;
+                            this.textContent = '↻';
+                        }
+                    });
+                }
+            }
+        };
+        
+        // Test functions
+        document.getElementById('testInitBtn').addEventListener('click', () => {
+            document.getElementById('status').innerHTML = '<div class="text-blue-600">🔄 Testing initialization...</div>';
+            App.initDelegateSection();
+        });
+        
+        document.getElementById('testFetchBtn').addEventListener('click', async () => {
+            try {
+                document.getElementById('status').innerHTML = '<div class="text-blue-600">🔄 Testing fetch validators...</div>';
+                const validators = await App.fetchValidators();
+                document.getElementById('status').innerHTML = `<div class="text-green-600">✅ Successfully fetched ${validators.length} validators!</div>`;
+            } catch (error) {
+                document.getElementById('status').innerHTML = `<div class="text-red-600">❌ Error fetching validators: ${error.message}</div>`;
+            }
+        });
+        
+        // Auto-initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('status').innerHTML = '<div class="text-blue-600">🔄 Auto-initializing on page load...</div>';
+            App.initDelegateSection();
+        });
+    </script>
+</body>
+</html>

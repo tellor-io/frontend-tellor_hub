@@ -1067,6 +1067,8 @@
   z-index: 10 !important;
 }
 
+
+
 /* Enable withdraw button when Bridge to Ethereum section is active */
 #bridgeToEthSection.active #withdrawButton {
   background-color: #003734 !important;
@@ -1379,3 +1381,30 @@
   transform: translateY(-2px);
   box-shadow: 0 4px 15px rgba(56, 168, 163, 0.4);
 }
+
+/* TRB Price Tooltip Styles */
+.trb-price-tooltip {
+  position: fixed;
+  background-color: #d4d8e3;
+  padding: 5px 10px;
+  border-radius: 5px;
+  border: 1px solid black;
+  font-size: 14px;
+  color: #083b44;
+  font-family: 'PPNeueMontreal-Book', Arial, sans-serif;
+  z-index: 1000;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  transition: opacity 0.1s ease-out;
+}
+
+/* Ensure tooltip is completely hidden when not visible */
+.trb-price-tooltip[style*="display: none"],
+.trb-price-tooltip[style*="visibility: hidden"] {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: scale(0.95) !important;
+}
+
+

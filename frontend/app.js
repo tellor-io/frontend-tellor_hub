@@ -35,16 +35,16 @@ const App = {
         // Initialize ethers
         App.ethers = ethers;
         
-        // Wait for CosmJS to be loaded
+        // Initialize delegate section immediately (doesn't depend on Web3 or CosmJS)
+        App.initDelegateSection();
+        
+        // Check CosmJS dependency for functions that need it
         if (!window.cosmjsLoaded) {
-          throw new Error('CosmJS not loaded yet');
+          console.warn('CosmJS not loaded yet - some Cosmos functions may not work');
+        } else if (typeof window.cosmjs === 'undefined' || typeof window.cosmjs.stargate === 'undefined') {
+          console.warn('CosmJS not properly loaded - some Cosmos functions may not work');
         }
-
-        // Verify CosmJS is available
-        if (typeof window.cosmjs === 'undefined' || typeof window.cosmjs.stargate === 'undefined') {
-          throw new Error('CosmJS not properly loaded');
-        }
-
+        
         App.initWeb3()
           .then(() => {
             App.initInputValidation();
@@ -649,6 +649,9 @@ const App = {
             }
             // Refresh validator dropdown when connecting in delegate section
             await App.populateValidatorDropdown();
+        } else {
+            // If not in delegate section, still populate validators for when user switches to delegate
+            await App.populateValidatorDropdown();
         }
         
         App.setPageParams();
@@ -787,6 +790,9 @@ const App = {
             }
             // Refresh validator dropdown when connecting in delegate section
             await App.populateValidatorDropdown();
+        } else {
+            // If not in delegate section, still populate validators for when user switches to delegate
+            await App.populateValidatorDropdown();
         }
         
         App.setPageParams();
@@ -913,6 +919,13 @@ const App = {
         }
         if (delegateButton) {
             delegateButton.disabled = true;
+        }
+        
+        // Reset validator dropdown when disconnecting
+        const validatorDropdown = document.getElementById('delegateValidatorDropdown');
+        if (validatorDropdown) {
+            validatorDropdown.innerHTML = '<option value="">Connect Cosmos wallet to view validators</option>';
+            validatorDropdown.disabled = true;
         }
 
         // Update withdrawal history to reflect wallet disconnection
@@ -1413,9 +1426,12 @@ const App = {
         await App.connectKeplr();
       }
       
-      // Refresh validator dropdown if currently in delegate section
-      if (App.currentBridgeDirection === 'delegate') {
-        await App.populateValidatorDropdown();
+      // Always refresh validator dropdown when switching networks
+      try {
+        await App.populateValidatorDropdown(true); // true = isNetworkSwitch
+        console.log('Validator dropdown refreshed after network switch');
+      } catch (error) {
+        console.error('Failed to refresh validator dropdown after network switch:', error);
       }
       
       // Update balance for the new network after a small delay to ensure wallet is ready
@@ -1883,28 +1899,44 @@ const App = {
     
     // Create tooltip element
     const tooltip = document.createElement('div');
+    tooltip.className = 'trb-price-tooltip';
     tooltip.style.display = 'none';
-    tooltip.style.position = 'fixed';
-    tooltip.style.backgroundColor = '#d4d8e3';
-    tooltip.style.padding = '5px 10px';
-    tooltip.style.borderRadius = '5px';
-    tooltip.style.border = '1px solid black';
-    tooltip.style.fontSize = '14px';
-    tooltip.style.color = '#083b44';
-    tooltip.style.fontFamily = "'PPNeueMontreal-Book', Arial, sans-serif";
-    tooltip.style.zIndex = '1000';
-    tooltip.style.whiteSpace = 'nowrap';
     document.body.appendChild(tooltip);
 
+    // Get all TRB input fields
+    const delegateStakeAmountInput = document.getElementById('delegateStakeAmount');
+    
     // Position tooltip relative to the active input field
     function positionTooltip() {
-        const activeInput = App.currentBridgeDirection === 'layer' ? stakeAmountInput : ethStakeAmountInput;
+        // Find which input is currently focused or has a value
+        let activeInput = null;
+        
+        if (document.activeElement && document.activeElement.classList.contains('trb-input-field')) {
+            activeInput = document.activeElement;
+        } else if (stakeAmountInput && stakeAmountInput.value) {
+            activeInput = stakeAmountInput;
+        } else if (ethStakeAmountInput && ethStakeAmountInput.value) {
+            activeInput = ethStakeAmountInput;
+        } else if (delegateStakeAmountInput && delegateStakeAmountInput.value) {
+            activeInput = delegateStakeAmountInput;
+        }
+        
         if (!activeInput) return;
 
         const inputRect = activeInput.getBoundingClientRect();
-        tooltip.style.left = (inputRect.right + 10) + 'px';
-        tooltip.style.top = (inputRect.top + (inputRect.height / 2)) + 'px';
-        tooltip.style.transform = 'translateY(-50%)';
+        
+        // Special positioning for Bridge to Ethereum section
+        if (activeInput.id === 'ethStakeAmount') {
+            // Position above the input field
+            tooltip.style.left = (inputRect.left + (inputRect.width / 2)) + 'px';
+            tooltip.style.top = (inputRect.top - 10) + 'px';
+            tooltip.style.transform = 'translate(-50%, -100%)';
+        } else {
+            // Standard positioning to the right of the input
+            tooltip.style.left = (inputRect.right + 10) + 'px';
+            tooltip.style.top = (inputRect.top + (inputRect.height / 2)) + 'px';
+            tooltip.style.transform = 'translateY(-50%)';
+        }
     }
 
     let trbPrice = 0;
@@ -1938,11 +1970,27 @@ const App = {
 
     // Update tooltip with USD value
     async function updateTooltip(event) {
-        const activeInput = App.currentBridgeDirection === 'layer' ? stakeAmountInput : ethStakeAmountInput;
+        // Get the input that triggered this event
+        const triggeredInput = event ? event.target : null;
+        
+        // Find which input to use for the tooltip
+        let activeInput = null;
+        if (triggeredInput && triggeredInput.classList.contains('trb-input-field')) {
+            activeInput = triggeredInput;
+        } else if (stakeAmountInput && stakeAmountInput.value) {
+            activeInput = stakeAmountInput;
+        } else if (ethStakeAmountInput && ethStakeAmountInput.value) {
+            activeInput = ethStakeAmountInput;
+        } else if (delegateStakeAmountInput && delegateStakeAmountInput.value) {
+            activeInput = delegateStakeAmountInput;
+        }
+        
         if (!activeInput) return;
 
         const amount = parseFloat(activeInput.value) || 0;
-        if (amount > 0) {
+        console.log('updateTooltip called:', { amount, shouldBeVisible: shouldTooltipBeVisible(), activeInput: activeInput.id });
+        
+        if (amount > 0 && shouldTooltipBeVisible()) {
             if (trbPrice === 0) {
                 await updateTrbPrice();
             }
@@ -1952,10 +2000,10 @@ const App = {
             } else {
                 tooltip.textContent = 'Price data unavailable';
             }
-            tooltip.style.display = 'block';
+            showTooltip();
             requestAnimationFrame(positionTooltip);
         } else {
-            tooltip.style.display = 'none';
+            enhancedHideTooltip();
         }
     }
 
@@ -1977,15 +2025,77 @@ const App = {
     });
     // Reduce polling frequency to avoid hosting issues
     priceUpdateInterval = setInterval(updateTrbPrice, 300000); // 5 minutes instead of 1 minute
+    
+    // Periodically check if tooltip should be visible
+    setInterval(() => {
+        if (tooltip.style.display === 'block' && !shouldTooltipBeVisible()) {
+            enhancedHideTooltip();
+        }
+    }, 1000); // Check every second
+    
+    // Also check more frequently for immediate hiding
+    setInterval(() => {
+        if (tooltip && tooltip.style.display === 'block') {
+            const activeSection = document.querySelector('.function-section.active');
+            if (activeSection && activeSection.id === 'noStakeReportSection') {
+                enhancedHideTooltip();
+            }
+        }
+    }, 500); // Check every 500ms for immediate hiding
+    
+    // Watch for section changes and hide tooltip immediately
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                // Check if any section became active
+                const activeSection = document.querySelector('.function-section.active');
+                if (activeSection) {
+                    // Hide tooltip immediately when sections change
+                    hideTrbPriceTooltip();
+                }
+            }
+        });
+    });
+    
+    // Start observing section changes
+    document.addEventListener('DOMContentLoaded', function() {
+        const sections = document.querySelectorAll('.function-section');
+        sections.forEach(section => {
+            observer.observe(section, { attributes: true });
+        });
+        
+        // Add global event listeners to hide tooltip
+        document.addEventListener('click', function(e) {
+            // Hide tooltip when clicking anywhere except TRB inputs
+            if (!e.target.classList.contains('trb-input-field')) {
+                enhancedHideTooltip();
+            }
+        });
+    });
 
-    // Add event listeners to both input fields
+    // Add CSS class to all TRB input fields for identification
+    stakeAmountInput.classList.add('trb-input-field');
+    if (ethStakeAmountInput) {
+        ethStakeAmountInput.classList.add('trb-input-field');
+    }
+    if (delegateStakeAmountInput) {
+        delegateStakeAmountInput.classList.add('trb-input-field');
+    }
+    
+    // Add event listeners to all TRB input fields
     stakeAmountInput.addEventListener('input', updateTooltip);
     stakeAmountInput.addEventListener('focus', updateTooltip);
     if (ethStakeAmountInput) {
         ethStakeAmountInput.addEventListener('input', updateTooltip);
         ethStakeAmountInput.addEventListener('focus', updateTooltip);
     }
+    if (delegateStakeAmountInput) {
+        delegateStakeAmountInput.addEventListener('input', updateTooltip);
+        delegateStakeAmountInput.addEventListener('focus', updateTooltip);
+    }
     window.addEventListener('resize', positionTooltip);
+    
+
 
     // Add event listener for bridge direction changes
     const bridgeToLayerBtn = document.getElementById('bridgeToLayerBtn');
@@ -2003,6 +2113,133 @@ const App = {
         bridgeToLayerBtn.addEventListener('click', handleDirectionChange);
         bridgeToEthBtn.addEventListener('click', handleDirectionChange);
     }
+
+    // Function to reset TRB price tooltip (hide and clear content)
+    function resetTrbPriceTooltip() {
+        tooltip.style.display = 'none';
+        tooltip.textContent = '';
+        tooltip.style.visibility = 'hidden';
+    }
+
+    // Function to hide TRB price tooltip completely
+    function hideTrbPriceTooltip() {
+        if (tooltip) {
+            tooltip.style.display = 'none';
+            tooltip.style.visibility = 'hidden';
+            tooltip.style.opacity = '0';
+            tooltip.style.transform = 'scale(0.95)';
+            tooltip.textContent = '';
+            tooltip.style.pointerEvents = 'none';
+            tooltip.style.left = '-9999px';
+            tooltip.style.top = '-9999px';
+            tooltip.style.zIndex = '-1';
+        }
+        
+        // Also try to hide any other tooltips that might exist
+        const allTooltips = document.querySelectorAll('.trb-price-tooltip');
+        allTooltips.forEach(t => {
+            t.style.display = 'none';
+            t.style.visibility = 'hidden';
+            t.style.opacity = '0';
+            t.style.transform = 'scale(0.95)';
+            t.style.left = '-9999px';
+            t.style.top = '-9999px';
+            t.style.zIndex = '-1';
+        });
+    }
+    
+    // Enhanced tooltip hiding function
+    function enhancedHideTooltip() {
+        if (tooltip) {
+            tooltip.style.display = 'none';
+            tooltip.style.visibility = 'hidden';
+            tooltip.style.opacity = '0';
+            tooltip.style.transform = 'scale(0.95)';
+            tooltip.style.pointerEvents = 'none';
+            tooltip.style.left = '-9999px';
+            tooltip.style.top = '-9999px';
+            tooltip.style.zIndex = '-1';
+        }
+    }
+    
+    // Function to show tooltip properly
+    function showTooltip() {
+        if (tooltip) {
+            tooltip.style.display = 'block';
+            tooltip.style.visibility = 'visible';
+            tooltip.style.opacity = '1';
+            tooltip.style.transform = 'scale(1)';
+            tooltip.style.pointerEvents = 'none';
+            tooltip.style.zIndex = '1000';
+        }
+    }
+
+    // Add event listeners for section changes
+    document.addEventListener('DOMContentLoaded', function() {
+        // Listen for clicks on nav options and orbiting pods
+        const navOptions = document.querySelectorAll('.nav-option, .orbiting-pod');
+        navOptions.forEach(option => {
+            option.addEventListener('click', function() {
+                const functionType = this.getAttribute('data-function');
+                // Hide tooltip immediately when switching sections
+                enhancedHideTooltip();
+                
+                // Also hide tooltip when any section becomes active
+                setTimeout(() => {
+                    if (functionType !== 'noStakeReport') {
+                        // Double-check that tooltip is hidden
+                        enhancedHideTooltip();
+                    }
+                }, 50);
+                
+                // Only hide tooltip when going to No-Stake Report (which has no TRB inputs)
+                if (functionType === 'noStakeReport') {
+                    // Tooltip is already hidden, no need to do anything else
+                } else {
+                    // For other sections, check if there's a value in the current input and show tooltip if appropriate
+                    setTimeout(() => {
+                        const activeInput = App.currentBridgeDirection === 'layer' ? stakeAmountInput : ethStakeAmountInput;
+                        if (activeInput && activeInput.value && parseFloat(activeInput.value) > 0) {
+                            updateTooltip();
+                        }
+                    }, 200);
+                }
+            });
+        });
+
+        // Listen for back to hub button - hide tooltip completely
+        const backToHubBtn = document.getElementById('backToHubBtn');
+        if (backToHubBtn) {
+            backToHubBtn.addEventListener('click', hideTrbPriceTooltip);
+        }
+    });
+
+    // Function to check if tooltip should be visible based on current section
+    function shouldTooltipBeVisible() {
+        const bridgeToLayerSection = document.getElementById('bridgeToLayerSection');
+        const bridgeToEthSection = document.getElementById('bridgeToEthSection');
+        const delegateSection = document.getElementById('delegateSection');
+        
+        const result = (bridgeToLayerSection && bridgeToLayerSection.classList.contains('active')) ||
+               (bridgeToEthSection && bridgeToEthSection.classList.contains('active')) ||
+               (delegateSection && delegateSection.classList.contains('active'));
+        
+        console.log('shouldTooltipBeVisible:', { 
+            bridgeToLayer: bridgeToLayerSection?.classList.contains('active'),
+            bridgeToEth: bridgeToEthSection?.classList.contains('active'),
+            delegate: delegateSection?.classList.contains('active'),
+            result: result
+        });
+        
+        return result;
+    }
+    
+    // Clean up tooltip when page is unloaded
+    window.addEventListener('beforeunload', function() {
+        if (tooltip && tooltip.parentNode) {
+            tooltip.parentNode.removeChild(tooltip);
+        }
+    });
   },
 
   showPendingPopup: function(message) {
@@ -3862,28 +4099,75 @@ const App = {
         jailed: validator.jailed || false
       }));
     } catch (error) {
-      // console.error(...);
+      console.error('Error fetching validators:', error);
       throw error;
     }
   },
 
+
+
+  // Initialize delegate section
+  initDelegateSection: function() {
+    // Set initial state - don't load validators until wallet is connected
+    const dropdown = document.getElementById('delegateValidatorDropdown');
+    if (dropdown) {
+      dropdown.innerHTML = '<option value="">Connect Cosmos wallet to view validators</option>';
+      dropdown.disabled = true;
+    }
+    
+    // Add change event listener to update the hidden input
+    if (dropdown && !dropdown.hasAttribute('data-initialized')) {
+      dropdown.setAttribute('data-initialized', 'true');
+      dropdown.addEventListener('change', function() {
+        const hiddenInput = document.getElementById('delegateValidatorAddress');
+        if (hiddenInput) {
+          hiddenInput.value = this.value;
+        }
+      });
+    }
+    
+    // Add refresh button event listener if not already added
+    const refreshBtn = document.getElementById('refreshValidatorsBtn');
+    if (refreshBtn && !refreshBtn.hasAttribute('data-initialized')) {
+      refreshBtn.setAttribute('data-initialized', 'true');
+      refreshBtn.addEventListener('click', async function() {
+        this.disabled = true;
+        this.textContent = '⟳';
+        try {
+          await App.populateValidatorDropdown();
+        } catch (error) {
+          console.error('Error refreshing validators:', error);
+        } finally {
+          this.disabled = false;
+          this.textContent = '↻';
+        }
+      });
+    }
+  },
+
   // Add function to populate validator dropdown
-  populateValidatorDropdown: async function() {
+  populateValidatorDropdown: async function(isNetworkSwitch = false) {
     try {
       const dropdown = document.getElementById('delegateValidatorDropdown');
       if (!dropdown) {
-        // console.error(...);
+        console.error('Validator dropdown not found');
         return;
       }
       
-      // Show loading state
-      dropdown.innerHTML = '<option value="">Loading validators...</option>';
+      // Show appropriate loading state
+      if (isNetworkSwitch) {
+        const networkName = App.cosmosChainId === 'tellor-1' ? 'mainnet' : 'testnet';
+        dropdown.innerHTML = `<option value="">Switching to ${networkName} - loading validators...</option>`;
+      } else {
+        dropdown.innerHTML = '<option value="">Loading validators...</option>';
+      }
       dropdown.disabled = true;
       
       const validators = await this.fetchValidators();
       
-      // Clear loading state and populate dropdown
-      dropdown.innerHTML = '<option value="">Select a validator...</option>';
+      // Clear loading state and populate dropdown with network indicator
+      const networkName = App.cosmosChainId === 'tellor-1' ? 'Mainnet' : 'Testnet';
+      dropdown.innerHTML = `<option value="">Select a validator (${networkName})...</option>`;
       
                       validators.forEach(validator => {
                     if (!validator.jailed) { // Only show non-jailed validators
@@ -3898,41 +4182,19 @@ const App = {
                         
                         const option = document.createElement('option');
                         option.value = validator.address;
-                        option.textContent = `${displayMoniker} (${votingPower} TRB, ${commission}%)`;
-                        option.title = `${validator.moniker} (${votingPower} TRB, ${commission}% commission)`; // Full name in tooltip
+                        const networkName = App.cosmosChainId === 'tellor-1' ? 'MN' : 'TN';
+                        option.textContent = `${displayMoniker} (${votingPower} TRB, ${commission}%) [${networkName}]`;
+                        option.title = `${validator.moniker} (${votingPower} TRB, ${commission}% commission) - ${networkName === 'MN' ? 'Mainnet' : 'Testnet'}`; // Full name in tooltip
                         dropdown.appendChild(option);
                     }
                 });
       
       dropdown.disabled = false;
       
-      // Add change event listener to update the hidden input
-      dropdown.addEventListener('change', function() {
-        const hiddenInput = document.getElementById('delegateValidatorAddress');
-        if (hiddenInput) {
-          hiddenInput.value = this.value;
-        }
-      });
-      
-      // Add refresh button event listener
-      const refreshBtn = document.getElementById('refreshValidatorsBtn');
-      if (refreshBtn) {
-        refreshBtn.addEventListener('click', async function() {
-          this.disabled = true;
-          this.textContent = '⟳';
-          try {
-            await App.populateValidatorDropdown();
-          } catch (error) {
-            // console.error(...);
-          } finally {
-            this.disabled = false;
-            this.textContent = '↻';
-          }
-        });
-      }
+
       
     } catch (error) {
-      // console.error(...);
+      console.error('Error populating validator dropdown:', error);
       const dropdown = document.getElementById('delegateValidatorDropdown');
       if (dropdown) {
         dropdown.innerHTML = '<option value="">Error loading validators</option>';
@@ -4037,6 +4299,46 @@ window.App.claimWithdrawal = App.claimWithdrawal;  // Explicitly expose claimWit
 window.App.requestAttestation = App.requestAttestation;  // Also explicitly expose requestAttestation
 window.App.submitNoStakeReport = App.submitNoStakeReport;  // Expose no-stake report function
 window.App.checkNoStakeWalletStatus = App.checkNoStakeWalletStatus;  // Expose wallet status check
+
+// Global function to hide TRB price tooltip
+window.hideTrbPriceTooltip = function() {
+    const trbPriceTooltip = document.querySelector('.trb-price-tooltip');
+    if (trbPriceTooltip) {
+        trbPriceTooltip.style.display = 'none';
+        trbPriceTooltip.style.visibility = 'hidden';
+        trbPriceTooltip.style.opacity = '0';
+        trbPriceTooltip.style.transform = 'scale(0.95)';
+        trbPriceTooltip.textContent = '';
+        trbPriceTooltip.style.pointerEvents = 'none';
+        trbPriceTooltip.style.left = '-9999px';
+        trbPriceTooltip.style.top = '-9999px';
+        trbPriceTooltip.style.zIndex = '-1';
+    }
+    
+    // Also try to hide any other tooltips that might exist
+    const allTooltips = document.querySelectorAll('.trb-price-tooltip');
+    allTooltips.forEach(t => {
+        t.style.display = 'none';
+        t.style.visibility = 'hidden';
+        t.style.opacity = '0';
+        t.style.transform = 'scale(0.95)';
+        t.style.left = '-9999px';
+        t.style.top = '-9999px';
+        t.style.zIndex = '-1';
+    });
+};
+
+
+
+// Global function to reset TRB price tooltip
+window.resetTrbPriceTooltip = function() {
+    const trbPriceTooltip = document.querySelector('.trb-price-tooltip');
+    if (trbPriceTooltip) {
+        trbPriceTooltip.style.display = 'none';
+        trbPriceTooltip.style.visibility = 'hidden';
+        trbPriceTooltip.textContent = '';
+    }
+};
 
 
 // Export App as default for module usage
