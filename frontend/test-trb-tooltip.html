@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TRB Tooltip Test - All Sections</title>
+    <link rel="stylesheet" href="space-station.css">
+    <style>
+        .test-container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        .test-section {
+            border: 1px solid #ccc;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .test-button {
+            background: #003734;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .test-button:hover {
+            background: #005a52;
+        }
+        .input-field {
+            width: 200px;
+            padding: 8px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+        .behavior-info {
+            background: #f0f8ff;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #003734;
+            margin: 20px 0;
+        }
+        .section-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .section-tab {
+            padding: 10px 20px;
+            border: 1px solid #ccc;
+            background: #f5f5f5;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .section-tab.active {
+            background: #003734;
+            color: white;
+            border-color: #003734;
+        }
+        .section-content {
+            display: none;
+        }
+        .section-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>TRB Price Tooltip Test - All Sections</h1>
+        
+        <div class="behavior-info">
+            <h3>Expected Behavior:</h3>
+            <ul>
+                <li><strong>Bridge to Tellor & Delegate:</strong> Tooltip appears to the right of the input field</li>
+                <li><strong>Bridge to Ethereum:</strong> Tooltip appears above the input field</li>
+                <li><strong>Section Switching:</strong> Tooltip should hide when switching sections</li>
+                <li><strong>No-Stake Report:</strong> Tooltip should hide completely (no TRB inputs)</li>
+                <li><strong>Back to Hub:</strong> Tooltip should hide completely</li>
+            </ul>
+        </div>
+        
+        <div class="section-tabs">
+            <div class="section-tab active" onclick="switchToSection('bridgeToLayer')">Bridge to Tellor</div>
+            <div class="section-tab" onclick="switchToSection('bridgeToEth')">Bridge to Ethereum</div>
+            <div class="section-tab" onclick="switchToSection('delegate')">Delegate</div>
+            <div class="section-tab" onclick="switchToSection('noStakeReport')">No-Stake Report</div>
+        </div>
+        
+        <div id="bridgeToLayerSection" class="section-content active">
+            <h3>Bridge to Tellor Section</h3>
+            <p>Enter a TRB amount to see the price tooltip:</p>
+            <input type="text" class="input-field trb-input-field" id="stakeAmount" placeholder="Enter TRB amount">
+            <p><em>Type a number to see the USD price tooltip appear</em></p>
+        </div>
+        
+        <div id="bridgeToEthSection" class="section-content">
+            <h3>Bridge to Ethereum Section</h3>
+            <p>Enter a TRB amount to see the price tooltip:</p>
+            <input type="text" class="input-field trb-input-field" id="ethStakeAmount" placeholder="Enter TRB amount">
+            <p><em>Type a number to see the USD price tooltip appear</em></p>
+        </div>
+        
+        <div id="delegateSection" class="section-content">
+            <h3>Delegate Section</h3>
+            <p>Enter a TRB amount to see the price tooltip:</p>
+            <input type="text" class="input-field trb-input-field" id="delegateStakeAmount" placeholder="Enter TRB amount">
+            <p><em>Type a number to see the USD price tooltip appear</em></p>
+        </div>
+        
+        <div id="noStakeReportSection" class="section-content">
+            <h3>No-Stake Report Section</h3>
+            <p>This section has no TRB inputs, so no tooltip should appear.</p>
+            <input type="text" class="input-field" id="noStakeValue" placeholder="Enter hex value">
+        </div>
+        
+        <div class="test-section">
+            <h3>Test Navigation</h3>
+            <button class="test-button" onclick="goBackToHub()">Back to Hub</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>Current Section: <span id="currentSection">Bridge to Tellor</span></h3>
+            <p><strong>Test Steps:</strong></p>
+            <ol>
+                <li>Type a number in any TRB input to see the tooltip</li>
+                <li>Switch between Bridge to Tellor, Bridge to Ethereum, and Delegate - tooltip should work in all</li>
+                <li>Switch to No-Stake Report - tooltip should hide completely</li>
+                <li>Go back to Hub - tooltip should hide completely</li>
+                <li>Return to any relevant section and type again - tooltip should work normally</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        // Simulate the TRB price tooltip functionality
+        let trbPrice = 0.5; // Default price for testing
+        
+        // Create tooltip element
+        const tooltip = document.createElement('div');
+        tooltip.className = 'trb-price-tooltip';
+        tooltip.style.display = 'none';
+        document.body.appendChild(tooltip);
+        
+        // Position tooltip
+        function positionTooltip() {
+            const activeInput = document.querySelector('.trb-input-field:focus') || 
+                               document.querySelector('.trb-input-field[value]');
+            if (activeInput) {
+                const inputRect = activeInput.getBoundingClientRect();
+                
+                // Special positioning for Bridge to Ethereum section
+                if (activeInput.id === 'ethStakeAmount') {
+                    // Position above the input field
+                    tooltip.style.left = (inputRect.left + (inputRect.width / 2)) + 'px';
+                    tooltip.style.top = (inputRect.top - 10) + 'px';
+                    tooltip.style.transform = 'translate(-50%, -100%)';
+                } else {
+                    // Standard positioning to the right of the input
+                    tooltip.style.left = (inputRect.right + 10) + 'px';
+                    tooltip.style.top = (inputRect.top + (inputRect.height / 2)) + 'px';
+                    tooltip.style.transform = 'translateY(-50%)';
+                }
+            }
+        }
+        
+        // Update tooltip
+        function updateTooltip(event) {
+            const triggeredInput = event ? event.target : null;
+            let activeInput = null;
+            
+            if (triggeredInput && triggeredInput.classList.contains('trb-input-field')) {
+                activeInput = triggeredInput;
+            } else {
+                // Find any input with a value
+                const inputs = document.querySelectorAll('.trb-input-field');
+                for (let input of inputs) {
+                    if (input.value && parseFloat(input.value) > 0) {
+                        activeInput = input;
+                        break;
+                    }
+                }
+            }
+            
+            if (activeInput) {
+                const amount = parseFloat(activeInput.value) || 0;
+                if (amount > 0 && shouldTooltipBeVisible()) {
+                    const usdValue = (amount * trbPrice).toFixed(2);
+                    tooltip.textContent = `≈ $${usdValue} USD`;
+                    tooltip.style.display = 'block';
+                    tooltip.style.visibility = 'visible';
+                    requestAnimationFrame(positionTooltip);
+                } else {
+                    tooltip.style.display = 'none';
+                    tooltip.style.visibility = 'hidden';
+                }
+            } else {
+                tooltip.style.display = 'none';
+                tooltip.style.visibility = 'hidden';
+            }
+        }
+        
+        // Check if tooltip should be visible
+        function shouldTooltipBeVisible() {
+            const bridgeToLayerSection = document.getElementById('bridgeToLayerSection');
+            const bridgeToEthSection = document.getElementById('bridgeToEthSection');
+            const delegateSection = document.getElementById('delegateSection');
+            
+            return (bridgeToLayerSection && bridgeToLayerSection.classList.contains('active')) ||
+                   (bridgeToEthSection && bridgeToEthSection.classList.contains('active')) ||
+                   (delegateSection && delegateSection.classList.contains('active'));
+        }
+        
+        // Add event listeners to all TRB input fields
+        document.addEventListener('DOMContentLoaded', function() {
+            const trbInputs = document.querySelectorAll('.trb-input-field');
+            trbInputs.forEach(input => {
+                input.addEventListener('input', updateTooltip);
+                input.addEventListener('focus', updateTooltip);
+            });
+        });
+        
+        // Navigation functions
+        function switchToSection(sectionName) {
+            // Hide tooltip immediately when switching sections
+            hideTrbPriceTooltip();
+            
+            // Update tabs
+            document.querySelectorAll('.section-tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.section-content').forEach(content => content.classList.remove('active'));
+            
+            // Show selected section
+            document.querySelector(`[onclick*="${sectionName}"]`).classList.add('active');
+            document.getElementById(sectionName + 'Section').classList.add('active');
+            
+            document.getElementById('currentSection').textContent = sectionName;
+            
+            // Double-check tooltip is hidden
+            setTimeout(() => {
+                hideTrbPriceTooltip();
+            }, 50);
+        }
+        
+        function goBackToHub() {
+            document.getElementById('currentSection').textContent = 'Hub';
+            hideTrbPriceTooltip();
+        }
+        
+        // Global functions to match app.js behavior
+        window.hideTrbPriceTooltip = function() {
+            const trbPriceTooltip = document.querySelector('.trb-price-tooltip');
+            if (trbPriceTooltip) {
+                trbPriceTooltip.style.display = 'none';
+                trbPriceTooltip.style.visibility = 'hidden';
+                trbPriceTooltip.style.opacity = '0';
+                trbPriceTooltip.style.transform = 'scale(0.95)';
+                trbPriceTooltip.style.left = '-9999px';
+                trbPriceTooltip.style.top = '-9999px';
+                trbPriceTooltip.style.zIndex = '-1';
+                trbPriceTooltip.textContent = '';
+            }
+        };
+        
+        window.resetTrbPriceTooltip = function() {
+            const trbPriceTooltip = document.querySelector('.trb-price-tooltip');
+            if (trbPriceTooltip) {
+                trbPriceTooltip.style.display = 'none';
+                trbPriceTooltip.style.visibility = 'hidden';
+                trbPriceTooltip.style.opacity = '0';
+                trbPriceTooltip.style.transform = 'scale(0.95)';
+                trbPriceTooltip.style.left = '-9999px';
+                trbPriceTooltip.style.top = '-9999px';
+                trbPriceTooltip.style.zIndex = '-1';
+                trbPriceTooltip.textContent = '';
+            }
+        };
+        
+
+    </script>
+</body>
+</html>

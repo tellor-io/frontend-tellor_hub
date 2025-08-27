@@ -3,6 +3,7 @@ window.layerProto = {
     // Message type URLs
     MSG_WITHDRAW_TOKENS_TYPE: "/layer.bridge.MsgWithdrawTokens",
     MSG_REQUEST_ATTESTATIONS_TYPE: "/layer.bridge.MsgRequestAttestations",
+    MSG_NO_STAKE_REPORT_TYPE: "/layer.oracle.MsgNoStakeReport",
     
     // Initialize proto types
     bridge: {
@@ -92,6 +93,35 @@ window.layerProto = {
                 }
                 return message;
             }
+        },
+
+        // Define the MsgNoStakeReport type
+        MsgNoStakeReport: {
+            create: (data) => ({
+                creator: data.creator || "",
+                query_data: data.query_data || new Uint8Array(0),
+                value: data.value || ""
+            }),
+            encode: (message) => {
+                const writer = protobuf.Writer.create();
+                if (message.creator) writer.uint32(10).string(message.creator);
+                if (message.query_data) writer.uint32(18).bytes(message.query_data);
+                if (message.value) writer.uint32(26).string(message.value);
+                return writer.finish();
+            },
+            decode: (reader) => {
+                const message = {};
+                while (reader.nextField()) {
+                    if (reader.isEndGroup) break;
+                    switch (reader.getFieldNumber()) {
+                        case 1: message.creator = reader.readString(); break;
+                        case 2: message.query_data = reader.readBytes(); break;
+                        case 3: message.value = reader.readString(); break;
+                        default: reader.skipField();
+                    }
+                }
+                return message;
+            }
         }
     },
 
@@ -115,6 +145,18 @@ window.layerProto = {
                 creator,
                 query_id: queryId,
                 timestamp
+            })
+        };
+    },
+
+    // Helper function to create a MsgNoStakeReport message
+    createMsgNoStakeReport: (creator, queryData, value) => {
+        return {
+            typeUrl: window.layerProto.MSG_NO_STAKE_REPORT_TYPE,
+            value: window.layerProto.bridge.MsgNoStakeReport.create({
+                creator,
+                query_data: queryData,
+                value
             })
         };
     },

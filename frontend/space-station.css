@@ -1,0 +1,1410 @@
+/* Space Station Theme CSS */
+.space-station-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  padding: 20px;
+  position: relative;
+  overflow: visible;
+  margin-top: 40px; /* Reduced: just enough space for header logo */
+  margin-bottom: 60px; /* Reduced: just enough space for footer */
+}
+
+/* Hub Only State - Initial View */
+.hub-only-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 80vh;
+  position: relative;
+}
+
+/* Function Focus State - When Function is Selected */
+.function-focus-state {
+  display: flex;
+  width: 100%;
+  max-width: 100vw; /* Ensure it never exceeds viewport width */
+  gap: 30px;
+  min-height: 80vh;
+  max-height: calc(100vh - 120px); /* Adjusted for reduced margins */
+  overflow-y: auto; /* Allow scrolling if content is too tall */
+  overflow-x: hidden; /* Prevent horizontal overflow */
+  margin-top: 60px; /* Push down to avoid header overlap */
+  box-sizing: border-box;
+  padding-right: 20px; /* Ensure right side doesn't overflow */
+  padding-left: 20px; /* Ensure left side doesn't overflow */
+}
+
+/* Central Hub */
+.central-hub {
+  position: absolute;
+  z-index: 10;
+  top: 60%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.hub-core {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  width: 140px;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.hub-logo {
+  max-width: 140px;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+/* Hub title and subtitle removed for swoosh design */
+
+/* Hub pulse animation removed for swoosh design */
+
+/* Floating Pods Container */
+.orbit-container {
+  position: absolute;
+  width: 720px;
+  height: 720px;
+  top: 60%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Floating pods don't need pause functionality */
+
+/* Orbiting Pods */
+.orbiting-pod {
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+/* Position pods in a square around the hub - closer to center with proper spoke connections */
+.orbiting-pod[data-function="bridgeToLayer"] {
+  top: 60px;
+  left: 60px;
+  transform: none;
+}
+
+.orbiting-pod[data-function="bridgeToEth"] {
+  top: 60px;
+  right: 60px;
+  transform: none;
+}
+
+.orbiting-pod[data-function="delegate"] {
+  bottom: 60px;
+  right: 60px;
+  transform: none;
+}
+
+.orbiting-pod[data-function="noStakeReport"] {
+  bottom: 60px;
+  left: 60px;
+  transform: none;
+}
+
+/* Staggered floating animations for natural movement */
+.orbiting-pod[data-function="bridgeToLayer"] .pod-content {
+  animation-delay: 0s;
+}
+
+.orbiting-pod[data-function="bridgeToEth"] .pod-content {
+  animation-delay: -1.5s;
+}
+
+.orbiting-pod[data-function="delegate"] .pod-content {
+  animation-delay: -3s;
+}
+
+.orbiting-pod[data-function="noStakeReport"] .pod-content {
+  animation-delay: -4.5s;
+}
+
+.orbiting-pod:hover {
+  transform: scale(1.1);
+  z-index: 20;
+}
+
+/* Hover effects removed for cleaner look */
+
+/* Floating pod content */
+.pod-content {
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  animation: floatGently 6s ease-in-out infinite;
+  transform-origin: center center;
+}
+
+/* Ensure floating animation works properly */
+.orbiting-pod .pod-content {
+  animation: floatGently 6s ease-in-out infinite;
+  transform-origin: center center;
+}
+
+@keyframes floatGently {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+/* Connection circle removed for cleaner look */
+
+/* Two continuous diagonal lines connecting opposite pods through the hub */
+.spoke-line {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3px;
+  height: 400px;
+  background: linear-gradient(to bottom, rgba(0, 55, 52, 0.8), rgba(0, 55, 52, 0.4));
+  transform-origin: center center;
+  z-index: -1;
+}
+
+.spoke-diagonal-1 {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.spoke-diagonal-2 {
+  transform: translate(-50%, -50%) rotate(135deg);
+}
+
+/* Individual spoke lines connecting hub center to each pod */
+.orbiting-pod::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3px;
+  height: 120px;
+  background: linear-gradient(to bottom, rgba(0, 55, 52, 0.8), rgba(0, 55, 52, 0.4));
+  transform-origin: bottom center;
+  z-index: 1;
+  display: none;
+}
+
+.orbiting-pod[data-function="bridgeToLayer"]::after {
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.orbiting-pod[data-function="bridgeToEth"]::after {
+  transform: translateX(-50%) rotate(135deg);
+}
+
+.orbiting-pod[data-function="delegate"]::after {
+  transform: translateX(-50%) rotate(225deg);
+}
+
+.orbiting-pod[data-function="noStakeReport"]::after {
+  transform: translateX(-50%) rotate(315deg);
+}
+
+.orbiting-pod:hover .pod-content {
+  /* Hover effect removed for cleaner look */
+}
+
+.pod-icon {
+  font-size: 32px;
+  margin-bottom: 0;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+  width: 200px;
+  height: 200px;
+  object-fit: contain;
+}
+
+.pod-title {
+  font-family: 'PPNeueMontreal-Bold', monospace;
+  font-size: 11px;
+  color: #003734;
+  text-align: center;
+  margin-bottom: 0;
+  line-height: 1.2;
+}
+
+
+
+@keyframes orbit {
+  0% {
+    transform: rotate(0deg) translateX(200px) rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg) translateX(200px) rotate(-360deg);
+  }
+}
+
+/* Top Left Logo */
+.top-left {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 1000;
+}
+
+.top-left-logo {
+  width: 300px;
+  height: auto;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+/* Side Navigation Menu */
+.side-nav-menu {
+  width: 250px;
+  background: rgba(196, 237, 235, 0.95);
+  border: 3px solid #003734;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 
+    0 10px 30px rgba(0, 55, 52, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  height: fit-content;
+  position: relative; /* Remove sticky positioning to flow naturally */
+  margin-top: 0; /* Remove any top margin */
+}
+
+.side-nav-header {
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #38A8A3;
+}
+
+.back-to-hub-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #003734 0%, #004d47 100%);
+  color: #eefffb;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-family: 'PPNeueMontreal-Bold', monospace;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  justify-content: center;
+}
+
+.back-to-hub-btn:hover {
+  background: linear-gradient(135deg, #004d47 0%, #38A8A3 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(56, 168, 163, 0.4);
+}
+
+.back-icon {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.side-nav-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.nav-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.nav-option:hover {
+  background: rgba(56, 168, 163, 0.1);
+  border-color: #38A8A3;
+  transform: translateX(5px);
+}
+
+.nav-option.active {
+  background: linear-gradient(135deg, #003734 0%, #004d47 100%);
+  border-color: #88FFEC;
+  color: #eefffb;
+  box-shadow: 0 4px 15px rgba(56, 168, 163, 0.3);
+}
+
+.nav-option-icon {
+  font-size: 24px;
+  width: 40px;
+  text-align: center;
+}
+
+.nav-option-title {
+  font-family: 'PPNeueMontreal-Bold', monospace;
+  font-size: 14px;
+  flex: 1;
+}
+
+/* Function Display Area */
+.function-display-area {
+  flex: 1;
+  min-height: 400px;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding-left: 20px;
+  margin-top: 0; /* Remove top margin since function-focus-state handles spacing */
+  margin-bottom: 20px; /* Reduced: minimal space above footer */
+}
+
+
+
+.function-container {
+  background: rgba(196, 237, 235, 0.95);
+  border: 3px solid #003734;
+  border-radius: 20px;
+  padding: 25px;
+  box-shadow: 
+    0 10px 30px rgba(0, 55, 52, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  height: calc(100vh - 165px); /* Fixed height to align with side-nav-menu */
+  margin-top: 0; /* Remove top margin since function-display-area handles spacing */
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden; /* Prevent content from overflowing */
+  overflow-x: hidden; /* Specifically prevent horizontal overflow */
+  display: flex;
+  flex-direction: column;
+}
+
+.function-section {
+  display: none;
+  opacity: 0;
+  transition: all 0.5s ease;
+}
+
+.function-section.active {
+  display: block;
+  opacity: 1;
+  animation: fadeInUp 0.5s ease;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.section-header {
+  text-align: center;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #38A8A3;
+}
+
+.section-header h2 {
+  font-family: 'PPNeueMontreal-Bold', monospace;
+  font-size: 16px;
+  color: #003734;
+  margin: 0 0 3px 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.section-description {
+  font-family: 'PPNeueMontreal-Book', monospace;
+  font-size: 12px;
+  color: #004d47;
+  margin: 0;
+  opacity: 0.9;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .function-focus-state {
+    flex-direction: column;
+    gap: 20px;
+    overflow-x: hidden !important; /* Force prevent horizontal overflow */
+    max-width: 100vw !important; /* Force ensure container stays within viewport */
+    width: 100vw !important; /* Force width to viewport */
+  }
+  
+  .side-nav-menu {
+    width: 100%;
+    position: static;
+  }
+  
+  .side-nav-options {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .nav-option {
+    min-width: 200px;
+    justify-content: center;
+  }
+  
+  /* CRITICAL: Override main.css .box-wrapper rules that are causing the issue */
+  .box-wrapper {
+    overflow-x: hidden !important; /* Override main.css overflow-x: auto */
+    overflow: hidden !important; /* Override main.css overflow: visible at 1024px */
+    max-width: 100vw !important; /* Force viewport containment */
+    width: 100vw !important; /* Force viewport width */
+  }
+  
+  /* Force override main.css problematic rules for Bridge to Ethereum section */
+  .function-container {
+    overflow-x: hidden !important; /* Force prevent horizontal overflow */
+    max-width: 100vw !important; /* Force ensure container stays within viewport */
+    width: 100vw !important; /* Force width to viewport */
+  }
+  
+  .bridge-eth-vertical-layout {
+    overflow-x: hidden !important; /* Force prevent horizontal overflow */
+    max-width: 100vw !important; /* Force ensure container stays within viewport */
+    width: 100vw !important; /* Force width to viewport */
+  }
+  
+  .withdrawal-table-full {
+    overflow-x: hidden !important; /* Force prevent horizontal overflow */
+    max-width: 100vw !important; /* Force ensure container stays within viewport */
+    width: 100vw !important; /* Force width to viewport */
+  }
+  
+  /* Force override any conflicting table rules */
+  .withdrawal-table-full table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    overflow-x: hidden !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .space-station-container {
+    padding: 10px;
+  }
+  
+  .hub-core {
+    width: 150px;
+    height: 150px;
+  }
+  
+  .hub-logo {
+    max-width: 110px;
+  }
+  
+  .hub-subtitle {
+    font-size: 14px;
+  }
+  
+  .orbit-container {
+    width: 600px;
+    height: 600px;
+  }
+  
+  .orbiting-pod {
+    width: 240px;
+    height: 240px;
+  }
+  
+  .pod-icon {
+    font-size: 24px;
+    width: 180px;
+    height: 180px;
+  }
+  
+  .pod-title {
+    font-size: 10px;
+  }
+  
+  .pod-description {
+    font-size: 8px;
+  }
+  
+  .function-container {
+    padding: 20px;
+  }
+  
+  .section-header h2 {
+    font-size: 24px;
+  }
+  
+  .section-description {
+    font-size: 14px;
+  }
+  
+  .side-nav-menu {
+    padding: 15px;
+  }
+  
+  .nav-option {
+    min-width: 150px;
+    padding: 10px;
+  }
+  
+  .nav-option-icon {
+    font-size: 20px;
+    width: 30px;
+  }
+  
+  .nav-option-title {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hub-core {
+    width: 120px;
+    height: 120px;
+  }
+  
+  .hub-logo {
+    max-width: 85px;
+  }
+  
+  .hub-subtitle {
+    font-size: 12px;
+  }
+  
+  .orbit-container {
+    width: 480px;
+    height: 480px;
+  }
+  
+  .orbiting-pod {
+    width: 200px;
+    height: 200px;
+  }
+  
+  .pod-icon {
+    font-size: 20px;
+    width: 140px;
+    height: 140px;
+  }
+  
+  .pod-title {
+    font-size: 9px;
+  }
+  
+  .pod-description {
+    font-size: 7px;
+  }
+  
+  .function-container {
+    padding: 15px;
+  }
+  
+  .section-header h2 {
+    font-size: 20px;
+  }
+  
+  .section-description {
+    font-size: 12px;
+  }
+  
+  .side-nav-menu {
+    padding: 10px;
+  }
+  
+  .nav-option {
+    min-width: 120px;
+    padding: 8px;
+  }
+  
+  .nav-option-icon {
+    font-size: 18px;
+    width: 25px;
+  }
+  
+  .nav-option-title {
+    font-size: 11px;
+  }
+}
+
+/* Ensure existing functionality styles are preserved */
+.function-section .wallet-disclaimer,
+.function-section .balance-info,
+.function-section .input-button-container,
+.function-section .bridge-direction {
+  margin-bottom: 6px;
+}
+
+.function-section .input,
+.function-section .input-address {
+  width: 100%;
+  max-width: none;
+}
+
+/* Preserve existing button styles */
+.function-section .button-style-1,
+.function-section .button-style-2,
+.function-section .button-style-3 {
+  margin: 5px;
+}
+
+/* Preserve existing input styles */
+.function-section .input-with-label {
+  width: 100%;
+}
+
+.function-section .input-label {
+  background: #003734;
+  color: #eefffb;
+  padding: 12px 4px;
+  border-radius: 8px 0 0 8px;
+  font-family: 'PPNeueMontreal-Book', monospace;
+  font-size: 20px;
+  font-weight: bold;
+  display: inline-block;
+  min-width: 60px;
+  text-align: center;
+  height: 45px !important; /* ← Add this to make it shorter */
+
+}
+
+/* Additional space station enhancements */
+.space-station-container::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(circle at 20% 80%, rgba(56, 168, 163, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(136, 255, 236, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(0, 55, 52, 0.05) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Enhanced pod interactions */
+.orbiting-pod::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  border: 2px solid transparent;
+  border-radius: 200px;
+  background: linear-gradient(45deg, #38A8A3, #88FFEC, #38A8A3);
+  background-size: 200% 200%;
+  animation: borderGlow 3s ease-in-out infinite;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+
+.orbiting-pod:hover::before {
+  opacity: 0.3;
+}
+
+@keyframes borderGlow {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Enhanced function container - glow effect removed */
+
+/* Ensure proper z-indexing */
+.space-station-container {
+  z-index: 1;
+}
+
+.central-hub {
+  z-index: 10;
+}
+
+.orbit-container {
+  z-index: 5;
+}
+
+.function-display-area {
+  z-index: 15;
+}
+
+/* Bridge to Ethereum vertical layout */
+#bridgeToEthSection .bridge-eth-vertical-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 15px !important;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden; /* Prevent horizontal overflow */
+}
+
+/* Force viewport containment for Bridge to Ethereum section */
+#bridgeToEthSection {
+  overflow-x: hidden !important;
+  max-width: 100vw !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+#bridgeToEthSection .withdrawal-form-top {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  background: rgba(196, 237, 235, 0.95);
+  border: 2px solid #003734;
+  border-radius: 10px;
+  padding: 8px !important;
+  box-shadow: 
+    0 3px 10px rgba(0, 55, 52, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+}
+
+.withdrawal-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.input-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.input-row .input-with-label {
+  flex: 1;
+  min-width: 300px;
+}
+
+.input-row .input-with-label:first-child {
+  flex: 0 0 200px; /* TRB input gets fixed width */
+}
+
+.withdraw-button-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 0;
+}
+
+#bridgeToEthSection .withdraw-button-container .button-style-3 {
+  font-size: 24px !important;
+  padding: 10px 16px !important;
+  white-space: nowrap !important;
+  width: auto !important; /* Override 400px width */
+  min-width: fit-content !important; /* Allow button to size to content */
+  max-width: none !important; /* Remove any max-width constraints */
+  display: inline-block !important; /* Override block display */
+  margin: 0 !important; /* Remove auto centering */
+  height: auto !important; /* Allow natural height */
+  line-height: 1.2 !important; /* Control line height */
+  box-sizing: border-box !important; /* Ensure padding is included in width */
+}
+
+/* Enhanced TRB input field - no more conflicts with main.css */
+.trb-input {
+  width: 120px !important;
+  min-width: 120px !important;
+  font-size: 14px !important;
+  padding: 10px 12px !important;
+  height: 45px !important;
+  box-sizing: border-box !important;
+  background-color: #f0f0f0 !important;
+  border: 1px solid #7FAFB1 !important;
+  border-radius: 0px 12px 12px 0px !important;
+  margin-top: 12px !important;
+  line-height: 1 !important;
+}
+
+/* Address input field - no more conflicts with main.css */
+.address-input {
+  width: 200px !important;
+  min-width: 400px !important;
+  flex-shrink: 0;
+  font-size: 14px !important;
+  padding: 10px 12px !important;
+  height: 45px !important;
+  box-sizing: border-box !important;
+  background-color: #f0f0f0 !important;
+  border: 1px solid #7FAFB1 !important;
+  border-radius: 12px !important;
+  margin-top: 12px !important;
+  line-height: 1.2 !important;
+  color: #008D8B !important;
+}
+
+/* Override container constraints for Bridge to Ethereum */
+#bridgeToEthSection .input-button-container {
+  max-width: 600px !important; /* Increased from 340px to accommodate all elements */
+  width: 100% !important;
+  justify-content: flex-start !important; /* Left-align instead of space-between */
+  gap: 15px !important; /* Increased gap between elements */
+  margin: 0 !important; /* Remove auto centering */
+  padding: 0 !important; /* Remove any padding */
+}
+
+/* Ensure function container stays within viewport */
+#bridgeToEthSection {
+  height: 100% !important; /* Take full height of parent function-container */
+  overflow: hidden !important; /* Prevent container overflow */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Make transactions table scrollable within container */
+#bridgeToEthSection .transactions-container {
+  max-height: calc(100vh - 350px) !important; /* Reserve space for form above */
+  overflow-y: auto !important; /* Enable vertical scrolling */
+  overflow-x: hidden !important; /* Prevent horizontal overflow */
+  width: 100% !important; /* Take full width */
+  max-width: 100% !important; /* Ensure no width constraints */
+  min-width: 100% !important; /* Force minimum width */
+}
+
+/* Override input-with-label width constraints for Bridge to Ethereum */
+#bridgeToEthSection .input-button-container .input-with-label {
+  width: auto !important; /* Override 100% width */
+  flex-shrink: 0 !important; /* Prevent shrinking */
+  margin: 0 !important; /* Remove any margins */
+}
+
+/* Override balance-info centering for Bridge to Ethereum */
+#bridgeToEthSection .balance-info {
+  align-items: flex-start !important; /* Left-align instead of center */
+  margin: 0 !important; /* Remove auto centering */
+  max-width: none !important; /* Remove width constraint */
+}
+
+/* Ensure proper spacing and viewport containment */
+#bridgeToEthSection .balance-info {
+  margin-bottom: 20px !important; /* Space between form and table */
+}
+
+/* Make table container properly scrollable */
+#bridgeToEthSection .transactions-container {
+  flex: 1 !important; /* Take remaining space */
+  min-height: 0 !important; /* Allow shrinking */
+  overflow: hidden !important; /* Container overflow control */
+}
+
+/* Ensure table container has proper scrolling */
+#bridgeToEthSection .withdrawal-table-container {
+  overflow-y: auto !important; /* Enable vertical scrolling */
+  height: 100% !important; /* Take full height of transactions-container */
+  width: 100% !important; /* Take full width */
+  max-width: 100% !important; /* Ensure no width constraints */
+  border: 1px solid #e2e8f0 !important; /* Visual boundary for scrollable area */
+  border-radius: 8px !important;
+}
+
+/* No-Stake Stacked Layout */
+.no-stake-horizontal-layout {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+.no-stake-row {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 20px !important;
+  align-items: flex-start !important;
+  width: 100% !important;
+}
+
+/* Left side: Stacked Value and Query Data */
+.no-stake-left-column {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1px !important;
+  flex: 1 !important; /* Take remaining space */
+  min-width: 0 !important; /* Allow shrinking */
+}
+
+.no-stake-value-container {
+  width: 100% !important; /* Full width of left column */
+  min-width: 0 !important; /* Allow shrinking */
+}
+
+.no-stake-query-container {
+  width: 100% !important; /* Full width of left column */
+  min-width: 0 !important; /* Allow shrinking */
+}
+
+.no-stake-submit-container {
+  flex: 0 0 auto !important; /* Don't grow or shrink, stay at natural size */
+  display: flex !important;
+  align-items: flex-start !important; /* Align to top */
+  padding-top: 45px !important; /* Move button down by 20px */
+}
+
+/* Adjust textarea height for horizontal layout */
+.no-stake-horizontal-layout .no-stake-input {
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Ensure submit button fits properly */
+.no-stake-submit-container .button-style-3 {
+  white-space: nowrap !important;
+  min-width: fit-content !important;
+}
+
+/* Specific styling for no-stake reporting input labels */
+#noStakeReportSection .input-label {
+  height: 35px !important; /* Adjust this value as needed */
+  padding: 8px 4px !important; /* Adjust padding if needed */
+  margin-top: 0 !important; /* Remove top margin */
+}
+
+/* Hide empty wallet connection containers that cause spacing issues */
+.wallet-connection-container:empty {
+  display: none !important;
+}
+
+/* Force Delegate section to be properly positioned and isolated */
+#delegateSection {
+  position: relative !important;
+  z-index: 1 !important;
+  overflow: visible !important;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+#delegateSection .section-header {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+/* Ensure Bridge to Ethereum section doesn't interfere with others */
+#bridgeToEthSection:not(.active) {
+  display: none !important;
+  position: absolute !important;
+  left: -9999px !important;
+  top: -9999px !important;
+  z-index: -1 !important;
+}
+
+/* Universal button hover effects - consistent across all buttons */
+.button-style-1:hover,
+.button-style-2:hover,
+.button-style-3:hover,
+.wallet-manager-toggle:hover,
+.refresh-btn:hover {
+  background: linear-gradient(135deg, #004d47 0%, #38A8A3 100%) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(56, 168, 163, 0.4) !important;
+  color: #eefffb !important;
+  transition: all 0.3s ease !important;
+}
+
+/* Ensure disabled buttons don't get hover effects */
+.button-style-1:disabled:hover,
+.button-style-2:disabled:hover,
+.button-style-3:disabled:hover {
+  background: #cccccc !important;
+  color: #666666 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Force button to single line - highest specificity override */
+#bridgeToEthSection button#withdrawButton.button-style-3 {
+  width: auto !important;
+  min-width: fit-content !important;
+  max-width: none !important;
+  display: inline-block !important;
+  padding: 10px 16px !important;
+  margin-top: 12px !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.2 !important;
+  height: auto !important;
+  box-sizing: border-box !important;
+  background-color: #003734 !important;
+  color: #eefffb !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 10 !important;
+}
+
+
+
+/* Enable withdraw button when Bridge to Ethereum section is active */
+#bridgeToEthSection.active #withdrawButton {
+  background-color: #003734 !important;
+  color: #eefffb !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
+}
+
+#bridgeToEthSection.active #withdrawButton:disabled {
+  background-color: #003734 !important;
+  color: #eefffb !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
+}
+
+/* Force enable withdrawal button for Bridge to Ethereum section */
+#bridgeToEthSection #withdrawButton {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
+}
+
+/* Compact wallet disclaimer */
+.withdrawal-form-top .wallet-disclaimer {
+  font-size: 11px;
+  margin-bottom: 4px;
+  text-align: center;
+}
+
+.withdrawal-form-top .wallet-connection-container {
+  margin-bottom: 4px;
+}
+
+.withdrawal-table-full {
+  width: 100%;
+  max-width: 100%;
+  background-color: #C4EDEB;
+  border: 3px solid black;
+  border-radius: 10px;
+  padding: 15px;
+  box-sizing: border-box;
+  overflow: hidden; /* Prevent content from overflowing viewport */
+}
+
+/* Ensure table doesn't cause horizontal overflow */
+#bridgeToEthSection .withdrawal-table-full table {
+  width: 100% !important;
+  max-width: 100% !important;
+  table-layout: fixed !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.withdrawal-table-sidebar .withdrawal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  table-layout: fixed;
+  min-width: 600px;
+}
+
+.withdrawal-table-sidebar .withdrawal-table th {
+  background-color: #f8f9fa;
+  padding: 6px 4px;
+  text-align: left;
+  border-bottom: 2px solid #e2e8f0;
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 11px !important; 
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.withdrawal-table-sidebar .withdrawal-table td {
+  padding: 6px 4px;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: middle;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.withdrawal-table-sidebar .withdrawal-table tr:last-child td {
+  border-bottom: none;
+}
+
+.withdrawal-table-sidebar .withdrawal-table tr:hover {
+  background-color: #f8f9fa;
+}
+
+.withdrawal-table-sidebar .amount-column {
+  text-align: right;
+}
+
+.withdrawal-table-sidebar .address-cell {
+  font-family: monospace;
+  color: #4a5568;
+  font-size: 12px;
+}
+
+/* Column width management */
+.withdrawal-table-sidebar .withdrawal-table th:nth-child(1),
+.withdrawal-table-sidebar .withdrawal-table td:nth-child(1) {
+  width: 120px; /* Actions column */
+}
+
+/* Maximum specificity override */
+#bridgeToEthSection .withdrawal-table-container .withdrawal-table th:nth-child(1),
+#bridgeToEthSection .withdrawal-table-container .withdrawal-table th:nth-child(2),
+#bridgeToEthSection .withdrawal-table-container .withdrawal-table th:nth-child(3),
+#bridgeToEthSection .withdrawal-table-container .withdrawal-table th:nth-child(4),
+#bridgeToEthSection .withdrawal-table-container .withdrawal-table th:nth-child(5),
+#bridgeToEthSection .withdrawal-table-container .withdrawal-table th:nth-child(6),
+#bridgeToEthSection .withdrawal-table-container .withdrawal-table th:nth-child(7) {
+  font-size: 11px !important;
+}
+/* Make TRB input field 100px wider */
+#bridgeToLayerSection #stakeAmount {
+  width: 300px !important; /* Increase from 400px to 500px */
+}
+
+.withdrawal-table-sidebar .withdrawal-table th:nth-child(2),
+.withdrawal-table-sidebar .withdrawal-table td:nth-child(2) {
+  width: 50px; /* ID column */
+}
+
+.withdrawal-table-sidebar .withdrawal-table th:nth-child(3),
+.withdrawal-table-sidebar .withdrawal-table td:nth-child(3) {
+  width: 100px; /* Sender column */
+}
+
+.withdrawal-table-sidebar .withdrawal-table th:nth-child(4),
+.withdrawal-table-sidebar .withdrawal-table td:nth-child(4) {
+  width: 100px; /* Recipient column */
+}
+
+.withdrawal-table-sidebar .withdrawal-table th:nth-child(5),
+.withdrawal-table-sidebar .withdrawal-table td:nth-child(5) {
+  width: 80px; /* Amount column */
+}
+
+.withdrawal-table-sidebar .withdrawal-table th:nth-child(6),
+.withdrawal-table-sidebar .withdrawal-table td:nth-child(6) {
+  width: 120px; /* Time column */
+}
+
+.withdrawal-table-sidebar .withdrawal-table th:nth-child(7),
+.withdrawal-table-sidebar .withdrawal-table td:nth-child(7) {
+  width: 80px; /* Status column */
+}
+
+.withdrawal-table-sidebar .status-true {
+  color: #38a169;
+  font-weight: 500;
+}
+
+.withdrawal-table-sidebar .status-false {
+  color: #e53e3e;
+  font-weight: 500;
+}
+
+.withdrawal-table-sidebar .attest-button,
+.withdrawal-table-sidebar .claim-button {
+  margin: 0 2px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+
+.withdrawal-table-sidebar .attest-button:hover,
+.withdrawal-table-sidebar .claim-button:hover {
+  opacity: 0.9;
+}
+
+.withdrawal-table-sidebar .attest-button:disabled,
+.withdrawal-table-sidebar .claim-button:disabled {
+  background-color: #cbd5e0 !important;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.withdrawal-table-sidebar .attest-button.disconnected {
+  background-color: #cbd5e0 !important;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.withdrawal-form-container .balance-info.compact {
+  max-width: 100%;
+  margin: 0;
+}
+
+.withdrawal-form-container .input-button-container {
+  margin-bottom: 15px;
+}
+
+.withdrawal-form-container .bridge-direction {
+  margin-top: 20px;
+}
+
+/* Responsive design for vertical layout */
+@media (max-width: 1200px) {
+  .input-row {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .input-row .input-with-label {
+    min-width: 100%;
+  }
+  
+  .input-row .input-with-label:first-child {
+    flex: none;
+    min-width: 100%;
+  }
+}
+
+/* Additional breakpoint for very small viewports */
+@media (max-width: 800px) {
+  .function-focus-state {
+    padding-left: 10px;
+    padding-right: 10px;
+    gap: 15px;
+  }
+  
+  .bridge-eth-vertical-layout {
+    gap: 15px;
+  }
+  
+  .withdrawal-form-top {
+    padding: 8px;
+  }
+  
+  .withdrawal-table-full {
+    padding: 15px;
+  }
+}
+
+/* Specific adjustments for smaller viewports */
+@media (max-width: 1400px) {
+  .withdrawal-form-container {
+    flex: 0 0 300px;
+    min-width: 300px;
+    max-width: 300px;
+  }
+  
+  .withdrawal-table-sidebar {
+    min-width: 450px;
+    max-width: calc(100% - 360px); /* Increased buffer for smaller viewports */
+  }
+  
+  .bridge-eth-layout {
+    gap: 15px;
+  }
+}
+
+/* Specific adjustments for your viewport size (1344x616px) */
+@media (max-width: 1344px) {
+  .space-station-container {
+    margin-top: 30px; /* Minimal top margin for smaller viewport */
+    margin-bottom: 40px; /* Minimal bottom margin for smaller viewport */
+  }
+  
+  .function-focus-state {
+    margin-top: 40px; /* Reduced top margin for smaller viewport */
+  }
+  
+
+  
+  .function-display-area {
+    margin-top: 0; /* Remove top margin since function-focus-state handles spacing */
+    margin-bottom: 15px; /* Minimal bottom margin for smaller viewport */
+  }
+  
+
+}
+
+/* Preserve existing transaction container positioning */
+#bridgeTransactionsContainer {
+  position: relative;
+  z-index: 20;
+  margin-top: 40px;
+}
+
+/* Preserve existing frontend code link */
+.frontend-code-link {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  z-index: 25;
+  background: rgba(196, 237, 235, 0.9);
+  color: #003734;
+  text-decoration: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  border: 2px solid #38A8A3;
+  font-family: 'PPNeueMontreal-Book', monospace;
+  font-size: 12px;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.frontend-code-link:hover {
+  background: rgba(56, 168, 163, 0.9);
+  color: #eefffb;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(56, 168, 163, 0.4);
+}
+
+/* TRB Price Tooltip Styles */
+.trb-price-tooltip {
+  position: fixed;
+  background-color: #d4d8e3;
+  padding: 5px 10px;
+  border-radius: 5px;
+  border: 1px solid black;
+  font-size: 14px;
+  color: #083b44;
+  font-family: 'PPNeueMontreal-Book', Arial, sans-serif;
+  z-index: 1000;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  transition: opacity 0.1s ease-out;
+}
+
+/* Ensure tooltip is completely hidden when not visible */
+.trb-price-tooltip[style*="display: none"],
+.trb-price-tooltip[style*="visibility: hidden"] {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: scale(0.95) !important;
+}
+
+
