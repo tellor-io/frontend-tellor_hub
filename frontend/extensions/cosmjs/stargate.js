@@ -307,6 +307,71 @@
                         
                         console.log('Encoding MsgNoStakeReport:', msgValue);
                         encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
+                    } else if (message.typeUrl === '/layer.dispute.MsgProposeDispute') {
+                        // Encode dispute proposal message
+                        const MsgProposeDispute = new protobuf.Type("MsgProposeDispute")
+                            .add(new protobuf.Field("creator", 1, "string"))
+                            .add(new protobuf.Field("disputedReporter", 2, "string"))
+                            .add(new protobuf.Field("reportMetaId", 3, "uint64"))
+                            .add(new protobuf.Field("reportQueryId", 4, "string"))
+                            .add(new protobuf.Field("disputeCategory", 5, "uint32"))
+                            .add(new protobuf.Field("fee", 6, "Coin"))
+                            .add(new protobuf.Field("payFromBond", 7, "bool"));
+                        
+                        root.add(MsgProposeDispute);
+                        const MsgType = root.lookupType("MsgProposeDispute");
+                        
+                        const msgValue = {
+                            creator: message.value.creator,
+                            disputedReporter: message.value.disputedReporter,
+                            reportMetaId: message.value.reportMetaId,
+                            reportQueryId: message.value.reportQueryId,
+                            disputeCategory: message.value.disputeCategory,
+                            fee: message.value.fee,
+                            payFromBond: message.value.payFromBond
+                        };
+                        
+                        console.log('Encoding MsgProposeDispute:', msgValue);
+                        encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
+                    } else if (message.typeUrl === '/layer.dispute.MsgVote') {
+                        // Encode dispute vote message
+                        const MsgVote = new protobuf.Type("MsgVote")
+                            .add(new protobuf.Field("voter", 1, "string"))
+                            .add(new protobuf.Field("id", 2, "uint64"))
+                            .add(new protobuf.Field("vote", 3, "uint32"));  // Changed from "string" to "uint32"
+                        
+                        root.add(MsgVote);
+                        const MsgType = root.lookupType("MsgVote");
+                        
+                        const msgValue = {
+                            voter: message.value.voter,
+                            id: message.value.id,
+                            vote: message.value.vote
+                        };
+                        
+                        console.log('Encoding MsgVote:', msgValue);
+                        console.log('Vote field type:', typeof msgValue.vote, 'Value:', msgValue.vote);
+                        encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
+                    } else if (message.typeUrl === '/layer.dispute.MsgAddFeeToDispute') {
+                        // Encode dispute add fee message
+                        const MsgAddFeeToDispute = new protobuf.Type("MsgAddFeeToDispute")
+                            .add(new protobuf.Field("creator", 1, "string"))
+                            .add(new protobuf.Field("disputeId", 2, "uint64"))
+                            .add(new protobuf.Field("amount", 3, "Coin"))
+                            .add(new protobuf.Field("payFromBond", 4, "bool"));
+                        
+                        root.add(MsgAddFeeToDispute);
+                        const MsgType = root.lookupType("MsgAddFeeToDispute");
+                        
+                        const msgValue = {
+                            creator: message.value.creator,
+                            disputeId: message.value.disputeId,
+                            amount: message.value.amount,
+                            payFromBond: message.value.payFromBond
+                        };
+                        
+                        console.log('Encoding MsgAddFeeToDispute:', msgValue);
+                        encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else {
                         throw new Error(`Unsupported message type: ${message.typeUrl}`);
                     }

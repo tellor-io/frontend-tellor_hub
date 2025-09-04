@@ -202,8 +202,15 @@ class NoStakeReporter {
                 throw new Error('Wallet not connected.');
             }
 
-            // Use the existing balance fetching logic
-            const response = await fetch(`https://node-palmito.tellorlayer.com/cosmos/bank/v1beta1/balances/${this.currentAddress}`);
+            // Use the same network logic as submitNoStakeReport
+            let rpcEndpoint;
+            if (window.App && window.App.cosmosChainId === 'tellor-1') {
+                rpcEndpoint = 'https://mainnet.tellorlayer.com';
+            } else {
+                rpcEndpoint = 'https://node-palmito.tellorlayer.com';
+            }
+
+            const response = await fetch(`${rpcEndpoint}/cosmos/bank/v1beta1/balances/${this.currentAddress}`);
             
             if (!response.ok) {
                 throw new Error(`Failed to fetch balance: ${response.status}`);

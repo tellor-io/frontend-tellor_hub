@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Test Vote Conversion</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-4">
+  <div class="max-w-2xl mx-auto">
+    <h1 class="text-2xl font-bold mb-4">Test Vote Conversion</h1>
+    
+    <div class="bg-white p-6 rounded-lg shadow">
+      <h2 class="text-lg font-semibold mb-4">Vote Choice to Enum Conversion</h2>
+      
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-2">Vote Choice:</label>
+        <select id="voteChoice" class="w-full p-2 border rounded">
+          <option value="vote-support">Support</option>
+          <option value="vote-against">Against</option>
+          <option value="vote-invalid">Invalid</option>
+        </select>
+      </div>
+      
+      <button id="testConversionBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+        Test Conversion
+      </button>
+      
+      <div id="testResult" class="mt-4 p-3 bg-gray-100 rounded"></div>
+    </div>
+  </div>
+
+  <script src="./extensions/jquery.min.js"></script>
+  <script src="./extensions/cosmjs/proto.js"></script>
+  
+  <script>
+    // Test vote conversion
+    function testVoteConversion() {
+      const resultDiv = document.getElementById('testResult');
+      const voteChoice = document.getElementById('voteChoice').value;
+      
+      try {
+        if (!window.layerProto || !window.layerProto.convertVoteChoiceToEnum) {
+          throw new Error('layerProto.convertVoteChoiceToEnum not available');
+        }
+        
+        const voteEnum = window.layerProto.convertVoteChoiceToEnum(voteChoice);
+        
+        // Test creating a MsgVote message
+        const msg = window.layerProto.createMsgVote('tellor1test123456789012345678901234567890', 1, voteChoice);
+        
+        resultDiv.innerHTML = `
+          <h3 class="font-semibold text-green-600">Success!</h3>
+          <p><strong>Vote Choice:</strong> ${voteChoice}</p>
+          <p><strong>Enum Value:</strong> ${voteEnum}</p>
+          <p><strong>Message Type URL:</strong> ${msg.typeUrl}</p>
+          <p><strong>Message Value:</strong></p>
+          <pre class="text-sm bg-gray-200 p-2 rounded mt-2">${JSON.stringify(msg.value, null, 2)}</pre>
+        `;
+        
+        console.log('Vote conversion test:', {
+          voteChoice,
+          voteEnum,
+          message: msg
+        });
+        
+      } catch (error) {
+        console.error('Test failed:', error);
+        resultDiv.innerHTML = `
+          <h3 class="font-semibold text-red-600">Error</h3>
+          <p>${error.message}</p>
+        `;
+      }
+    }
+    
+    // Test all vote choices
+    function testAllVoteChoices() {
+      const resultDiv = document.getElementById('testResult');
+      const voteChoices = ['vote-support', 'vote-against', 'vote-invalid'];
+      
+      try {
+        if (!window.layerProto || !window.layerProto.convertVoteChoiceToEnum) {
+          throw new Error('layerProto.convertVoteChoiceToEnum not available');
+        }
+        
+        const results = voteChoices.map(choice => ({
+          voteChoice: choice,
+          enumValue: window.layerProto.convertVoteChoiceToEnum(choice)
+        }));
+        
+        resultDiv.innerHTML = `
+          <h3 class="font-semibold text-green-600">All Vote Choices Test</h3>
+          <div class="space-y-2">
+            ${results.map(result => `
+              <div class="bg-gray-200 p-2 rounded">
+                <strong>${result.voteChoice}:</strong> ${result.enumValue}
+              </div>
+            `).join('')}
+          </div>
+        `;
+        
+        console.log('All vote choices test:', results);
+        
+      } catch (error) {
+        console.error('Test failed:', error);
+        resultDiv.innerHTML = `
+          <h3 class="font-semibold text-red-600">Error</h3>
+          <p>${error.message}</p>
+        `;
+      }
+    }
+    
+    // Event listeners
+    document.getElementById('testConversionBtn').addEventListener('click', testVoteConversion);
+    
+    // Auto-test all vote choices when page loads
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        if (window.layerProto) {
+          testAllVoteChoices();
+        }
+      }, 500);
+    });
+  </script>
+</body>
+</html>

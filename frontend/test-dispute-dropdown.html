@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Test Dispute Dropdown</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="space-station.css">
+</head>
+<body class="p-4">
+  <div class="max-w-2xl mx-auto">
+    <h1 class="text-2xl font-bold mb-4">Test Dispute Dropdown</h1>
+    
+    <div class="bg-white p-6 rounded-lg shadow">
+      <h2 class="text-lg font-semibold mb-4">Vote on Dispute Tab</h2>
+      
+      <div class="input-with-label dispute-input-container">
+        <span class="input-label">Dispute ID</span>
+        <select class="dispute-input" id="voteDisputeId">
+          <option value="">Select a dispute</option>
+        </select>
+        <button type="button" class="refresh-btn" onclick="testLoadOpenDisputes()" title="Refresh open disputes">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 4v6h6"></path>
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="input-with-label dispute-input-container mt-4">
+        <span class="input-label">Vote Choice</span>
+        <select class="dispute-input" id="voteChoice">
+          <option value="">Select vote</option>
+          <option value="vote-support">Support</option>
+          <option value="vote-against">Against</option>
+          <option value="vote-invalid">Invalid</option>
+        </select>
+      </div>
+      
+      <button id="testLoadBtn" class="button-style-3 mt-4" onclick="testLoadOpenDisputes()">Load Open Disputes</button>
+      <button id="testWalletEventBtn" class="button-style-3 mt-4 ml-2" onclick="testWalletConnectionEvent()">Test Wallet Event</button>
+      
+      <div id="testResult" class="mt-4 p-3 bg-gray-100 rounded"></div>
+    </div>
+  </div>
+
+  <script src="./extensions/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.10.0/web3.min.js"></script>
+  
+  <script type="module">
+    // Load required modules
+    import('./js/dispute.js').then(() => {
+      console.log('Dispute module loaded');
+    }).catch(error => {
+      console.error('Failed to load dispute module:', error);
+    });
+    
+    import('./app.js').then(() => {
+      console.log('App module loaded');
+    }).catch(error => {
+      console.error('Failed to load app module:', error);
+    });
+  </script>
+  
+  <script>
+    // Test function to load open disputes
+    async function testLoadOpenDisputes() {
+      const resultDiv = document.getElementById('testResult');
+      resultDiv.innerHTML = 'Loading open disputes...';
+      
+      try {
+        if (!window.App || !window.App.loadOpenDisputes) {
+          throw new Error('App.loadOpenDisputes not available');
+        }
+        
+        await window.App.loadOpenDisputes();
+        
+        const select = document.getElementById('voteDisputeId');
+        const options = Array.from(select.options).map(opt => opt.textContent);
+        
+        resultDiv.innerHTML = `
+          <h3 class="font-semibold">Success!</h3>
+          <p>Dropdown options: ${options.join(', ')}</p>
+          <p>Total options: ${select.options.length}</p>
+        `;
+      } catch (error) {
+        console.error('Test failed:', error);
+        resultDiv.innerHTML = `
+          <h3 class="font-semibold text-red-600">Error</h3>
+          <p>${error.message}</p>
+        `;
+      }
+    }
+    
+    // Test wallet connection event
+    function testWalletConnectionEvent() {
+      const resultDiv = document.getElementById('testResult');
+      resultDiv.innerHTML = 'Testing wallet connection event...';
+      
+      // Simulate wallet connection
+      document.dispatchEvent(new CustomEvent('walletConnected'));
+      
+      setTimeout(() => {
+        const select = document.getElementById('voteDisputeId');
+        const options = Array.from(select.options).map(opt => opt.textContent);
+        
+        resultDiv.innerHTML = `
+          <h3 class="font-semibold">Wallet Connection Event Test</h3>
+          <p>Dropdown options after event: ${options.join(', ')}</p>
+          <p>Total options: ${select.options.length}</p>
+        `;
+      }, 1000);
+    }
+    
+    // Auto-load when page loads
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        if (window.App && window.App.loadOpenDisputes) {
+          testLoadOpenDisputes();
+        }
+      }, 1000);
+    });
+  </script>
+</body>
+</html>

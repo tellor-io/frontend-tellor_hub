@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tellor Hub - Space Station</title>
+    <title>Tellor Hub</title>
     <link rel="stylesheet" href="main.css" />
     <link rel="stylesheet" href="space-station.css" />
     <link rel="icon" type="image/x-icon" href="/drkgrnswsh.png">
@@ -87,9 +87,9 @@
       <div class="hub-only-state" id="hubOnlyState">
         <!-- Central Hub -->
         <div class="central-hub">
-          <div class="hub-core">
-            <img src="drkgrnswsh.png" alt="Dark Green Swoosh Hub" class="hub-logo">
-          </div>
+          <a href="https://explorer.tellor.io" target="_blank" class="hub-core">
+            <img src="glwgrnswsh.png" alt="Dark Green Swoosh Hub" class="hub-logo">
+          </a>
         </div>
 
         <!-- Orbiting Pods -->
@@ -101,28 +101,35 @@
           <!-- Bridge to Layer Pod -->
           <div class="orbiting-pod" data-function="bridgeToLayer">
             <div class="pod-content">
-              <img src="finales_bridge_tellor.png" alt="Bridge to Layer" class="pod-icon">
+              <img src="Orb_Bridge_Tellor.png" alt="Bridge to Layer" class="pod-icon">
             </div>
           </div>
 
           <!-- Bridge to Ethereum Pod -->
           <div class="orbiting-pod" data-function="bridgeToEth">
             <div class="pod-content">
-              <img src="finales_bridge_eth.png" alt="Bridge to Ethereum" class="pod-icon">
+              <img src="Orb_Bridge_Eth.png" alt="Bridge to Ethereum" class="pod-icon">
             </div>
           </div>
 
           <!-- Delegate Pod -->
           <div class="orbiting-pod" data-function="delegate">
             <div class="pod-content">
-              <img src="finales_delegate.png" alt="Delegate" class="pod-icon">
+              <img src="Orb_Delegate.png" alt="Delegate" class="pod-icon">
             </div>
           </div>
 
           <!-- No-Stake Report Pod -->
           <div class="orbiting-pod" data-function="noStakeReport">
             <div class="pod-content">
-              <img src="finales_report.png" alt="Report" class="pod-icon">
+              <img src="Orb_Report.png" alt="Report" class="pod-icon">
+            </div>
+          </div>
+
+          <!-- Dispute Pod -->
+          <div class="orbiting-pod" data-function="dispute">
+            <div class="pod-content">
+              <img src="Orb_Dispute.png" alt="Dispute" class="pod-icon">
             </div>
           </div>
         </div>
@@ -158,6 +165,11 @@
             <div class="nav-option" data-function="noStakeReport">
               <img class="nav-option-icon"src="./symbol_report.png" alt="Bridge to Ethereum"/>
               <div class="nav-option-title">No-Stake Report</div>
+            </div>
+            
+            <div class="nav-option" data-function="dispute">
+              <img class="nav-option-icon"src="./symbol_dispute.png" alt="Dispute"/>
+              <div class="nav-option-title">Propose Dispute</div>
             </div>
           </div>
         </div>
@@ -306,6 +318,180 @@
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Dispute Section -->
+            <div id="disputeSection" class="function-section">
+              <div class="section-header">
+                <h2>Dispute Management</h2>
+                <p class="section-description">Propose disputes and vote on existing disputes</p>
+              </div>
+              
+              <!-- Tab Navigation -->
+              <div class="dispute-tabs">
+                <button class="dispute-tab-btn active" onclick="switchDisputeTab('proposeDisputeTab')">Propose Dispute</button>
+                <button class="dispute-tab-btn" onclick="switchDisputeTab('addFeeDisputeTab')">Add Fee</button>
+                <button class="dispute-tab-btn" onclick="switchDisputeTab('voteDisputeTab')">Vote on Dispute</button>
+                <button class="dispute-tab-btn" onclick="switchDisputeTab('queryDisputeTab')">Query Dispute</button>
+              </div>
+              
+              <!-- Propose Dispute Tab -->
+              <div class="dispute-tab-content active" id="proposeDisputeTab">
+                <h3 class="text-lg font-semibold mb-4">Propose New Dispute</h3>
+                <div class="wallet-disclaimer">*Please connect your Cosmos wallet*</div>
+                <div class="balance-info dispute-horizontal-layout">
+                  <div class="dispute-row">
+                    <div class="dispute-left-column">
+                      <div class="input-with-label dispute-input-container">
+                        <span class="input-label">Disputed Reporter Address</span>
+                        <input class="dispute-input" type="text" id="disputedReporter" placeholder="tellor1..." />
+                      </div>
+                      <div class="input-with-label dispute-input-container">
+                        <span class="input-label">Report Meta ID</span>
+                        <input class="dispute-input" type="text" id="reportMetaId" placeholder="Enter report meta ID" />
+                      </div>
+                      <div class="input-with-label dispute-input-container">
+                        <span class="input-label">Report Query ID</span>
+                        <input class="dispute-input" type="text" id="reportQueryId" placeholder="Enter report query ID" />
+                      </div>
+                      <div class="input-with-label dispute-input-container">
+                        <span class="input-label">Dispute Category</span>
+                        <select class="dispute-input" id="disputeCategory">
+                          <option value="warning">warning</option>
+                          <option value="minor">minor</option>
+                          <option value="major">major</option>
+                        </select>
+                      </div>
+                      <div class="input-with-label dispute-input-container">
+                        <span class="input-label">Fee (loya)</span>
+                        <input class="dispute-input" type="text" id="disputeFee" placeholder="0" />
+                      </div>
+                      <div class="input-with-label dispute-checkbox-container">
+                        <label class="checkbox-label">
+                          <input type="checkbox" id="payFromBond" />
+                          <span class="checkbox-text">Pay from bond</span>
+                        </label>
+                      </div>
+                    </div>
+                    <div class="dispute-submit-container">
+                      <button id="proposeDisputeBtn" class="button-style-3" onclick="App.proposeDispute()">Propose Dispute</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Add Fee to Dispute Tab -->
+              <div class="dispute-tab-content" id="addFeeDisputeTab">
+                <h3 class="text-lg font-semibold mb-4">Add Fee to Dispute</h3>
+                <div class="wallet-disclaimer">*Please connect your Cosmos wallet*</div>
+                <div class="balance-info dispute-horizontal-layout">
+                  <div class="dispute-row">
+                    <div class="dispute-left-column">
+                      <div class="input-with-label dispute-input-container">
+                        <span class="input-label">Dispute ID</span>
+                        <input class="dispute-input" type="number" id="addFeeDisputeId" placeholder="Enter dispute ID" />
+                      </div>
+                      <div class="input-with-label dispute-input-container">
+                        <span class="input-label">Amount (TRB)</span>
+                        <input class="dispute-input" type="number" id="addFeeAmount" placeholder="Enter amount in TRB" step="0.000001" />
+                      </div>
+                      <div class="dispute-checkbox-container">
+                        <label class="checkbox-label">
+                          <input type="checkbox" id="addFeePayFromBond" />
+                          <span class="checkbox-text">Pay from bond</span>
+                        </label>
+                        <div class="help-text text-xs text-gray-500 mt-1">
+                          Check to pay from staked bond. Disputed reporters cannot use bond funds.
+                        </div>
+                      </div>
+                    </div>
+                    <div class="dispute-submit-container">
+                      <button id="addFeeDisputeBtn" class="button-style-3" onclick="App.addFeeToDispute()">Add Fee</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Vote on Dispute Tab -->
+              <div class="dispute-tab-content" id="voteDisputeTab">
+                <h3 class="text-lg font-semibold mb-4">Vote on Dispute</h3>
+                <div class="wallet-disclaimer">*Please connect your Cosmos wallet*</div>
+                <div class="balance-info dispute-horizontal-layout">
+                  <div id="votingPowerIndicator" class="voting-power-indicator" style="display: none;"></div>
+                  
+                  <div class="dispute-row">
+                    <div class="dispute-left-column">
+                      <div class="input-with-label dispute-input-container">
+                        <span class="input-label">Dispute ID</span>
+                        <select class="dispute-input" id="voteDisputeId">
+                          <option value="">Select a dispute</option>
+                        </select>
+                        <button type="button" class="refresh-btn" onclick="App.loadOpenDisputes()" title="Refresh open disputes">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M1 4v6h6"></path>
+                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                          </svg>
+                        </button>
+                      </div>
+                      <div class="input-with-label dispute-input-container">
+                        <span class="input-label">Vote Choice</span>
+                        <select class="dispute-input" id="voteChoice">
+                          <option value="">Select vote</option>
+                          <option value="vote-support">Support</option>
+                          <option value="vote-against">Against</option>
+                          <option value="vote-invalid">Invalid</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="dispute-submit-container">
+                      <button id="voteDisputeBtn" class="button-style-3" onclick="App.voteOnDispute()">Submit Vote</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Query Dispute Tab -->
+              <div class="dispute-tab-content" id="queryDisputeTab">
+                <div class="disputes-query-header">
+                  <h3 class="text-lg font-semibold mb-4">All Disputes</h3>
+                  <div class="disputes-controls">
+                    <button class="refresh-btn" onclick="App.loadAllDisputes()" title="Refresh disputes">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 4v6h6"></path>
+                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                      </svg>
+                    </button>
+                    <div id="disputesTotalCount" class="disputes-count"></div>
+                  </div>
+                </div>
+                
+                <div id="disputesLoading" class="disputes-loading" style="display: none;">
+                  Loading disputes...
+                </div>
+                
+                <div id="disputesError" class="disputes-error" style="display: none;"></div>
+                
+                <div id="disputesTable" class="disputes-table-container" style="display: none;">
+                  <table class="disputes-table">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Status</th>
+                        <th>Category</th>
+                        <th>Reporter</th>
+                        <th>Query ID</th>
+                        <th>Fees (TRB)</th>
+                        <th>Dates</th>
+                        <th>Block</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="disputesTableBody">
+                      <!-- Disputes will be populated here -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -512,6 +698,9 @@
               case 'noStakeReport':
                 sectionId = 'noStakeReportSection';
                 break;
+              case 'dispute':
+                sectionId = 'disputeSection';
+                break;
             }
             
             if (sectionId) {
@@ -524,7 +713,7 @@
               }
               
               // For relevant sections, check if there's a value and show tooltip if appropriate
-              if (functionType !== 'noStakeReport') {
+              if (functionType !== 'noStakeReport' && functionType !== 'dispute') {
                 setTimeout(() => {
                   if (window.App && window.App.currentBridgeDirection) {
                     const activeInput = window.App.currentBridgeDirection === 'layer' ? 
@@ -600,6 +789,9 @@
               case 'noStakeReport':
                 sectionId = 'noStakeReportSection';
                 break;
+              case 'dispute':
+                sectionId = 'disputeSection';
+                break;
             }
             
             if (sectionId) {
@@ -612,7 +804,7 @@
               }
               
               // For relevant sections, check if there's a value and show tooltip if appropriate
-              if (functionType !== 'noStakeReport') {
+              if (functionType !== 'noStakeReport' && functionType !== 'dispute') {
                 setTimeout(() => {
                   if (window.App && window.App.currentBridgeDirection) {
                     const activeInput = window.App.currentBridgeDirection === 'layer' ? 
@@ -896,8 +1088,77 @@
         
         // Start waiting for App
         waitForAppAndInitialize();
+
+        // Dispute tab switching function
+        function switchDisputeTab(tabId) {
+          // Hide all tab contents
+          document.querySelectorAll('.dispute-tab-content').forEach(tab => {
+            tab.classList.remove('active');
+          });
+          
+          // Remove active class from all tab buttons
+          document.querySelectorAll('.dispute-tab-btn').forEach(btn => {
+            btn.classList.remove('active');
+          });
+          
+          // Show selected tab content
+          document.getElementById(tabId).classList.add('active');
+          
+          // Add active class to clicked button
+          event.target.classList.add('active');
+        }
       });
     </script>
+
+    <!-- Global dispute tab switching function -->
+    <script>
+      // Global function for dispute tab switching
+      window.switchDisputeTab = function(tabId) {
+        // Hide all tab contents
+        document.querySelectorAll('.dispute-tab-content').forEach(tab => {
+          tab.classList.remove('active');
+        });
+        
+        // Remove active class from all tab buttons
+        document.querySelectorAll('.dispute-tab-btn').forEach(btn => {
+          btn.classList.remove('active');
+        });
+        
+        // Show selected tab content
+        document.getElementById(tabId).classList.add('active');
+        
+        // Add active class to clicked button
+        event.target.classList.add('active');
+        
+        // Auto-load open disputes and check voting power when Vote on Dispute tab is selected (only if wallet is connected)
+        if (tabId === 'voteDisputeTab') {
+          setTimeout(async () => {
+            // Check if wallet is connected before loading disputes
+            if (window.disputeProposer) {
+              const walletStatus = await window.disputeProposer.getWalletStatus();
+              if (walletStatus.isConnected) {
+                if (window.App && window.App.loadOpenDisputes) {
+                  window.App.loadOpenDisputes();
+                }
+                if (window.App && window.App.checkVotingPower) {
+                  window.App.checkVotingPower();
+                }
+              }
+            }
+          }, 100);
+        }
+        
+        // Auto-load all disputes when Query Dispute tab is selected (always try, will check wallet inside)
+        if (tabId === 'queryDisputeTab') {
+          setTimeout(() => {
+            if (window.App && window.App.loadAllDisputes) {
+              window.App.loadAllDisputes();
+            }
+          }, 100);
+        }
+      };
+    </script>
     <script src="./js/noStake.js"></script>
+    <script src="./js/dispute.js"></script>
   </body>
 </html>

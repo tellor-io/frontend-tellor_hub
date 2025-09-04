@@ -9,7 +9,7 @@
   position: relative;
   overflow: visible;
   margin-top: 40px; /* Reduced: just enough space for header logo */
-  margin-bottom: 60px; /* Reduced: just enough space for footer */
+  margin-bottom: 100px; /* Increased: ensure enough space for footer and content */
 }
 
 /* Hub Only State - Initial View */
@@ -29,11 +29,12 @@
   width: 100%;
   max-width: 100vw; /* Ensure it never exceeds viewport width */
   gap: 30px;
-  min-height: 80vh;
-  max-height: calc(100vh - 120px); /* Adjusted for reduced margins */
-  overflow-y: auto; /* Allow scrolling if content is too tall */
+  min-height: calc(100vh - 180px); /* Account for header and footer space */
+  max-height: none; /* Remove max-height to allow full expansion */
+  overflow-y: visible; /* Allow natural content flow */
   overflow-x: hidden; /* Prevent horizontal overflow */
   margin-top: 60px; /* Push down to avoid header overlap */
+  margin-bottom: 80px; /* Add bottom margin to prevent footer overlap */
   box-sizing: border-box;
   padding-right: 20px; /* Ensure right side doesn't overflow */
   padding-left: 20px; /* Ensure left side doesn't overflow */
@@ -63,6 +64,14 @@
   position: relative;
   padding: 0;
   box-sizing: border-box;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.hub-core:hover {
+  transform: scale(1.05);
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.4));
 }
 
 .hub-logo {
@@ -79,14 +88,29 @@
 /* Floating Pods Container */
 .orbit-container {
   position: absolute;
-  width: 720px;
-  height: 720px;
+  width: 800px;
+  height: 800px;
   top: 60%;
   left: 50%;
   transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Mobile orbit container sizing */
+@media (max-width: 768px) {
+  .orbit-container {
+    width: 600px;
+    height: 600px;
+  }
+}
+
+@media (max-width: 480px) {
+  .orbit-container {
+    width: 500px;
+    height: 500px;
+  }
 }
 
 /* Floating pods don't need pause functionality */
@@ -100,29 +124,80 @@
   transition: all 0.3s ease;
 }
 
-/* Position pods in a square around the hub - closer to center with proper spoke connections */
+/* Position pods in a true pentagram formation around the hub using mathematical positioning */
 .orbiting-pod[data-function="bridgeToLayer"] {
-  top: 60px;
-  left: 60px;
-  transform: none;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) translateY(-200px);
 }
 
 .orbiting-pod[data-function="bridgeToEth"] {
-  top: 60px;
-  right: 60px;
-  transform: none;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(72deg) translateY(-200px);
 }
 
 .orbiting-pod[data-function="delegate"] {
-  bottom: 60px;
-  right: 60px;
-  transform: none;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(144deg) translateY(-200px);
 }
 
 .orbiting-pod[data-function="noStakeReport"] {
-  bottom: 60px;
-  left: 60px;
-  transform: none;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(216deg) translateY(-200px);
+}
+
+.orbiting-pod[data-function="dispute"] {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(288deg) translateY(-200px);
+}
+
+/* Mobile pod positioning - bring them closer to center */
+@media (max-width: 768px) {
+  .orbiting-pod[data-function="bridgeToLayer"] {
+    transform: translate(-50%, -50%) translateY(-150px);
+  }
+
+  .orbiting-pod[data-function="bridgeToEth"] {
+    transform: translate(-50%, -50%) rotate(72deg) translateY(-150px);
+  }
+
+  .orbiting-pod[data-function="delegate"] {
+    transform: translate(-50%, -50%) rotate(144deg) translateY(-150px);
+  }
+
+  .orbiting-pod[data-function="noStakeReport"] {
+    transform: translate(-50%, -50%) rotate(216deg) translateY(-150px);
+  }
+
+  .orbiting-pod[data-function="dispute"] {
+    transform: translate(-50%, -50%) rotate(288deg) translateY(-150px);
+  }
+}
+
+@media (max-width: 480px) {
+  .orbiting-pod[data-function="bridgeToLayer"] {
+    transform: translate(-50%, -50%) translateY(-120px);
+  }
+
+  .orbiting-pod[data-function="bridgeToEth"] {
+    transform: translate(-50%, -50%) rotate(72deg) translateY(-120px);
+  }
+
+  .orbiting-pod[data-function="delegate"] {
+    transform: translate(-50%, -50%) rotate(144deg) translateY(-120px);
+  }
+
+  .orbiting-pod[data-function="noStakeReport"] {
+    transform: translate(-50%, -50%) rotate(216deg) translateY(-120px);
+  }
+
+  .orbiting-pod[data-function="dispute"] {
+    transform: translate(-50%, -50%) rotate(288deg) translateY(-120px);
+  }
 }
 
 /* Staggered floating animations for natural movement */
@@ -131,20 +206,89 @@
 }
 
 .orbiting-pod[data-function="bridgeToEth"] .pod-content {
-  animation-delay: -1.5s;
+  animation-delay: -1.2s;
 }
 
 .orbiting-pod[data-function="delegate"] .pod-content {
-  animation-delay: -3s;
+  animation-delay: -2.4s;
 }
 
 .orbiting-pod[data-function="noStakeReport"] .pod-content {
-  animation-delay: -4.5s;
+  animation-delay: -3.6s;
+}
+
+.orbiting-pod[data-function="dispute"] .pod-content {
+  animation-delay: -4.8s;
 }
 
 .orbiting-pod:hover {
-  transform: scale(1.1);
   z-index: 20;
+}
+
+/* Hover effects for each pod that maintain their pentagram position */
+.orbiting-pod[data-function="bridgeToLayer"]:hover {
+  transform: translate(-50%, -50%) translateY(-200px) scale(1.1);
+}
+
+.orbiting-pod[data-function="bridgeToEth"]:hover {
+  transform: translate(-50%, -50%) rotate(72deg) translateY(-200px) scale(1.1);
+}
+
+.orbiting-pod[data-function="delegate"]:hover {
+  transform: translate(-50%, -50%) rotate(144deg) translateY(-200px) scale(1.1);
+}
+
+.orbiting-pod[data-function="noStakeReport"]:hover {
+  transform: translate(-50%, -50%) rotate(216deg) translateY(-200px) scale(1.1);
+}
+
+.orbiting-pod[data-function="dispute"]:hover {
+  transform: translate(-50%, -50%) rotate(288deg) translateY(-200px) scale(1.1);
+}
+
+/* Mobile hover effects - maintain proper positioning */
+@media (max-width: 768px) {
+  .orbiting-pod[data-function="bridgeToLayer"]:hover {
+    transform: translate(-50%, -50%) translateY(-150px) scale(1.1);
+  }
+
+  .orbiting-pod[data-function="bridgeToEth"]:hover {
+    transform: translate(-50%, -50%) rotate(72deg) translateY(-150px) scale(1.1);
+  }
+
+  .orbiting-pod[data-function="delegate"]:hover {
+    transform: translate(-50%, -50%) rotate(144deg) translateY(-150px) scale(1.1);
+  }
+
+  .orbiting-pod[data-function="noStakeReport"]:hover {
+    transform: translate(-50%, -50%) rotate(216deg) translateY(-150px) scale(1.1);
+  }
+
+  .orbiting-pod[data-function="dispute"]:hover {
+    transform: translate(-50%, -50%) rotate(288deg) translateY(-150px) scale(1.1);
+  }
+}
+
+@media (max-width: 480px) {
+  .orbiting-pod[data-function="bridgeToLayer"]:hover {
+    transform: translate(-50%, -50%) translateY(-120px) scale(1.1);
+  }
+
+  .orbiting-pod[data-function="bridgeToEth"]:hover {
+    transform: translate(-50%, -50%) rotate(72deg) translateY(-120px) scale(1.1);
+  }
+
+  .orbiting-pod[data-function="delegate"]:hover {
+    transform: translate(-50%, -50%) rotate(144deg) translateY(-120px) scale(1.1);
+  }
+
+  .orbiting-pod[data-function="noStakeReport"]:hover {
+    transform: translate(-50%, -50%) rotate(216deg) translateY(-120px) scale(1.1);
+  }
+
+  .orbiting-pod[data-function="dispute"]:hover {
+    transform: translate(-50%, -50%) rotate(288deg) translateY(-120px) scale(1.1);
+  }
 }
 
 /* Hover effects removed for cleaner look */
@@ -167,9 +311,10 @@
 
 /* Ensure floating animation works properly */
 .orbiting-pod .pod-content {
-  animation: floatGently 6s ease-in-out infinite;
   transform-origin: center center;
 }
+
+
 
 @keyframes floatGently {
   0%, 100% {
@@ -180,61 +325,167 @@
   }
 }
 
-/* Connection circle removed for cleaner look */
-
-/* Two continuous diagonal lines connecting opposite pods through the hub */
-.spoke-line {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 3px;
-  height: 400px;
-  background: linear-gradient(to bottom, rgba(0, 55, 52, 0.8), rgba(0, 55, 52, 0.4));
-  transform-origin: center center;
-  z-index: -1;
+/* Static positioning for each pod to maintain upright orientation */
+@keyframes staticBridgeToLayer {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
 }
 
-.spoke-diagonal-1 {
-  transform: translate(-50%, -50%) rotate(45deg);
+@keyframes staticBridgeToEth {
+  0%, 100% {
+    transform: rotate(-72deg);
+  }
 }
 
-.spoke-diagonal-2 {
-  transform: translate(-50%, -50%) rotate(135deg);
+@keyframes staticDelegate {
+  0%, 100% {
+    transform: rotate(-144deg);
+  }
 }
 
-/* Individual spoke lines connecting hub center to each pod */
+@keyframes staticNoStakeReport {
+  0%, 100% {
+    transform: rotate(-216deg);
+  }
+}
+
+@keyframes staticDispute {
+  0%, 100% {
+    transform: rotate(-288deg);
+  }
+}
+
+/* Use static positioning to maintain upright orientation */
+.orbiting-pod[data-function="bridgeToLayer"] .pod-content {
+  animation: staticBridgeToLayer 1s ease-in-out infinite;
+}
+
+.orbiting-pod[data-function="bridgeToEth"] .pod-content {
+  animation: staticBridgeToEth 1s ease-in-out infinite;
+}
+
+.orbiting-pod[data-function="delegate"] .pod-content {
+  animation: staticDelegate 1s ease-in-out infinite;
+}
+
+.orbiting-pod[data-function="noStakeReport"] .pod-content {
+  animation: staticNoStakeReport 1s ease-in-out infinite;
+}
+
+.orbiting-pod[data-function="dispute"] .pod-content {
+  animation: staticDispute 1s ease-in-out infinite;
+}
+
+/* Hose Graphics - Connect each pod to the hub using absolute positioning */
 .orbiting-pod::after {
   content: '';
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 3px;
-  height: 120px;
-  background: linear-gradient(to bottom, rgba(0, 55, 52, 0.8), rgba(0, 55, 52, 0.4));
-  transform-origin: bottom center;
-  z-index: 1;
-  display: none;
+  width: 200px;
+  height: 8px;
+  background: linear-gradient(90deg, 
+    rgba(56, 168, 163, 0.8) 0%, 
+    rgb(9, 121, 106) 30%, 
+    rgba(56, 168, 163, 0.8) 70%, 
+    rgb(9, 255, 104) 100%);
+  border-radius: 4px;
+  transform-origin: left center;
+  z-index: -1;
+  box-shadow: 
+    0 0 10px rgba(56, 168, 163, 0.4),
+    inset 0 1px 2px rgba(255, 255, 255, 0.3);
+  animation: hoseGlow 3s ease-in-out infinite;
 }
 
+/* Position hoses for each pod to connect to hub center */
 .orbiting-pod[data-function="bridgeToLayer"]::after {
-  transform: translateX(-50%) rotate(45deg);
+  top: 140px;
+  left: 140px;
+  transform: rotate(90deg);
 }
 
 .orbiting-pod[data-function="bridgeToEth"]::after {
-  transform: translateX(-50%) rotate(135deg);
-}
-
-.orbiting-pod[data-function="delegate"]::after {
-  transform: translateX(-50%) rotate(225deg);
+  top: 140px;
+  left: 140px;
+  transform: rotate(90deg);
 }
 
 .orbiting-pod[data-function="noStakeReport"]::after {
-  transform: translateX(-50%) rotate(315deg);
+  top: 140px;
+  left: 140px;
+  transform: rotate(90deg);
 }
 
-.orbiting-pod:hover .pod-content {
-  /* Hover effect removed for cleaner look */
+.orbiting-pod[data-function="delegate"]::after {
+  top: 140px;
+  left: 140px;
+  transform: rotate(90deg);
 }
+
+.orbiting-pod[data-function="dispute"]::after {
+  top: 140px;
+  left: 140px;
+  transform: rotate(90deg);
+}
+
+/* Mobile hose positioning - adjust for closer pods */
+@media (max-width: 768px) {
+  .orbiting-pod::after {
+    width: 150px;
+    height: 6px;
+  }
+  
+  .orbiting-pod[data-function="bridgeToLayer"]::after,
+  .orbiting-pod[data-function="bridgeToEth"]::after,
+  .orbiting-pod[data-function="noStakeReport"]::after,
+  .orbiting-pod[data-function="delegate"]::after,
+  .orbiting-pod[data-function="dispute"]::after {
+    top: 120px;
+    left: 120px;
+  }
+}
+
+@media (max-width: 480px) {
+  .orbiting-pod::after {
+    width: 120px;
+    height: 5px;
+  }
+  
+  .orbiting-pod[data-function="bridgeToLayer"]::after,
+  .orbiting-pod[data-function="bridgeToEth"]::after,
+  .orbiting-pod[data-function="noStakeReport"]::after,
+  .orbiting-pod[data-function="delegate"]::after,
+  .orbiting-pod[data-function="dispute"]::after {
+    top: 100px;
+    left: 100px;
+  }
+}
+
+/* Connection circle removed for cleaner look */
+
+/* Main spoke lines are now handled by individual pod ::after pseudo-elements */
+
+/* Hose glow animation */
+@keyframes hoseGlow {
+  0%, 100% {
+    box-shadow: 
+      0 0 15px rgba(56, 168, 163, 0.6),
+      0 0 25px rgba(9, 121, 106, 0.4),
+      inset 0 1px 3px rgb(4, 239, 94);
+  }
+  50% {
+    box-shadow: 
+      0 0 30px rgba(136, 255, 236, 0.8),
+      0 0 45px rgba(9, 255, 104, 0.6),
+      inset 0 1px 4px rgba(255, 255, 255, 0.6);
+  }
+}
+
+
+
+
+
+/* Hover effect removed for cleaner look */
 
 .pod-icon {
   font-size: 32px;
@@ -279,6 +530,29 @@
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
 
+/* Mobile logo positioning fixes */
+@media (max-width: 768px) {
+  .top-left {
+    top: 10px;
+    left: 10px;
+  }
+  
+  .top-left-logo {
+    width: 200px;
+  }
+}
+
+@media (max-width: 480px) {
+  .top-left {
+    top: 5px;
+    left: 5px;
+  }
+  
+  .top-left-logo {
+    width: 150px;
+  }
+}
+
 /* Side Navigation Menu */
 .side-nav-menu {
   width: 250px;
@@ -290,7 +564,10 @@
     0 10px 30px rgba(0, 55, 52, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);
-  height: fit-content;
+  min-height: fit-content; /* Allow natural content height */
+  max-height: calc(100vh - 120px); /* Match function container height for visual consistency */
+  overflow-y: auto; /* Allow scrolling only if absolutely necessary */
+  overflow-x: hidden; /* Prevent horizontal overflow */
   position: relative; /* Remove sticky positioning to flow naturally */
   margin-top: 0; /* Remove any top margin */
 }
@@ -393,21 +670,27 @@
     0 10px 30px rgba(0, 55, 52, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);
-  height: calc(100vh - 165px); /* Fixed height to align with side-nav-menu */
+  height: calc(100vh - 120px); /* Maximize height for dispute module content */
+  max-height: calc(100vh - 120px); /* Use almost full viewport height */
   margin-top: 0; /* Remove top margin since function-display-area handles spacing */
+  margin-bottom: 0; /* Remove bottom margin since we're using fixed height */
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  overflow: hidden; /* Prevent content from overflowing */
-  overflow-x: hidden; /* Specifically prevent horizontal overflow */
+  overflow-y: auto !important; /* Enable internal scrolling */
+  overflow-x: hidden !important; /* Prevent horizontal overflow */
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 10; /* Ensure function container stays above frontend code link */
 }
 
 .function-section {
   display: none;
   opacity: 0;
   transition: all 0.5s ease;
+  overflow-y: auto !important; /* Allow vertical scrolling */
+  max-height: none !important; /* Remove height constraints */
 }
 
 .function-section.active {
@@ -458,11 +741,16 @@
     overflow-x: hidden !important; /* Force prevent horizontal overflow */
     max-width: 100vw !important; /* Force ensure container stays within viewport */
     width: 100vw !important; /* Force width to viewport */
+    margin-bottom: 120px !important; /* Increase bottom margin for mobile */
+    min-height: calc(100vh - 200px) !important; /* Adjust for mobile header/footer */
   }
   
   .side-nav-menu {
     width: 100%;
     position: static;
+    min-height: auto; /* Allow auto height on mobile */
+    max-height: none; /* Remove height restrictions on mobile */
+    overflow-y: visible; /* Allow natural flow on mobile */
   }
   
   .side-nav-options {
@@ -515,35 +803,31 @@
 @media (max-width: 768px) {
   .space-station-container {
     padding: 10px;
+    margin-top: 20px; /* Reduced top margin for mobile */
   }
   
   .hub-core {
-    width: 150px;
-    height: 150px;
+    width: 120px;
+    height: 120px;
   }
   
   .hub-logo {
-    max-width: 110px;
+    max-width: 100px;
   }
   
   .hub-subtitle {
     font-size: 14px;
   }
   
-  .orbit-container {
-    width: 600px;
-    height: 600px;
-  }
-  
   .orbiting-pod {
-    width: 240px;
-    height: 240px;
+    width: 200px;
+    height: 200px;
   }
   
   .pod-icon {
-    font-size: 24px;
-    width: 180px;
-    height: 180px;
+    font-size: 20px;
+    width: 150px;
+    height: 150px;
   }
   
   .pod-title {
@@ -586,33 +870,33 @@
 }
 
 @media (max-width: 480px) {
+  .space-station-container {
+    padding: 5px;
+    margin-top: 15px; /* Further reduced top margin for small mobile */
+  }
+  
   .hub-core {
-    width: 120px;
-    height: 120px;
+    width: 100px;
+    height: 100px;
   }
   
   .hub-logo {
-    max-width: 85px;
+    max-width: 80px;
   }
   
   .hub-subtitle {
     font-size: 12px;
   }
   
-  .orbit-container {
-    width: 480px;
-    height: 480px;
-  }
-  
   .orbiting-pod {
-    width: 200px;
-    height: 200px;
+    width: 160px;
+    height: 160px;
   }
   
   .pod-icon {
-    font-size: 20px;
-    width: 140px;
-    height: 140px;
+    font-size: 18px;
+    width: 120px;
+    height: 120px;
   }
   
   .pod-title {
@@ -987,9 +1271,19 @@
 
 /* Specific styling for no-stake reporting input labels */
 #noStakeReportSection .input-label {
-  height: 35px !important; /* Adjust this value as needed */
-  padding: 8px 4px !important; /* Adjust padding if needed */
-  margin-top: 0 !important; /* Remove top margin */
+  height: 40px !important; /* Match input height */
+  padding: 8px 12px !important; /* Match input padding */
+  margin: 0 !important; /* Remove all margins */
+  display: flex !important;
+  align-items: center !important; /* Vertically center text */
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #374151 !important;
+  background: none !important;
+  border-radius: 0 !important;
+  text-align: left !important;
+  min-width: auto !important;
+  line-height: 1.2 !important;
 }
 
 /* Hide empty wallet connection containers that cause spacing issues */
@@ -1020,6 +1314,607 @@
   left: -9999px !important;
   top: -9999px !important;
   z-index: -1 !important;
+}
+
+/* Dispute Form Layout */
+.dispute-horizontal-layout {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: fit-content !important; /* Ensure container fits content */
+}
+
+/* Ensure dispute section has proper height and scrolling */
+#disputeSection {
+  overflow-y: auto !important;
+  max-height: none !important;
+  min-height: fit-content !important;
+}
+
+#disputeSection .dispute-tab-content {
+  min-height: fit-content !important;
+  overflow: visible !important;
+}
+
+/* Ensure all dispute form fields are visible */
+#disputeSection .dispute-left-column {
+  gap: 20px !important; /* Increase gap between fields */
+  padding-bottom: 20px !important; /* Add bottom padding for last field */
+}
+
+/* Ensure the submit button is properly positioned */
+#disputeSection .dispute-submit-container {
+  padding-top: 60px !important; /* Increase top padding to align with form */
+  align-self: flex-start !important;
+}
+
+/* Add visual indicator for scrollable content */
+#disputeSection::after {
+  content: '';
+  display: block;
+  height: 20px;
+  background: linear-gradient(transparent, rgba(196, 237, 235, 0.3));
+  margin-top: 10px;
+  border-radius: 0 0 20px 20px;
+}
+
+/* Ensure the last field (pay from bond) is fully visible */
+#disputeSection .dispute-checkbox-container {
+  margin-bottom: 10px !important;
+  padding-bottom: 10px !important;
+}
+
+.dispute-row {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 20px !important;
+  align-items: flex-start !important;
+  width: 100% !important;
+}
+
+.dispute-left-column {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 15px !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+
+.dispute-input-container {
+  width: 100% !important;
+  min-width: 0 !important;
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0 !important; /* Remove gap to connect label and input */
+  margin-bottom: 16px !important;
+}
+
+.dispute-input {
+  width: 100% !important;
+  padding: 12px !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  box-sizing: border-box !important;
+  background-color: #ffffff !important;
+  transition: border-color 0.2s ease !important;
+  flex: 1 !important;
+}
+
+/* Dispute tab input labels - match input height and connect seamlessly */
+.dispute-input-container .input-label {
+  height: 48px !important; /* Match input height (12px padding * 2 + line height) */
+  padding: 12px !important; /* Match input padding */
+  margin: 0 !important; /* Remove all margins */
+  display: flex !important;
+  align-items: center !important; /* Vertically center text */
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #ffffff !important; /* White text for dark green background */
+  background: #003734 !important; /* Solid dark green background */
+  border: 1px solid #003734 !important; /* Matching dark green border */
+  border-right: none !important; /* Remove right border to connect with input */
+  border-radius: 8px 0 0 8px !important; /* Rounded left corners only */
+  text-align: left !important;
+  min-width: 120px !important; /* Consistent label width */
+  line-height: 1.2 !important;
+  flex-shrink: 0 !important; /* Prevent shrinking */
+  box-sizing: border-box !important;
+}
+
+/* Dispute tab inputs - connect with labels */
+.dispute-input-container .dispute-input,
+.dispute-input-container select,
+.dispute-input-container input[type="text"],
+.dispute-input-container input[type="number"] {
+  height: 48px !important; /* Match label height */
+  padding: 12px !important;
+  margin: 0 !important; /* Remove all margins */
+  border: 1px solid #e2e8f0 !important;
+  border-left: none !important; /* Remove left border to connect with label */
+  border-radius: 0 8px 8px 0 !important; /* Rounded right corners only */
+  background: white !important;
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+  flex-grow: 1 !important; /* Take remaining space */
+  box-sizing: border-box !important;
+}
+
+/* Special handling for containers with refresh buttons */
+.dispute-input-container:has(.refresh-btn) .dispute-input,
+.dispute-input-container:has(.refresh-btn) select {
+  border-radius: 0 !important; /* No right radius when button present */
+  border-right: none !important; /* No right border when button present */
+}
+
+/* Refresh button styling to connect seamlessly */
+.dispute-input-container .refresh-btn {
+  height: 48px !important; /* Match input and label height */
+  padding: 12px !important;
+  margin: 0 !important;
+  border: 1px solid #e2e8f0 !important;
+  border-left: none !important; /* Connect with input */
+  border-radius: 0 8px 8px 0 !important; /* Rounded right corners only */
+  background-color: #ffffff !important;
+  color: #64748b !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 48px !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.dispute-input-container .refresh-btn:hover {
+  background-color: #f1f5f9 !important;
+  color: #3b82f6 !important;
+  border-color: #3b82f6 !important;
+}
+
+/* Focus states for connected inputs */
+.dispute-input:focus,
+.dispute-input-container input:focus,
+.dispute-input-container select:focus {
+  outline: none !important;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Focus state for connected label when input is focused */
+.dispute-input-container input:focus + .input-label,
+.dispute-input-container select:focus + .input-label,
+.dispute-input-container:focus-within .input-label {
+  border-color: #3b82f6 !important;
+  background: #004d47 !important; /* Slightly lighter solid green on focus */
+}
+
+.dispute-input-container select.dispute-input {
+  cursor: pointer !important;
+}
+
+.refresh-btn {
+  padding: 8px !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 6px !important;
+  background-color: #ffffff !important;
+  color: #64748b !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 32px !important;
+  height: 32px !important;
+}
+
+.refresh-btn:hover {
+  background-color: #f1f5f9 !important;
+  color: #3b82f6 !important;
+  border-color: #3b82f6 !important;
+}
+
+.refresh-btn svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.voting-power-indicator {
+  width: 100% !important;
+  margin-bottom: 16px !important;
+}
+
+.voting-power-warning {
+  background: #fef3c7 !important;
+  border: 1px solid #f59e0b !important;
+  border-radius: 8px !important;
+  padding: 12px 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  font-size: 14px !important;
+  color: #92400e !important;
+}
+
+.warning-icon {
+  font-size: 16px !important;
+  flex-shrink: 0 !important;
+}
+
+.warning-text {
+  flex-grow: 1 !important;
+  line-height: 1.4 !important;
+}
+
+/* Disputes Table Styles */
+.disputes-query-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: 20px !important;
+}
+
+.disputes-controls {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+.disputes-count {
+  font-size: 14px !important;
+  color: #64748b !important;
+  font-weight: 500 !important;
+}
+
+.disputes-loading {
+  text-align: center !important;
+  padding: 40px !important;
+  color: #64748b !important;
+  font-size: 16px !important;
+}
+
+.disputes-error {
+  text-align: center !important;
+  padding: 20px !important;
+  background: #fef2f2 !important;
+  border: 1px solid #fecaca !important;
+  border-radius: 8px !important;
+  color: #dc2626 !important;
+  font-size: 14px !important;
+}
+
+.disputes-wallet-required {
+  text-align: center !important;
+  padding: 40px 20px !important;
+  background: #f0f9ff !important;
+  border: 1px solid #bae6fd !important;
+  border-radius: 8px !important;
+  color: #0369a1 !important;
+  font-size: 16px !important;
+}
+
+.wallet-connection-required {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+.connection-icon {
+  font-size: 32px !important;
+  opacity: 0.8 !important;
+}
+
+.connection-text {
+  font-weight: 500 !important;
+  line-height: 1.5 !important;
+}
+
+.disputes-table-container {
+  overflow-x: auto !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+  background: white !important;
+}
+
+.disputes-table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  font-size: 13px !important;
+}
+
+.disputes-table th {
+  background: #f8fafc !important;
+  padding: 12px 8px !important;
+  text-align: left !important;
+  font-weight: 600 !important;
+  color: #374151 !important;
+  border-bottom: 2px solid #e2e8f0 !important;
+  white-space: nowrap !important;
+}
+
+.disputes-table td {
+  padding: 10px 8px !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+  vertical-align: top !important;
+}
+
+.disputes-table tbody tr:hover {
+  background: #f8fafc !important;
+}
+
+.dispute-id {
+  font-weight: 600 !important;
+  color: #1e40af !important;
+}
+
+.dispute-status {
+  min-width: 120px !important;
+}
+
+.status-badge {
+  display: inline-block !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  margin-bottom: 4px !important;
+}
+
+.status-voting {
+  background: #dbeafe !important;
+  color: #1e40af !important;
+}
+
+.status-prevote {
+  background: #fef3c7 !important;
+  color: #d97706 !important;
+}
+
+.status-resolved {
+  background: #dcfce7 !important;
+  color: #16a34a !important;
+}
+
+.status-failed {
+  background: #fecaca !important;
+  color: #dc2626 !important;
+}
+
+.status-unknown {
+  background: #f1f5f9 !important;
+  color: #64748b !important;
+}
+
+.badge {
+  display: inline-block !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  font-size: 10px !important;
+  font-weight: 500 !important;
+}
+
+.badge-success {
+  background: #dcfce7 !important;
+  color: #16a34a !important;
+}
+
+.badge-secondary {
+  background: #f1f5f9 !important;
+  color: #64748b !important;
+}
+
+.dispute-reporter {
+  font-family: monospace !important;
+  font-size: 11px !important;
+  max-width: 100px !important;
+}
+
+.dispute-query {
+  font-family: monospace !important;
+  font-size: 11px !important;
+  max-width: 80px !important;
+  word-break: break-all !important;
+}
+
+.fee-info {
+  font-size: 11px !important;
+  line-height: 1.3 !important;
+}
+
+.fee-remaining {
+  font-weight: 600 !important;
+  color: #d97706 !important;
+}
+
+.dispute-dates {
+  font-size: 11px !important;
+  line-height: 1.3 !important;
+  min-width: 80px !important;
+}
+
+.dispute-block {
+  font-family: monospace !important;
+  font-size: 11px !important;
+}
+
+.btn-small {
+  padding: 4px 8px !important;
+  font-size: 11px !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 4px !important;
+  cursor: pointer !important;
+  font-weight: 500 !important;
+}
+
+.btn-vote {
+  background: #3b82f6 !important;
+}
+
+.btn-vote:hover {
+  background: #2563eb !important;
+}
+
+.btn-add-fee {
+  background: #16a34a !important;
+}
+
+.btn-add-fee:hover {
+  background: #15803d !important;
+}
+
+.status-text {
+  font-size: 11px !important;
+  color: #64748b !important;
+  font-weight: 500 !important;
+  text-transform: capitalize !important;
+}
+
+/* Dispute Tabs Styling */
+.dispute-tabs {
+  display: flex !important;
+  gap: 2px !important;
+  margin-bottom: 24px !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+.dispute-tab-btn {
+  flex: 1 !important;
+  padding: 12px 16px !important;
+  background: #f8fafc !important;
+  border: none !important;
+  color: #64748b !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  text-align: center !important;
+  border-right: 1px solid #e2e8f0 !important;
+}
+
+.dispute-tab-btn:last-child {
+  border-right: none !important;
+}
+
+.dispute-tab-btn:hover {
+  background: #f1f5f9 !important;
+  color: #374151 !important;
+}
+
+.dispute-tab-btn.active {
+  background: #003734 !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+}
+
+.dispute-tab-btn.active:hover {
+  background: #004d47 !important;
+  color: #ffffff !important; /* Keep text white on hover */
+}
+
+.dispute-checkbox-container {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.checkbox-label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  cursor: pointer !important;
+  font-size: 14px !important;
+  color: #374151 !important;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px !important;
+  height: 16px !important;
+  cursor: pointer !important;
+}
+
+.checkbox-text {
+  user-select: none !important;
+}
+
+.dispute-submit-container {
+  flex: 0 0 auto !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  padding-top: 45px !important;
+}
+
+.dispute-submit-container .button-style-3 {
+  white-space: nowrap !important;
+  min-width: fit-content !important;
+}
+
+/* Dispute Tab Styling */
+.dispute-tabs {
+  display: flex !important;
+  gap: 10px !important;
+  margin-top: 20px !important;
+  border-bottom: 2px solid #e2e8f0 !important;
+  padding-bottom: 10px !important;
+}
+
+.dispute-tab-btn {
+  padding: 10px 20px !important;
+  border: none !important;
+  background-color: #f1f5f9 !important;
+  color: #64748b !important;
+  border-radius: 8px 8px 0 0 !important;
+  cursor: pointer !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+}
+
+.dispute-tab-btn:hover {
+  background-color: #e2e8f0 !important;
+  color: #475569 !important;
+}
+
+
+
+.dispute-tab-content {
+  display: none !important;
+  min-height: fit-content !important;
+}
+
+.dispute-tab-content.active {
+  display: block !important;
+  min-height: fit-content !important;
+  overflow: visible !important;
+}
+
+/* Query result styling */
+#disputeQueryResult {
+  margin-top: 20px !important;
+  padding: 15px !important;
+  background-color: #f8fafc !important;
+  border-radius: 8px !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+#disputeQueryResult h3,
+#disputeQueryResult h4 {
+  color: #1e293b !important;
+  margin-bottom: 10px !important;
+}
+
+#disputeQueryResult pre {
+  background-color: #f1f5f9 !important;
+  padding: 10px !important;
+  border-radius: 4px !important;
+  overflow-x: auto !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
 }
 
 /* Universal button hover effects - consistent across all buttons */
@@ -1359,10 +2254,10 @@
 
 /* Preserve existing frontend code link */
 .frontend-code-link {
-  position: absolute;
+  position: fixed;
   bottom: 20px;
   right: 20px;
-  z-index: 25;
+  z-index: 5; /* Lower z-index to stay behind function containers */
   background: rgba(196, 237, 235, 0.9);
   color: #003734;
   text-decoration: none;
@@ -1373,6 +2268,12 @@
   font-size: 12px;
   transition: all 0.3s ease;
   backdrop-filter: blur(10px);
+}
+
+/* Hide frontend code link when function focus state is active */
+.function-focus-state .frontend-code-link,
+body:has(.function-focus-state) .frontend-code-link {
+  display: none !important;
 }
 
 .frontend-code-link:hover {
