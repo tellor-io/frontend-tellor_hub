@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Test Vote Encoding Fix</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-4">
+  <div class="max-w-2xl mx-auto">
+    <h1 class="text-2xl font-bold mb-4">Test Vote Encoding Fix</h1>
+    
+    <div class="bg-white p-6 rounded-lg shadow">
+      <h2 class="text-lg font-semibold mb-4">Vote Message Encoding Test</h2>
+      
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-2">Vote Choice:</label>
+        <select id="voteChoice" class="w-full p-2 border rounded">
+          <option value="vote-support">Support</option>
+          <option value="vote-against">Against</option>
+          <option value="vote-invalid">Invalid</option>
+        </select>
+      </div>
+      
+      <button id="testEncodingBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+        Test Encoding
+      </button>
+      
+      <div id="testResult" class="mt-4 p-3 bg-gray-100 rounded"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/protobufjs@7.2.4/dist/protobuf.min.js"></script>
+  <script src="./extensions/cosmjs/proto.js"></script>
+  
+  <script>
+    // Test vote encoding
+    function testVoteEncoding() {
+      const resultDiv = document.getElementById('testResult');
+      const voteChoice = document.getElementById('voteChoice').value;
+      
+      try {
+        if (!window.layerProto || !window.layerProto.convertVoteChoiceToEnum) {
+          throw new Error('layerProto.convertVoteChoiceToEnum not available');
+        }
+        
+        // Convert vote choice to enum
+        const voteEnum = window.layerProto.convertVoteChoiceToEnum(voteChoice);
+        
+        // Create message
+        const msg = window.layerProto.createMsgVote('tellor1test123456789012345678901234567890', 1, voteChoice);
+        
+        // Test protobuf encoding manually
+        const root = new protobuf.Root();
+        const MsgVote = new protobuf.Type("MsgVote")
+            .add(new protobuf.Field("voter", 1, "string"))
+            .add(new protobuf.Field("id", 2, "uint64"))
+            .add(new protobuf.Field("vote", 3, "uint32"));  // Using uint32 as fixed
+        
+        root.add(MsgVote);
+        const MsgType = root.lookupType("MsgVote");
+        
+        const msgValue = {
+            voter: msg.value.voter,
+            id: msg.value.id,
+            vote: msg.value.vote
+        };
+        
+        console.log('Testing vote encoding:', {
+            originalChoice: voteChoice,
+            enumValue: voteEnum,
+            messageValue: msgValue,
+            voteFieldType: typeof msgValue.vote
+        });
+        
+        // Try to encode
+        const encoded = MsgType.encode(MsgType.create(msgValue)).finish();
+        
+        resultDiv.innerHTML = `
+          <h3 class="font-semibold text-green-600">Success!</h3>
+          <p><strong>Original Vote Choice:</strong> ${voteChoice}</p>
+          <p><strong>Enum Value:</strong> ${voteEnum}</p>
+          <p><strong>Vote Field Type:</strong> ${typeof msgValue.vote}</p>
+          <p><strong>Encoded Length:</strong> ${encoded.length} bytes</p>
+          <p><strong>Message Value:</strong></p>
+          <pre class="text-sm bg-gray-200 p-2 rounded mt-2">${JSON.stringify(msgValue, null, 2)}</pre>
+        `;
+        
+      } catch (error) {
+        console.error('Test failed:', error);
+        resultDiv.innerHTML = `
+          <h3 class="font-semibold text-red-600">Error</h3>
+          <p>${error.message}</p>
+        `;
+      }
+    }
+    
+    // Event listeners
+    document.getElementById('testEncodingBtn').addEventListener('click', testVoteEncoding);
+    
+    // Auto-test when page loads
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        if (window.layerProto) {
+          testVoteEncoding();
+        }
+      }, 500);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Voting Power Validation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 300px;
+            margin: 5px;
+        }
+        .voting-power-warning {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #92400e;
+            margin: 10px 0;
+        }
+        .warning-icon {
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        .warning-text {
+            flex-grow: 1;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Voting Power Validation Test</h1>
+        
+        <div class="test-section">
+            <h3>Manual Address Test</h3>
+            <p>Test voting power for any address:</p>
+            <input type="text" id="testAddress" placeholder="Enter tellor address..." />
+            <button onclick="testVotingPowerForAddress()">Check Voting Power</button>
+            <div id="manualTestResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Connected Wallet Test</h3>
+            <p>Test voting power for currently connected wallet:</p>
+            <button onclick="testConnectedWalletPower()">Check Connected Wallet Power</button>
+            <div id="connectedWalletResult" class="result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>UI Indicator Test</h3>
+            <p>Test the voting power UI indicator:</p>
+            <button onclick="simulateNoVotingPower()">Simulate No Voting Power</button>
+            <button onclick="simulateVotingPower()">Simulate Has Voting Power</button>
+            <div id="votingPowerIndicator" class="voting-power-indicator" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>API Endpoint Tests</h3>
+            <button onclick="testTeamAddressEndpoint()">Test Team Address Endpoint</button>
+            <button onclick="testUserTipsEndpoint()">Test User Tips Endpoint</button>
+            <button onclick="testReportersEndpoint()">Test Reporters Endpoint</button>
+            <div id="endpointTestResults" class="result" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Load required scripts -->
+    <script src="./js/dispute.js"></script>
+    <script src="./js/walletAdapter.js"></script>
+    <script src="./js/walletModal.js"></script>
+
+    <script>
+        // Initialize dispute proposer
+        let disputeProposer;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                disputeProposer = new DisputeProposer();
+                console.log('DisputeProposer initialized for testing');
+            } catch (error) {
+                console.error('Failed to initialize DisputeProposer:', error);
+            }
+        });
+
+        async function testVotingPowerForAddress() {
+            const address = document.getElementById('testAddress').value.trim();
+            const resultDiv = document.getElementById('manualTestResult');
+            
+            if (!address) {
+                resultDiv.innerHTML = '<span style="color: red;">Please enter an address</span>';
+                resultDiv.style.display = 'block';
+                return;
+            }
+
+            if (!disputeProposer) {
+                resultDiv.innerHTML = '<span style="color: red;">DisputeProposer not initialized</span>';
+                resultDiv.style.display = 'block';
+                return;
+            }
+
+            resultDiv.innerHTML = 'Checking voting power...';
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result warning';
+
+            try {
+                // Temporarily set the address for testing
+                const originalAddress = disputeProposer.currentAddress;
+                disputeProposer.currentAddress = address;
+                
+                const result = await disputeProposer.checkVotingPower();
+                
+                // Restore original address
+                disputeProposer.currentAddress = originalAddress;
+                
+                const resultClass = result.hasVotingPower ? 'success' : 'error';
+                resultDiv.innerHTML = `
+                    <strong>Address:</strong> ${address}<br>
+                    <strong>Has Voting Power:</strong> ${result.hasVotingPower}<br>
+                    <strong>Reason:</strong> ${result.reason}<br>
+                    <strong>Details:</strong> ${result.details}
+                `;
+                resultDiv.className = `result ${resultClass}`;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function testConnectedWalletPower() {
+            const resultDiv = document.getElementById('connectedWalletResult');
+            
+            if (!disputeProposer) {
+                resultDiv.innerHTML = '<span style="color: red;">DisputeProposer not initialized</span>';
+                resultDiv.style.display = 'block';
+                return;
+            }
+
+            resultDiv.innerHTML = 'Checking connected wallet voting power...';
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result warning';
+
+            try {
+                const walletStatus = await disputeProposer.getWalletStatus();
+                if (!walletStatus.isConnected) {
+                    resultDiv.innerHTML = '<span style="color: orange;">No wallet connected. Please connect your wallet first.</span>';
+                    resultDiv.className = 'result warning';
+                    return;
+                }
+
+                const result = await disputeProposer.checkVotingPower();
+                
+                const resultClass = result.hasVotingPower ? 'success' : 'error';
+                resultDiv.innerHTML = `
+                    <strong>Connected Address:</strong> ${walletStatus.address}<br>
+                    <strong>Has Voting Power:</strong> ${result.hasVotingPower}<br>
+                    <strong>Reason:</strong> ${result.reason}<br>
+                    <strong>Details:</strong> ${result.details}
+                `;
+                resultDiv.className = `result ${resultClass}`;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        function simulateNoVotingPower() {
+            const indicator = document.getElementById('votingPowerIndicator');
+            indicator.innerHTML = `
+                <div class="voting-power-warning">
+                    <span class="warning-icon">⚠️</span>
+                    <span class="warning-text">No Voting Power: Address does not meet any voting power requirements (team address, sufficient tips, or unjailed reporter)</span>
+                </div>
+            `;
+            indicator.style.display = 'block';
+        }
+
+        function simulateVotingPower() {
+            const indicator = document.getElementById('votingPowerIndicator');
+            indicator.style.display = 'none';
+        }
+
+        async function testTeamAddressEndpoint() {
+            const resultDiv = document.getElementById('endpointTestResults');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Testing team address endpoint...';
+            resultDiv.className = 'result warning';
+
+            try {
+                const rpcEndpoint = 'https://node-palmito.tellorlayer.com';
+                const response = await fetch(`${rpcEndpoint}/tellor-io/layer/dispute/team-address`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `
+                        <strong>Team Address Endpoint:</strong> ✅ Success<br>
+                        <strong>Response:</strong> ${JSON.stringify(data, null, 2)}
+                    `;
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.innerHTML = `
+                        <strong>Team Address Endpoint:</strong> ❌ Failed<br>
+                        <strong>Status:</strong> ${response.status}<br>
+                        <strong>Status Text:</strong> ${response.statusText}
+                    `;
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <strong>Team Address Endpoint:</strong> ❌ Error<br>
+                    <strong>Error:</strong> ${error.message}
+                `;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function testUserTipsEndpoint() {
+            const resultDiv = document.getElementById('endpointTestResults');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Testing user tips endpoint...';
+            resultDiv.className = 'result warning';
+
+            try {
+                const rpcEndpoint = 'https://node-palmito.tellorlayer.com';
+                const testAddress = 'tellor1072q49v0sacgmlq4hkwzhryz5zefgl73jg5493'; // Example address
+                const response = await fetch(`${rpcEndpoint}/tellor-io/layer/oracle/get_user_tip_total/${testAddress}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `
+                        <strong>User Tips Endpoint:</strong> ✅ Success<br>
+                        <strong>Test Address:</strong> ${testAddress}<br>
+                        <strong>Response:</strong> ${JSON.stringify(data, null, 2)}
+                    `;
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.innerHTML = `
+                        <strong>User Tips Endpoint:</strong> ❌ Failed<br>
+                        <strong>Status:</strong> ${response.status}<br>
+                        <strong>Status Text:</strong> ${response.statusText}
+                    `;
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <strong>User Tips Endpoint:</strong> ❌ Error<br>
+                    <strong>Error:</strong> ${error.message}
+                `;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function testReportersEndpoint() {
+            const resultDiv = document.getElementById('endpointTestResults');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = 'Testing reporters endpoint...';
+            resultDiv.className = 'result warning';
+
+            try {
+                const rpcEndpoint = 'https://node-palmito.tellorlayer.com';
+                const response = await fetch(`${rpcEndpoint}/tellor-io/layer/reporter/reporters`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const reporterCount = data.reporters ? data.reporters.length : 0;
+                    resultDiv.innerHTML = `
+                        <strong>Reporters Endpoint:</strong> ✅ Success<br>
+                        <strong>Reporter Count:</strong> ${reporterCount}<br>
+                        <strong>Sample Response:</strong> ${JSON.stringify(data, null, 2).substring(0, 500)}...
+                    `;
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.innerHTML = `
+                        <strong>Reporters Endpoint:</strong> ❌ Failed<br>
+                        <strong>Status:</strong> ${response.status}<br>
+                        <strong>Status Text:</strong> ${response.statusText}
+                    `;
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <strong>Reporters Endpoint:</strong> ❌ Error<br>
+                    <strong>Error:</strong> ${error.message}
+                `;
+                resultDiv.className = 'result error';
+            }
+        }
+    </script>
+</body>
+</html>

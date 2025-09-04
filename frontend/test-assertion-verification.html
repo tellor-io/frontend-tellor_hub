@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Assertion Methods Verification</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-6 bg-gray-50">
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-3xl font-bold text-gray-900 mb-6">🔧 Assertion Methods Test</h1>
+    
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+      <h2 class="text-xl font-semibold mb-4">Testing All Assertion Methods</h2>
+      <button id="test-assertions" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+        Test Assertion Methods
+      </button>
+      
+      <div id="results" class="mt-6 p-4 bg-gray-100 rounded hidden">
+        <h3 class="font-semibold mb-2">Results:</h3>
+        <div id="results-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Copy the TestSuite class from the main test file
+    class TestSuite {
+      constructor() {
+        this.assertions = 0;
+        this.failures = 0;
+      }
+
+      // Assertion methods
+      assert(condition, message = 'Assertion failed') {
+        this.assertions++;
+        if (!condition) {
+          this.failures++;
+          throw new Error(message);
+        }
+      }
+
+      assertEqual(actual, expected, message = 'Values are not equal') {
+        this.assertions++;
+        if (actual !== expected) {
+          this.failures++;
+          throw new Error(`${message}: expected ${expected}, got ${actual}`);
+        }
+      }
+
+      assertNotNull(value, message = 'Value should not be null') {
+        this.assert(value !== null, message);
+      }
+
+      assertDefined(value, message = 'Value should be defined') {
+        this.assert(value !== undefined, message);
+      }
+
+      assertFunction(value, message = 'Value should be a function') {
+        this.assert(typeof value === 'function', message);
+      }
+
+      assertString(value, message = 'Value should be a string') {
+        this.assert(typeof value === 'string', message);
+      }
+
+      assertNumber(value, message = 'Value should be a number') {
+        this.assert(typeof value === 'number' && !isNaN(value), message);
+      }
+
+      assertObject(value, message = 'Value should be an object') {
+        this.assert(typeof value === 'object' && value !== null && !Array.isArray(value), message);
+      }
+
+      assertArray(value, message = 'Value should be an array') {
+        this.assert(Array.isArray(value), message);
+      }
+
+      assertTrue(condition, message = 'Condition should be true') {
+        this.assert(condition === true, message);
+      }
+
+      assertFalse(condition, message = 'Condition should be false') {
+        this.assert(condition === false, message);
+      }
+
+      assertNull(value, message = 'Value should be null') {
+        this.assert(value === null, message);
+      }
+
+      assertUndefined(value, message = 'Value should be undefined') {
+        this.assert(value === undefined, message);
+      }
+    }
+
+    async function testAssertionMethods() {
+      const resultsDiv = document.getElementById('results');
+      const contentDiv = document.getElementById('results-content');
+      
+      resultsDiv.classList.remove('hidden');
+      contentDiv.innerHTML = '<div class="text-blue-600">Testing assertion methods...</div>';
+      
+      const testSuite = new TestSuite();
+      const results = [];
+      
+      try {
+        // Test assertObject
+        testSuite.assertObject({}, 'Object test');
+        results.push('✓ assertObject: PASS');
+      } catch (e) {
+        results.push(`✗ assertObject: FAIL - ${e.message}`);
+      }
+      
+      try {
+        // Test assertTrue
+        testSuite.assertTrue(true, 'True test');
+        results.push('✓ assertTrue: PASS');
+      } catch (e) {
+        results.push(`✗ assertTrue: FAIL - ${e.message}`);
+      }
+      
+      try {
+        // Test assertFalse
+        testSuite.assertFalse(false, 'False test');
+        results.push('✓ assertFalse: PASS');
+      } catch (e) {
+        results.push(`✗ assertFalse: FAIL - ${e.message}`);
+      }
+      
+      try {
+        // Test assertArray
+        testSuite.assertArray([], 'Array test');
+        results.push('✓ assertArray: PASS');
+      } catch (e) {
+        results.push(`✗ assertArray: FAIL - ${e.message}`);
+      }
+      
+      try {
+        // Test assertNumber
+        testSuite.assertNumber(42, 'Number test');
+        results.push('✓ assertNumber: PASS');
+      } catch (e) {
+        results.push(`✗ assertNumber: FAIL - ${e.message}`);
+      }
+      
+      try {
+        // Test assertString
+        testSuite.assertString('test', 'String test');
+        results.push('✓ assertString: PASS');
+      } catch (e) {
+        results.push(`✗ assertString: FAIL - ${e.message}`);
+      }
+      
+      try {
+        // Test assertFunction
+        testSuite.assertFunction(() => {}, 'Function test');
+        results.push('✓ assertFunction: PASS');
+      } catch (e) {
+        results.push(`✗ assertFunction: FAIL - ${e.message}`);
+      }
+      
+      try {
+        // Test assertNull
+        testSuite.assertNull(null, 'Null test');
+        results.push('✓ assertNull: PASS');
+      } catch (e) {
+        results.push(`✗ assertNull: FAIL - ${e.message}`);
+      }
+      
+      try {
+        // Test assertUndefined
+        testSuite.assertUndefined(undefined, 'Undefined test');
+        results.push('✓ assertUndefined: PASS');
+      } catch (e) {
+        results.push(`✗ assertUndefined: FAIL - ${e.message}`);
+      }
+      
+      const passCount = results.filter(r => r.includes('PASS')).length;
+      const totalCount = results.length;
+      
+      contentDiv.innerHTML = `
+        <div class="mb-4">
+          <div class="text-lg font-semibold ${passCount === totalCount ? 'text-green-600' : 'text-red-600'}">
+            Assertion Methods Test: ${passCount}/${totalCount} Passed
+          </div>
+        </div>
+        <div class="space-y-1">
+          ${results.map(result => `<div class="text-sm ${result.includes('PASS') ? 'text-green-600' : 'text-red-600'}">${result}</div>`).join('')}
+        </div>
+        <div class="mt-4 p-3 ${passCount === totalCount ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'} rounded text-sm">
+          ${passCount === totalCount ? 
+            '<strong>✅ All assertion methods are working correctly!</strong> The dispute tests should now run without errors.' :
+            '<strong>❌ Some assertion methods failed.</strong> There may still be issues with the test suite.'
+          }
+        </div>
+      `;
+    }
+
+    document.getElementById('test-assertions').addEventListener('click', testAssertionMethods);
+  </script>
+</body>
+</html>

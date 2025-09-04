@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Dispute Module</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .test-button {
+            background-color: #3b82f6;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background-color: #2563eb;
+        }
+        .test-button:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+        .test-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            margin: 5px 0;
+        }
+        .test-result {
+            background-color: #f3f4f6;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1 class="text-3xl font-bold mb-6">Dispute Module Test</h1>
+        
+        <div class="test-section">
+            <h2 class="text-xl font-semibold mb-4">Module Status</h2>
+            <button id="checkModuleBtn" class="test-button">Check Module Status</button>
+            <div id="moduleStatus" class="test-result"></div>
+        </div>
+
+                <div class="test-section">
+          <h2 class="text-xl font-semibold mb-4">Test Dispute Form</h2>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-2">Disputed Reporter Address:</label>
+              <input type="text" id="testDisputedReporter" class="test-input" placeholder="tellor1..." value="tellor1test123456789012345678901234567890">
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Report Meta ID:</label>
+              <input type="text" id="testReportMetaId" class="test-input" placeholder="Enter report meta ID" value="test-meta-id-123">
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Report Query ID:</label>
+              <input type="text" id="testReportQueryId" class="test-input" placeholder="Enter report query ID" value="test-query-id-456">
+            </div>
+                                <div>
+                      <label class="block text-sm font-medium mb-2">Dispute Category:</label>
+                      <select id="testDisputeCategory" class="test-input">
+                        <option value="warning">warning</option>
+                        <option value="minor">minor</option>
+                        <option value="major">major</option>
+                      </select>
+                    </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Fee (loya):</label>
+              <input type="text" id="testDisputeFee" class="test-input" placeholder="0" value="1000000">
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Pay from Bond:</label>
+              <input type="checkbox" id="testPayFromBond">
+            </div>
+          </div>
+          <button id="testProposeDisputeBtn" class="test-button mt-4">Test Propose Dispute</button>
+          <div id="testResult" class="test-result"></div>
+        </div>
+
+        <div class="test-section">
+          <h2 class="text-xl font-semibold mb-4">Test Voting Functionality</h2>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-2">Dispute ID:</label>
+              <input type="number" id="testVoteDisputeId" class="test-input" placeholder="Enter dispute ID" value="1">
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-2">Vote Choice:</label>
+              <select id="testVoteChoice" class="test-input">
+                <option value="vote-support">Support</option>
+                <option value="vote-against">Against</option>
+                <option value="vote-invalid">Invalid</option>
+              </select>
+            </div>
+          </div>
+          <button id="testVoteBtn" class="test-button mt-4">Test Vote on Dispute</button>
+          <div id="testVoteResult" class="test-result"></div>
+        </div>
+
+        <div class="test-section">
+          <h2 class="text-xl font-semibold mb-4">Test Dispute Queries</h2>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-2">Dispute ID:</label>
+              <input type="number" id="testQueryDisputeId" class="test-input" placeholder="Enter dispute ID" value="1">
+            </div>
+          </div>
+          <button id="testQueryDisputeBtn" class="test-button mt-4">Test Query Dispute</button>
+          <button id="testQueryVotingBtn" class="test-button mt-2">Test Query Voting Info</button>
+          <button id="testCheckVotedBtn" class="test-button mt-2">Test Check If Voted</button>
+          <div id="testQueryResult" class="test-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2 class="text-xl font-semibold mb-4">Validation Tests</h2>
+            <button id="testValidationBtn" class="test-button">Test Validation Functions</button>
+            <div id="validationResult" class="test-result"></div>
+        </div>
+    </div>
+
+    <script>
+        // Test functions
+        function log(message) {
+            console.log(message);
+        }
+
+        function updateResult(elementId, content) {
+            document.getElementById(elementId).textContent = content;
+        }
+
+        // Check module status
+        document.getElementById('checkModuleBtn').addEventListener('click', function() {
+            const status = {
+                disputeProposer: typeof window.disputeProposer !== 'undefined',
+                DisputeProposer: typeof window.DisputeProposer !== 'undefined',
+                appProposeDispute: typeof window.App !== 'undefined' && typeof window.App.proposeDispute === 'function'
+            };
+            
+            updateResult('moduleStatus', JSON.stringify(status, null, 2));
+            log('Module status:', status);
+        });
+
+        // Test dispute proposal
+        document.getElementById('testProposeDisputeBtn').addEventListener('click', async function() {
+            try {
+                if (!window.disputeProposer) {
+                    throw new Error('DisputeProposer module not loaded');
+                }
+
+                const disputedReporter = document.getElementById('testDisputedReporter').value;
+                const reportMetaId = document.getElementById('testReportMetaId').value;
+                const reportQueryId = document.getElementById('testReportQueryId').value;
+                const disputeCategory = document.getElementById('testDisputeCategory').value;
+                const fee = document.getElementById('testDisputeFee').value;
+                const payFromBond = document.getElementById('testPayFromBond').checked;
+
+                log('Testing dispute proposal with:', {
+                    disputedReporter,
+                    reportMetaId,
+                    reportQueryId,
+                    disputeCategory,
+                    fee,
+                    payFromBond
+                });
+
+                // Test validation
+                const isValidAddress = window.disputeProposer.isValidAddress(disputedReporter);
+                const isValidMetaId = window.disputeProposer.validateReportMetaId(reportMetaId);
+                const isValidQueryId = window.disputeProposer.validateReportQueryId(reportQueryId);
+
+                const validationResult = {
+                    isValidAddress,
+                    isValidMetaId,
+                    isValidQueryId,
+                    allValid: isValidAddress && isValidMetaId && isValidQueryId
+                };
+
+                updateResult('testResult', `Validation Results:\n${JSON.stringify(validationResult, null, 2)}\n\nNote: Actual dispute submission requires a connected wallet.`);
+                log('Validation results:', validationResult);
+
+            } catch (error) {
+                updateResult('testResult', `Error: ${error.message}`);
+                log('Test error:', error);
+            }
+        });
+
+                // Test validation functions
+        document.getElementById('testValidationBtn').addEventListener('click', function() {
+          if (!window.disputeProposer) {
+            updateResult('validationResult', 'Error: DisputeProposer module not loaded');
+            return;
+          }
+
+          const testCases = [
+            { address: 'tellor1test123456789012345678901234567890', expected: true },
+            { address: 'layer1test123456789012345678901234567890', expected: true },
+            { address: 'invalid', expected: false },
+            { address: '', expected: false },
+            { address: 'cosmos1invalid', expected: false }
+          ];
+
+          const voteTestCases = [
+            { vote: 'vote-support', expected: true },
+            { vote: 'vote-against', expected: true },
+            { vote: 'vote-invalid', expected: true },
+            { vote: 'Yes', expected: false },
+            { vote: 'No', expected: false },
+            { vote: 'invalid', expected: false },
+            { vote: '', expected: false }
+          ];
+
+          const addressResults = testCases.map(testCase => ({
+            address: testCase.address,
+            expected: testCase.expected,
+            actual: window.disputeProposer.isValidAddress(testCase.address),
+            passed: testCase.expected === window.disputeProposer.isValidAddress(testCase.address)
+          }));
+
+          const voteResults = voteTestCases.map(testCase => ({
+            vote: testCase.vote,
+            expected: testCase.expected,
+            actual: window.disputeProposer.validateVoteChoice(testCase.vote),
+            passed: testCase.expected === window.disputeProposer.validateVoteChoice(testCase.vote)
+          }));
+
+          updateResult('validationResult', `Address Validation Tests:\n${JSON.stringify(addressResults, null, 2)}\n\nVote Choice Validation Tests:\n${JSON.stringify(voteResults, null, 2)}`);
+          log('Validation test results:', { addressResults, voteResults });
+        });
+
+        // Test voting functionality
+        document.getElementById('testVoteBtn').addEventListener('click', async function() {
+          try {
+            if (!window.disputeProposer) {
+              throw new Error('DisputeProposer module not loaded');
+            }
+
+            const disputeId = parseInt(document.getElementById('testVoteDisputeId').value);
+            const voteChoice = document.getElementById('testVoteChoice').value;
+
+            log('Testing vote on dispute:', { disputeId, voteChoice });
+
+            // Test validation
+            const isValidDisputeId = window.disputeProposer.validateDisputeId(disputeId);
+            const isValidVoteChoice = window.disputeProposer.validateVoteChoice(voteChoice);
+
+            const validationResult = {
+              isValidDisputeId,
+              isValidVoteChoice,
+              allValid: isValidDisputeId && isValidVoteChoice
+            };
+
+            updateResult('testVoteResult', `Vote Validation Results:\n${JSON.stringify(validationResult, null, 2)}\n\nNote: Actual voting requires a connected wallet.`);
+            log('Vote validation results:', validationResult);
+
+          } catch (error) {
+            updateResult('testVoteResult', `Error: ${error.message}`);
+            log('Vote test error:', error);
+          }
+        });
+
+        // Test dispute queries
+        document.getElementById('testQueryDisputeBtn').addEventListener('click', async function() {
+          try {
+            if (!window.disputeProposer) {
+              throw new Error('DisputeProposer module not loaded');
+            }
+
+            const disputeId = parseInt(document.getElementById('testQueryDisputeId').value);
+            log('Testing dispute query for ID:', disputeId);
+
+            // Test validation
+            const isValidDisputeId = window.disputeProposer.validateDisputeId(disputeId);
+            
+            if (!isValidDisputeId) {
+              updateResult('testQueryResult', 'Error: Invalid dispute ID format');
+              return;
+            }
+
+            updateResult('testQueryResult', `Dispute ID ${disputeId} is valid.\n\nNote: Actual query requires network connection.`);
+            log('Dispute query test passed');
+
+          } catch (error) {
+            updateResult('testQueryResult', `Error: ${error.message}`);
+            log('Query test error:', error);
+          }
+        });
+
+        // Test voting info query
+        document.getElementById('testQueryVotingBtn').addEventListener('click', async function() {
+          try {
+            if (!window.disputeProposer) {
+              throw new Error('DisputeProposer module not loaded');
+            }
+
+            const disputeId = parseInt(document.getElementById('testQueryDisputeId').value);
+            log('Testing voting info query for dispute ID:', disputeId);
+
+            // Test validation
+            const isValidDisputeId = window.disputeProposer.validateDisputeId(disputeId);
+            
+            if (!isValidDisputeId) {
+              updateResult('testQueryResult', 'Error: Invalid dispute ID format');
+              return;
+            }
+
+            updateResult('testQueryResult', `Voting info query for dispute ID ${disputeId} is valid.\n\nNote: Actual query requires network connection.`);
+            log('Voting info query test passed');
+
+          } catch (error) {
+            updateResult('testQueryResult', `Error: ${error.message}`);
+            log('Voting info query test error:', error);
+          }
+        });
+
+        // Test check if voted
+        document.getElementById('testCheckVotedBtn').addEventListener('click', async function() {
+          try {
+            if (!window.disputeProposer) {
+              throw new Error('DisputeProposer module not loaded');
+            }
+
+            const disputeId = parseInt(document.getElementById('testQueryDisputeId').value);
+            log('Testing check if voted for dispute ID:', disputeId);
+
+            // Test validation
+            const isValidDisputeId = window.disputeProposer.validateDisputeId(disputeId);
+            
+            if (!isValidDisputeId) {
+              updateResult('testQueryResult', 'Error: Invalid dispute ID format');
+              return;
+            }
+
+            updateResult('testQueryResult', `Check if voted for dispute ID ${disputeId} is valid.\n\nNote: Actual check requires network connection and wallet connection.`);
+            log('Check if voted test passed');
+
+          } catch (error) {
+            updateResult('testQueryResult', `Error: ${error.message}`);
+            log('Check if voted test error:', error);
+          }
+        });
+
+        // Check if modules are loaded
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                if (typeof window.disputeProposer !== 'undefined') {
+                    log('DisputeProposer module loaded successfully');
+                } else {
+                    log('DisputeProposer module not loaded');
+                }
+            }, 1000);
+        });
+    </script>
+
+    <!-- Load required scripts -->
+    <script src="./extensions/jquery.min.js"></script>
+    <script src="./js/dispute.js"></script>
+</body>
+</html>

@@ -15,7 +15,7 @@
         </div>
         
         <div class="p-4">
-        <h1 class="text-2xl font-bold mb-4">Tellor Hub - Space Station Test</h1>
+        <h1 class="text-2xl font-bold mb-4">Tellor Hub -  Test</h1>
     
     <!-- Test the space station container -->
     <div class="space-station-container" id="spaceStationContainer">
@@ -37,28 +37,28 @@
           <!-- Bridge to Layer Pod -->
           <div class="orbiting-pod" data-function="bridgeToLayer">
             <div class="pod-content">
-              <img src="finales_bridge_tellor.png" alt="Bridge to Layer" class="pod-icon">
+              <img src="Orb_Bridge_Tellor.png" alt="Bridge to Layer" class="pod-icon">
             </div>
           </div>
 
           <!-- Bridge to Ethereum Pod -->
           <div class="orbiting-pod" data-function="bridgeToEth">
             <div class="pod-content">
-              <img src="finales_bridge_eth.png" alt="Bridge to Ethereum" class="pod-icon">
+              <img src="Orb_Bridge_Eth.png" alt="Bridge to Ethereum" class="pod-icon">
             </div>
           </div>
 
           <!-- Delegate Pod -->
           <div class="orbiting-pod" data-function="delegate">
             <div class="pod-content">
-              <img src="finales_delegate.png" alt="Delegate" class="pod-icon">
+              <img src="Orb_Delegate.png" alt="Delegate" class="pod-icon">
             </div>
           </div>
 
           <!-- No-Stake Report Pod -->
           <div class="orbiting-pod" data-function="noStakeReport">
             <div class="pod-content">
-              <img src="finales_report.png" alt="Report" class="pod-icon">
+              <img src="Orb_Report.png" alt="Report" class="pod-icon">
             </div>
           </div>
         </div>
@@ -173,7 +173,7 @@
     function testSectionSwitch() {
       logTest('Testing section switching...');
       
-      const sections = ['bridgeToLayer', 'bridgeToEth', 'delegate', 'noStakeReport'];
+      const sections = ['bridgeToLayer', 'bridgeToEth', 'delegate', 'noStakeReport', 'dispute'];
       sections.forEach((section, index) => {
         setTimeout(() => {
           const navOption = document.querySelector(`.nav-option[data-function="${section}"]`);

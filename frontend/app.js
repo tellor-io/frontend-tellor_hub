@@ -51,6 +51,14 @@ const App = {
             App.initBridgeDirectionUI(); // Initialize bridge direction UI
             App.initWalletManagerDropdown(); // Initialize wallet manager dropdown
             App.initNoStakeReporting(); // Initialize no-stake reporting
+        App.initDisputeProposer(); // Initialize dispute proposer
+        
+        // Add wallet connection listener for dispute refresh
+        document.addEventListener('walletConnected', () => {
+            if (window.App && window.App.refreshDisputesOnWalletConnect) {
+                window.App.refreshDisputesOnWalletConnect();
+            }
+        });
             
             // Initialize network display
             App.updateNetworkDisplay();
@@ -89,6 +97,12 @@ const App = {
                             await App.disconnectKeplr();
                         } else {
                             await App.connectKeplr();
+                            // Refresh disputes if on Vote on Dispute tab after connection
+                            setTimeout(() => {
+                                if (window.App && window.App.refreshDisputesOnWalletConnect) {
+                                    window.App.refreshDisputesOnWalletConnect();
+                                }
+                            }, 1000);
                         }
                     } catch (error) {
                         // console.error(...);
@@ -604,6 +618,18 @@ const App = {
             App.cosmosChainId = 'layertest-4'; // Default to testnet
         }
         
+        // Try to detect the current network from the wallet adapter
+        try {
+            const currentChainId = await window.cosmosWalletAdapter.getChainId();
+            if (currentChainId === 'tellor-1') {
+                App.cosmosChainId = 'tellor-1';
+            } else if (currentChainId === 'layertest-4') {
+                App.cosmosChainId = 'layertest-4';
+            }
+        } catch (error) {
+            console.log('Could not detect current network from wallet adapter, using default');
+        }
+        
         // Connect to the selected wallet
         const connectionResult = await window.cosmosWalletAdapter.connectToWallet(walletType);
         
@@ -655,6 +681,10 @@ const App = {
         }
         
         App.setPageParams();
+        
+        // Dispatch wallet connected event for dispute refresh
+        document.dispatchEvent(new CustomEvent('walletConnected'));
+        
         return connectionResult;
     } catch (error) {
         // Clear connection state on error
@@ -689,17 +719,26 @@ const App = {
             restUrl = "https://node-palmito.tellorlayer.com/rpc";
             chainName = "Tellor Layer Testnet";
         }
-        
-        // First try to disable any existing connection
+
+        // Try to detect the current network from Keplr
         try {
-            if (typeof window.keplr.disable === 'function') {
-                await window.keplr.disable(App.cosmosChainId);
+            const currentChainId = await window.keplr.getChainId();
+            if (currentChainId === 'tellor-1') {
+                App.cosmosChainId = 'tellor-1';
+                rpcUrl = "https://mainnet.tellorlayer.com/rpc";
+                restUrl = "https://mainnet.tellorlayer.com/rpc";
+                chainName = "Tellor Layer";
+            } else if (currentChainId === 'layertest-4') {
+                App.cosmosChainId = 'layertest-4';
+                rpcUrl = "https://node-palmito.tellorlayer.com/rpc";
+                restUrl = "https://node-palmito.tellorlayer.com/rpc";
+                chainName = "Tellor Layer Testnet";
             }
         } catch (error) {
-            // console.warn(...);
+            console.log('Could not detect current network from Keplr, using default');
         }
 
-        // Suggest the chain to the user
+        // Suggest adding the chain if it's not already added
         await window.keplr.experimentalSuggestChain({
             chainId: App.cosmosChainId,
             chainName: chainName,
@@ -855,6 +894,10 @@ const App = {
 
         // Update page parameters
         App.setPageParams();
+        
+        // Dispatch wallet connected event for dispute refresh
+        document.dispatchEvent(new CustomEvent('walletConnected'));
+        
         // console.log(...);
     } catch (error) {
         // console.error(...);
@@ -934,6 +977,9 @@ const App = {
         // Update Cosmos network display
         App.updateCosmosNetworkDisplay();
         
+        // Update network compatibility warning
+        App.updateNetworkCompatibilityWarning();
+        
         // Update page parameters
         App.setPageParams();
         // console.log(...);
@@ -996,6 +1042,9 @@ const App = {
         
         App.setPageParams();
         this.updateUIForCurrentDirection();
+        
+        // Update network compatibility warning
+        App.updateNetworkCompatibilityWarning();
     } catch (error) {
         // console.error(...);
         App.handleError(error);
@@ -1027,6 +1076,9 @@ const App = {
         document.getElementById("currentBalance").innerHTML = 
             `<span class="connected-address-style">0 TRB</span>`;
         App.updateConnectedAddress();
+        
+        // Update network compatibility warning
+        App.updateNetworkCompatibilityWarning();
         
         // Clear any pending transactions or subscriptions
         if(App.web3 && App.web3.eth) {
@@ -2184,6 +2236,15 @@ const App = {
                 // Hide tooltip immediately when switching sections
                 enhancedHideTooltip();
                 
+                // Check scroll indicator for dispute section
+                if (functionType === 'dispute') {
+                    setTimeout(() => {
+                        if (window.checkScrollIndicatorVisibility) {
+                            window.checkScrollIndicatorVisibility();
+                        }
+                    }, 200);
+                }
+                
                 // Also hide tooltip when any section becomes active
                 setTimeout(() => {
                     if (functionType !== 'noStakeReport') {
@@ -2344,6 +2405,32 @@ const App = {
         if (!App.isKeplrConnected) {
             alert('Please connect your Keplr wallet first');
             return;
+        }
+
+        // Check if we have a valid cosmosChainId
+        if (!App.cosmosChainId) {
+            App.showValidationErrorPopup('Network not detected. Please reconnect your wallet.');
+            return;
+        }
+
+        // Validate network compatibility for withdrawal
+        if (App.isConnected && App.isKeplrConnected) {
+            const isEthereumMainnet = App.chainId === 1;
+            const isCosmosMainnet = App.cosmosChainId === 'tellor-1';
+            
+            if (isEthereumMainnet !== isCosmosMainnet) {
+                const ethereumNetwork = isEthereumMainnet ? 'Ethereum Mainnet' : 'Sepolia Testnet';
+                const cosmosNetwork = isCosmosMainnet ? 'Tellor Mainnet' : 'Tellor Testnet';
+                
+                App.showValidationErrorPopup(
+                    `Network mismatch detected!\n\n` +
+                    `Ethereum Wallet: ${ethereumNetwork}\n` +
+                    `Cosmos Wallet: ${cosmosNetwork}\n\n` +
+                    `Both wallets must be on the same network type (both mainnet or both testnet).\n\n` +
+                    `Please switch one of your wallets to match the other network.`
+                );
+                return;
+            }
         }
 
         const amount = document.getElementById('ethStakeAmount').value;
@@ -4018,6 +4105,9 @@ const App = {
     // Update UI for the new direction
     this.updateUIForCurrentDirection();
     
+    // Update network compatibility warning
+    this.updateNetworkCompatibilityWarning();
+    
     // Update balances when switching directions
     if (App.isConnected) {
         App.updateBalance().catch(error => {
@@ -4050,8 +4140,31 @@ const App = {
         // Update Ethereum section UI
         const withdrawButton = document.getElementById('withdrawButton');
         
+        // Enable withdrawal button if Keplr is connected, regardless of network
         if (App.isKeplrConnected) {
-            if (withdrawButton) withdrawButton.disabled = false;
+            if (withdrawButton) {
+                withdrawButton.disabled = false;
+                
+                // Check network compatibility and update button title
+                if (App.isConnected) {
+                    const isEthereumMainnet = App.chainId === 1;
+                    const isCosmosMainnet = App.cosmosChainId === 'tellor-1';
+                    
+                    if (isEthereumMainnet === isCosmosMainnet) {
+                        withdrawButton.title = 'Request withdrawal from Layer to Ethereum';
+                    } else {
+                        withdrawButton.title = 'Network mismatch detected. Both wallets must be on the same network type.';
+                    }
+                } else {
+                    withdrawButton.title = 'Connect your Ethereum wallet to withdraw';
+                }
+            }
+        } else {
+            // If not connected, show a helpful message but keep button enabled for UX
+            if (withdrawButton) {
+                withdrawButton.disabled = false;
+                withdrawButton.title = 'Connect your Cosmos wallet to withdraw';
+            }
         }
     } else if (this.currentBridgeDirection === 'delegate') {
         // Update Delegate section UI
@@ -4067,6 +4180,88 @@ const App = {
     if (transactionsContainer) {
         transactionsContainer.classList.toggle('active', this.currentBridgeDirection === 'ethereum');
     }
+  },
+
+  // Add function to update network compatibility warning
+  updateNetworkCompatibilityWarning: function() {
+    const warningElement = document.getElementById('networkCompatibilityWarning');
+    
+    if (warningElement) {
+      if (App.isConnected && App.isKeplrConnected) {
+        const isEthereumMainnet = App.chainId === 1;
+        const isCosmosMainnet = App.cosmosChainId === 'tellor-1';
+        
+        if (isEthereumMainnet !== isCosmosMainnet) {
+          const ethereumNetwork = isEthereumMainnet ? 'Ethereum Mainnet' : 'Sepolia Testnet';
+          const cosmosNetwork = isCosmosMainnet ? 'Tellor Mainnet' : 'Tellor Testnet';
+          
+          warningElement.innerHTML = `
+            <strong>⚠️ Network Mismatch Detected</strong><br>
+            Your wallets are on different networks:<br>
+            • Ethereum: ${ethereumNetwork}<br>
+            • Cosmos: ${cosmosNetwork}<br><br>
+            <strong>Withdrawals will fail with mismatched networks.</strong><br>
+            Please switch one wallet to match the other network.
+          `;
+          warningElement.style.display = 'block';
+        } else {
+          warningElement.style.display = 'none';
+        }
+      } else {
+        warningElement.style.display = 'none';
+      }
+    }
+  },
+
+  // Add debug function to check network status
+  debugNetworkStatus: function() {
+    const status = {
+      cosmosChainId: App.cosmosChainId,
+      isKeplrConnected: App.isKeplrConnected,
+      currentBridgeDirection: App.currentBridgeDirection,
+      keplrAddress: App.keplrAddress,
+      connectedWallet: App.connectedWallet,
+      ethereumChainId: App.chainId,
+      isEthereumConnected: App.isConnected,
+      ethereumAccount: App.account
+    };
+    
+    // Check network compatibility
+    if (App.isConnected && App.isKeplrConnected) {
+      const isEthereumMainnet = App.chainId === 1;
+      const isCosmosMainnet = App.cosmosChainId === 'tellor-1';
+      status.networkCompatible = isEthereumMainnet === isCosmosMainnet;
+      status.ethereumNetwork = isEthereumMainnet ? 'Mainnet' : 'Testnet';
+      status.cosmosNetwork = isCosmosMainnet ? 'Mainnet' : 'Testnet';
+    }
+    
+    console.log('Network Status:', status);
+    
+    // Check button states
+    const withdrawButton = document.getElementById('withdrawButton');
+    if (withdrawButton) {
+      console.log('Withdrawal Button State:', {
+        disabled: withdrawButton.disabled,
+        text: withdrawButton.textContent,
+        title: withdrawButton.title
+      });
+    }
+    
+    // Show network compatibility status
+    if (App.isConnected && App.isKeplrConnected) {
+      const isEthereumMainnet = App.chainId === 1;
+      const isCosmosMainnet = App.cosmosChainId === 'tellor-1';
+      
+      if (isEthereumMainnet === isCosmosMainnet) {
+        console.log('✅ Networks are compatible - withdrawals should work');
+      } else {
+        console.log('❌ Networks are incompatible - withdrawals will fail');
+        console.log('Ethereum:', isEthereumMainnet ? 'Mainnet' : 'Testnet');
+        console.log('Cosmos:', isCosmosMainnet ? 'Mainnet' : 'Testnet');
+      }
+    }
+    
+    return status;
   },
 
   // Add new function to fetch validators from Layer network
@@ -4218,6 +4413,21 @@ const App = {
     }
   },
 
+  // Dispute Functions
+  initDisputeProposer: async function() {
+    try {
+      // Initialize the dispute proposer
+      if (window.disputeProposer) {
+        await window.disputeProposer.init();
+        console.log('Dispute proposer initialized successfully');
+      } else {
+        console.error('DisputeProposer not found');
+      }
+    } catch (error) {
+      console.error('Failed to initialize dispute proposer:', error);
+    }
+  },
+
   // Check wallet connection status for no-stake reporting
   checkNoStakeWalletStatus: async function() {
     try {
@@ -4290,6 +4500,638 @@ const App = {
     }
   },
 
+  // Propose a dispute
+  proposeDispute: async function() {
+    try {
+      if (!window.disputeProposer) {
+        throw new Error('DisputeProposer not initialized');
+      }
+
+      // Get form values
+      const disputedReporter = document.getElementById('disputedReporter').value.trim();
+      const reportMetaId = document.getElementById('reportMetaId').value.trim();
+      const reportQueryId = document.getElementById('reportQueryId').value.trim();
+      const disputeCategory = document.getElementById('disputeCategory').value;
+      const fee = document.getElementById('disputeFee').value.trim();
+      const payFromBond = document.getElementById('payFromBond').checked;
+
+      // Validate inputs
+      if (!disputedReporter) {
+        throw new Error('Please enter the disputed reporter address');
+      }
+      if (!reportMetaId) {
+        throw new Error('Please enter the report meta ID');
+      }
+      if (!reportQueryId) {
+        throw new Error('Please enter the report query ID');
+      }
+      if (!disputeCategory) {
+        throw new Error('Please select a dispute category');
+      }
+      if (!fee || parseFloat(fee) <= 0) {
+        throw new Error('Please enter a valid fee amount');
+      }
+
+      // Validate address format
+      if (!window.disputeProposer.isValidAddress(disputedReporter)) {
+        throw new Error('Invalid disputed reporter address format');
+      }
+
+      // Show pending popup
+      App.showPendingPopup("Proposing dispute...");
+
+      // Submit the dispute proposal
+      const result = await window.disputeProposer.proposeDispute(
+        disputedReporter, 
+        reportMetaId, 
+        reportQueryId, 
+        disputeCategory, 
+        fee, 
+        payFromBond
+      );
+      
+      // Hide pending popup
+      App.hidePendingPopup();
+      
+      if (result.success) {
+        // Show success popup with transaction hash and block explorer link
+        App.showSuccessPopup("Dispute proposed successfully!", result.transactionHash, 'cosmos');
+        
+        // Clear form
+        document.getElementById('disputedReporter').value = '';
+        document.getElementById('reportMetaId').value = '';
+        document.getElementById('reportQueryId').value = '';
+        document.getElementById('disputeFee').value = '';
+        document.getElementById('payFromBond').checked = false;
+      } else {
+        throw new Error('Failed to propose dispute');
+      }
+    } catch (error) {
+      console.error('Failed to propose dispute:', error);
+      App.hidePendingPopup();
+      App.showErrorPopup(error.message || 'Failed to propose dispute');
+    }
+  },
+
+  // Refresh disputes when wallet connects (if on Vote on Dispute tab)
+  refreshDisputesOnWalletConnect: function() {
+    const voteDisputeTab = document.getElementById('voteDisputeTab');
+    const queryDisputeTab = document.getElementById('queryDisputeTab');
+    
+    // Refresh Vote on Dispute tab if active
+    if (voteDisputeTab && voteDisputeTab.classList.contains('active')) {
+      setTimeout(() => {
+        if (window.App && window.App.loadOpenDisputes) {
+          window.App.loadOpenDisputes();
+        }
+      }, 500);
+    }
+    
+    // Refresh Query Dispute tab if active
+    if (queryDisputeTab && queryDisputeTab.classList.contains('active')) {
+      setTimeout(() => {
+        if (window.App && window.App.loadAllDisputes) {
+          window.App.loadAllDisputes();
+        }
+      }, 500);
+    }
+    
+    // Always check voting power when wallet connects
+    setTimeout(() => {
+      if (window.App && window.App.checkVotingPower) {
+        window.App.checkVotingPower();
+      }
+    }, 600);
+  },
+
+      // Check and display voting power status
+    checkVotingPower: async function() {
+        try {
+            if (!walletStatus.isConnected) {
+                return;
+            }
+
+            const votingPowerCheck = await disputeProposer.checkVotingPower();
+            const votingPowerIndicator = document.getElementById('votingPowerIndicator');
+            
+            if (votingPowerIndicator) {
+                if (!votingPowerCheck.hasVotingPower) {
+                    votingPowerIndicator.innerHTML = `
+                        <div class="voting-power-warning">
+                            <span class="warning-icon">⚠️</span>
+                            <span class="warning-text">No Voting Power: ${votingPowerCheck.details}</span>
+                        </div>
+                    `;
+                    votingPowerIndicator.style.display = 'block';
+                } else {
+                    votingPowerIndicator.style.display = 'none';
+                }
+            }
+        } catch (error) {
+            console.error('Failed to check voting power:', error);
+        }
+    },
+
+    // Load all disputes for query tab
+    loadAllDisputes: async function() {
+        try {
+            if (!window.disputeProposer) {
+                throw new Error('DisputeProposer not initialized');
+            }
+
+            // Show loading state
+            const disputesTable = document.getElementById('disputesTable');
+            const loadingDiv = document.getElementById('disputesLoading');
+            const errorDiv = document.getElementById('disputesError');
+            
+            // Check wallet connection first
+            const walletStatus = await disputeProposer.getWalletStatus();
+            if (!walletStatus.isConnected) {
+                // Hide loading and table
+                if (loadingDiv) {
+                    loadingDiv.style.display = 'none';
+                }
+                if (disputesTable) {
+                    disputesTable.style.display = 'none';
+                }
+                
+                // Show wallet connection message
+                if (errorDiv) {
+                    errorDiv.innerHTML = `
+                        <div class="wallet-connection-required">
+                            <span class="connection-text">Please connect your Cosmos wallet to view disputes</span>
+                        </div>
+                    `;
+                    errorDiv.className = 'disputes-wallet-required';
+                    errorDiv.style.display = 'block';
+                }
+                return;
+            }
+            
+            if (loadingDiv) {
+                loadingDiv.style.display = 'block';
+                loadingDiv.textContent = `Loading disputes for ${walletStatus.network || 'current network'}...`;
+            }
+            if (errorDiv) {
+                errorDiv.style.display = 'none';
+            }
+            if (disputesTable) {
+                disputesTable.style.display = 'none';
+            }
+
+            const result = await disputeProposer.getAllDisputesForQuery();
+            
+            // Hide loading state
+            if (loadingDiv) {
+                loadingDiv.style.display = 'none';
+            }
+
+            if (result.disputes && result.disputes.length > 0) {
+                App.displayDisputesTable(result.disputes, result.pagination, walletStatus.network);
+                if (disputesTable) {
+                    disputesTable.style.display = 'block';
+                }
+            } else {
+                if (errorDiv) {
+                    errorDiv.textContent = `No disputes found on ${walletStatus.network || 'current network'}.`;
+                    errorDiv.className = 'disputes-error';
+                    errorDiv.style.display = 'block';
+                }
+            }
+
+        } catch (error) {
+            console.error('Failed to load disputes:', error);
+            
+            // Hide loading state
+            const loadingDiv = document.getElementById('disputesLoading');
+            if (loadingDiv) {
+                loadingDiv.style.display = 'none';
+            }
+
+            // Show error state
+            const errorDiv = document.getElementById('disputesError');
+            if (errorDiv) {
+                errorDiv.textContent = `Failed to load disputes: ${error.message}`;
+                errorDiv.className = 'disputes-error';
+                errorDiv.style.display = 'block';
+            }
+        }
+    },
+
+    // Display disputes in a table format
+    displayDisputesTable: function(disputes, pagination, network) {
+        const tableBody = document.getElementById('disputesTableBody');
+        const totalCount = document.getElementById('disputesTotalCount');
+        
+        if (!tableBody) {
+            console.error('Disputes table body not found');
+            return;
+        }
+
+        // Clear existing rows
+        tableBody.innerHTML = '';
+
+        // Update total count with network info
+        if (totalCount && pagination) {
+            const networkDisplay = network ? ` on ${network}` : '';
+            totalCount.textContent = `Total Disputes: ${pagination.total}${networkDisplay}`;
+        }
+
+        // Add rows for each dispute
+        disputes.forEach(dispute => {
+            const row = document.createElement('tr');
+            const data = dispute.displayData;
+            
+            // Format status with color coding
+            const statusClass = App.getStatusClass(data.disputeStatus);
+            const openBadge = data.isOpen ? '<span class="badge badge-success">Open</span>' : '<span class="badge badge-secondary">Closed</span>';
+            
+            // Format dates
+            const startDate = data.startTime ? new Date(data.startTime).toLocaleDateString() : 'N/A';
+            const endDate = data.endTime ? new Date(data.endTime).toLocaleDateString() : 'N/A';
+            
+            row.innerHTML = `
+                <td class="dispute-id">#${data.disputeId}</td>
+                <td class="dispute-status">
+                    <span class="status-badge ${statusClass}">${App.formatStatus(data.disputeStatus)}</span>
+                    ${openBadge}
+                </td>
+                <td class="dispute-category">${App.formatCategory(data.disputeCategory)}</td>
+                <td class="dispute-reporter" title="${data.reporter}">${App.truncateAddress(data.reporter)}</td>
+                <td class="dispute-query">${data.queryId}</td>
+                <td class="dispute-fees">
+                    <div class="fee-info">
+                        <div>Required: ${data.slashAmount} TRB</div>
+                        <div>Paid: ${data.feeTotal} TRB</div>
+                        <div class="fee-remaining">Remaining: ${data.feeRemaining} TRB</div>
+                    </div>
+                </td>
+                <td class="dispute-dates">
+                    <div>Start: ${startDate}</div>
+                    <div>End: ${endDate}</div>
+                </td>
+                <td class="dispute-block">${data.blockNumber}</td>
+                <td class="dispute-actions">
+                    ${data.disputeStatus === 'DISPUTE_STATUS_VOTING' ? 
+                        `<button class="btn-small btn-vote" onclick="App.navigateToVoting('${data.disputeId}')">Vote</button>` : 
+                        data.disputeStatus === 'DISPUTE_STATUS_PREVOTE' ?
+                        `<button class="btn-small btn-add-fee" onclick="App.navigateToAddFee('${data.disputeId}')">Add Fee</button>` :
+                        `<span class="status-text">${App.formatStatus(data.disputeStatus)}</span>`
+                    }
+                </td>
+            `;
+            
+            tableBody.appendChild(row);
+        });
+    },
+
+    // Helper functions for formatting
+    getStatusClass: function(status) {
+        switch (status) {
+            case 'DISPUTE_STATUS_VOTING': return 'status-voting';
+            case 'DISPUTE_STATUS_PREVOTE': return 'status-prevote';
+            case 'DISPUTE_STATUS_RESOLVED': return 'status-resolved';
+            case 'DISPUTE_STATUS_FAILED': return 'status-failed';
+            default: return 'status-unknown';
+        }
+    },
+
+    formatStatus: function(status) {
+        return status ? status.replace('DISPUTE_STATUS_', '').replace(/_/g, ' ') : 'Unknown';
+    },
+
+    formatCategory: function(category) {
+        return category ? category.replace('DISPUTE_CATEGORY_', '').replace(/_/g, ' ') : 'Unspecified';
+    },
+
+    truncateAddress: function(address) {
+        if (!address || address.length <= 12) return address;
+        return `${address.substring(0, 6)}...${address.substring(address.length - 6)}`;
+    },
+
+    // Navigate to add fee tab with dispute pre-selected
+    navigateToAddFee: function(disputeId) {
+        try {
+            console.log('Navigating to add fee tab for dispute:', disputeId);
+            
+            // Switch to the add fee tab
+            if (window.switchDisputeTab) {
+                window.switchDisputeTab('addFeeDisputeTab');
+            }
+            
+            // Wait a moment for the tab to load, then populate the dispute ID
+            setTimeout(() => {
+                const disputeIdInput = document.getElementById('addFeeDisputeId');
+                if (disputeIdInput) {
+                    disputeIdInput.value = disputeId;
+                    console.log(`Dispute ID #${disputeId} populated in add fee tab`);
+                    
+                    // Optional: Focus on the amount field for user convenience
+                    const amountInput = document.getElementById('addFeeAmount');
+                    if (amountInput) {
+                        amountInput.focus();
+                    }
+                } else {
+                    console.error('Add fee dispute ID input not found');
+                }
+            }, 200);
+            
+        } catch (error) {
+            console.error('Failed to navigate to add fee tab:', error);
+            App.showErrorPopup('Failed to navigate to add fee tab');
+        }
+    },
+
+    // Navigate to voting tab with dispute pre-selected
+    navigateToVoting: function(disputeId) {
+        try {
+            console.log('Navigating to voting tab for dispute:', disputeId);
+            
+            // Switch to the voting tab
+            if (window.switchDisputeTab) {
+                window.switchDisputeTab('voteDisputeTab');
+            }
+            
+            // Wait a moment for the tab to load, then select the dispute
+            setTimeout(async () => {
+                const disputeSelect = document.getElementById('voteDisputeId');
+                if (disputeSelect) {
+                    // Check if the dispute option exists in the dropdown
+                    const option = disputeSelect.querySelector(`option[value="${disputeId}"]`);
+                    if (option) {
+                        disputeSelect.value = disputeId;
+                        console.log(`Dispute #${disputeId} selected in voting tab`);
+                    } else {
+                        // If dispute not in dropdown, try to refresh the list first
+                        console.log(`Dispute #${disputeId} not found in dropdown, refreshing list...`);
+                        if (window.App && window.App.loadOpenDisputes) {
+                            await window.App.loadOpenDisputes();
+                            
+                            // Try again after refresh
+                            setTimeout(() => {
+                                const refreshedOption = disputeSelect.querySelector(`option[value="${disputeId}"]`);
+                                if (refreshedOption) {
+                                    disputeSelect.value = disputeId;
+                                    console.log(`Dispute #${disputeId} selected after refresh`);
+                                } else {
+                                    console.warn(`Dispute #${disputeId} not available for voting (may not be in voting state)`);
+                                    // Still switch to the tab but show a message
+                                    App.showInfoMessage(`Dispute #${disputeId} may not be available for voting at this time.`);
+                                }
+                            }, 500);
+                        }
+                    }
+                } else {
+                    console.error('Vote dispute dropdown not found');
+                }
+            }, 200);
+            
+        } catch (error) {
+            console.error('Failed to navigate to voting tab:', error);
+            App.showErrorPopup('Failed to navigate to voting tab');
+        }
+    },
+
+    // Show info message to user
+    showInfoMessage: function(message) {
+        // You can implement a toast notification here
+        // For now, using alert as a simple solution
+        alert(message);
+    },
+
+    // Load open disputes for dropdown
+    loadOpenDisputes: async function() {
+    try {
+      if (!window.disputeProposer) {
+        throw new Error('DisputeProposer not initialized');
+      }
+
+      // Check if wallet is connected
+      const walletStatus = await window.disputeProposer.getWalletStatus();
+      if (!walletStatus.isConnected) {
+        const disputeSelect = document.getElementById('voteDisputeId');
+        disputeSelect.innerHTML = '<option value="">Please connect your wallet first</option>';
+        return;
+      }
+
+      // Show loading state
+      const disputeSelect = document.getElementById('voteDisputeId');
+      disputeSelect.innerHTML = '<option value="">Loading open disputes...</option>';
+
+      // Fetch open disputes with status information
+      const openDisputes = await window.disputeProposer.getOpenDisputes();
+      
+      // Populate dropdown
+      disputeSelect.innerHTML = '<option value="">Select a dispute</option>';
+      
+      if (openDisputes.length === 0) {
+        disputeSelect.innerHTML = '<option value="">No open disputes available</option>';
+      } else {
+        openDisputes.forEach(dispute => {
+          const option = document.createElement('option');
+          option.value = dispute.id;
+          
+          // Format fee information
+          const feeRequired = (parseInt(dispute.feeRequired) / 1000000).toFixed(2);
+          const feePaid = (parseInt(dispute.feePaid) / 1000000).toFixed(2);
+          const feeRemaining = (dispute.feeRemaining / 1000000).toFixed(2);
+          
+          // Add status indicator
+          const statusText = dispute.canVote ? ' (Ready to Vote)' : ' (Needs Fee)';
+          option.textContent = `Dispute #${dispute.id} (${feePaid}/${feeRequired} TRB)${statusText}`;
+          option.dataset.disputeInfo = JSON.stringify(dispute);
+          disputeSelect.appendChild(option);
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load open disputes:', error);
+      const disputeSelect = document.getElementById('voteDisputeId');
+      disputeSelect.innerHTML = '<option value="">Error loading disputes</option>';
+    }
+  },
+
+  // Add fee to dispute
+  addFeeToDispute: async function() {
+    try {
+      if (!window.disputeProposer) {
+        throw new Error('DisputeProposer not initialized');
+      }
+
+      // Get form values
+      const disputeId = parseInt(document.getElementById('addFeeDisputeId').value);
+      const amount = document.getElementById('addFeeAmount').value;
+      const payFromBond = document.getElementById('addFeePayFromBond').checked;
+
+      // Validate inputs
+      if (!disputeId || disputeId <= 0) {
+        throw new Error('Please enter a valid dispute ID');
+      }
+      if (!amount || parseFloat(amount) <= 0) {
+        throw new Error('Please enter a valid amount');
+      }
+
+      // Get dispute information to check if user is the disputed reporter
+      const disputeInfo = await window.disputeProposer.getDisputeInfo(disputeId);
+      const metadata = disputeInfo.metadata;
+      
+      if (!metadata) {
+        throw new Error('Could not retrieve dispute information');
+      }
+
+      // Check if user is the disputed reporter
+      const userAddress = window.disputeProposer.currentAddress;
+      const disputedReporter = metadata.initial_evidence?.reporter;
+      
+      if (userAddress && disputedReporter && userAddress === disputedReporter && payFromBond) {
+        throw new Error('Disputed reporters cannot add fees from bond. Please uncheck "Pay from bond" or use a different wallet.');
+      }
+
+      // Show pending popup
+      App.showPendingPopup("Adding fee to dispute...");
+
+      // Add fee to dispute
+      const result = await window.disputeProposer.addFeeToDispute(disputeId, amount, payFromBond);
+      
+      // Hide pending popup
+      App.hidePendingPopup();
+      
+      if (result.success) {
+        // Show success popup with transaction hash and block explorer link
+        App.showSuccessPopup("Fee added to dispute successfully!", result.transactionHash, 'cosmos');
+        
+        // Clear form
+        document.getElementById('addFeeDisputeId').value = '';
+        document.getElementById('addFeeAmount').value = '';
+        document.getElementById('addFeePayFromBond').checked = false;
+      } else {
+        throw new Error('Failed to add fee to dispute');
+      }
+    } catch (error) {
+      console.error('Failed to add fee to dispute:', error);
+      App.hidePendingPopup();
+      App.showErrorPopup(error.message || 'Failed to add fee to dispute');
+    }
+  },
+
+  // Vote on a dispute
+  voteOnDispute: async function() {
+    try {
+      if (!window.disputeProposer) {
+        throw new Error('DisputeProposer not initialized');
+      }
+
+      // Get form values
+      const disputeId = parseInt(document.getElementById('voteDisputeId').value);
+      const voteChoice = document.getElementById('voteChoice').value;
+
+      // Validate inputs
+      if (!disputeId || disputeId <= 0) {
+        throw new Error('Please enter a valid dispute ID');
+      }
+      if (!voteChoice) {
+        throw new Error('Please select a vote choice');
+      }
+
+      // Get dispute information to check status
+      const disputeInfo = await window.disputeProposer.getDisputeInfo(disputeId);
+      const metadata = disputeInfo.metadata;
+      
+      if (!metadata) {
+        throw new Error('Could not retrieve dispute information');
+      }
+
+      // Check if dispute is in voting state
+      if (metadata.dispute_status !== 'DISPUTE_STATUS_VOTING') {
+        const status = metadata.dispute_status || 'Unknown';
+        const feeRequired = (parseInt(metadata.dispute_fee) / 1000000).toFixed(2);
+        const feePaid = (parseInt(metadata.fee_total) / 1000000).toFixed(2);
+        const feeRemaining = ((parseInt(metadata.dispute_fee) - parseInt(metadata.fee_total)) / 1000000).toFixed(2);
+        
+        throw new Error(`Dispute is not in voting state. Current status: ${status}. Fee required: ${feeRequired} TRB, Fee paid: ${feePaid} TRB, Fee remaining: ${feeRemaining} TRB. Please add the remaining fee first.`);
+      }
+
+      // Validate inputs using dispute module
+      if (!window.disputeProposer.validateDisputeId(disputeId)) {
+        throw new Error('Invalid dispute ID format');
+      }
+      if (!window.disputeProposer.validateVoteChoice(voteChoice)) {
+        throw new Error('Invalid vote choice');
+      }
+
+      // Show pending popup
+      App.showPendingPopup("Submitting vote...");
+
+      // Submit the vote
+      const result = await window.disputeProposer.voteOnDispute(disputeId, voteChoice);
+      
+      // Hide pending popup
+      App.hidePendingPopup();
+      
+      if (result.success) {
+        // Show success popup with transaction hash and block explorer link
+        App.showSuccessPopup("Vote submitted successfully!", result.transactionHash, 'cosmos');
+        
+        // Clear form
+        document.getElementById('voteDisputeId').value = '';
+        document.getElementById('voteChoice').value = '';
+      } else {
+        throw new Error('Failed to submit vote');
+      }
+    } catch (error) {
+      console.error('Failed to submit vote:', error);
+      App.hidePendingPopup();
+      App.showErrorPopup(error.message || 'Failed to submit vote');
+    }
+  },
+
+  // Get dispute information
+  getDisputeInfo: async function() {
+    try {
+      if (!window.disputeProposer) {
+        throw new Error('DisputeProposer not initialized');
+      }
+
+      const disputeId = parseInt(document.getElementById('queryDisputeId').value.trim());
+      
+      if (!disputeId || disputeId <= 0) {
+        throw new Error('Please enter a valid dispute ID');
+      }
+
+      // Show pending popup
+      App.showPendingPopup("Fetching dispute information...");
+
+      // Get dispute info
+      const disputeInfo = await window.disputeProposer.getDisputeInfo(disputeId);
+      const votingInfo = await window.disputeProposer.getVotingInfo(disputeId);
+      const hasVoted = await window.disputeProposer.hasVoted(disputeId);
+      
+      // Hide pending popup
+      App.hidePendingPopup();
+      
+      // Display results
+      const resultDiv = document.getElementById('disputeQueryResult');
+      resultDiv.innerHTML = `
+        <h3 class="text-lg font-semibold mb-2">Dispute #${disputeId}</h3>
+        <div class="bg-gray-100 p-3 rounded mb-3">
+          <pre class="text-sm">${JSON.stringify(disputeInfo, null, 2)}</pre>
+        </div>
+        <h4 class="text-md font-semibold mb-2">Voting Information</h4>
+        <div class="bg-gray-100 p-3 rounded mb-3">
+          <pre class="text-sm">${JSON.stringify(votingInfo, null, 2)}</pre>
+        </div>
+        <h4 class="text-md font-semibold mb-2">Your Voting Status</h4>
+        <div class="bg-gray-100 p-3 rounded">
+          <pre class="text-sm">${JSON.stringify(hasVoted, null, 2)}</pre>
+        </div>
+      `;
+      
+    } catch (error) {
+      console.error('Failed to get dispute info:', error);
+      App.hidePendingPopup();
+      App.showErrorPopup(error.message || 'Failed to get dispute information');
+    }
+  },
+
 
 };
 
@@ -4299,6 +5141,14 @@ window.App.claimWithdrawal = App.claimWithdrawal;  // Explicitly expose claimWit
 window.App.requestAttestation = App.requestAttestation;  // Also explicitly expose requestAttestation
 window.App.submitNoStakeReport = App.submitNoStakeReport;  // Expose no-stake report function
 window.App.checkNoStakeWalletStatus = App.checkNoStakeWalletStatus;  // Expose wallet status check
+window.App.proposeDispute = App.proposeDispute;  // Expose dispute function
+  window.App.voteOnDispute = App.voteOnDispute;  // Expose dispute voting function
+  window.App.loadOpenDisputes = App.loadOpenDisputes;  // Expose load open disputes function
+  window.App.refreshDisputesOnWalletConnect = App.refreshDisputesOnWalletConnect;  // Expose refresh disputes function
+  window.App.addFeeToDispute = App.addFeeToDispute;  // Expose add fee to dispute function
+  window.App.checkVotingPower = App.checkVotingPower;  // Expose voting power check function
+  window.App.loadAllDisputes = App.loadAllDisputes;  // Expose load all disputes function
+window.App.getDisputeInfo = App.getDisputeInfo;  // Expose dispute query function
 
 // Global function to hide TRB price tooltip
 window.hideTrbPriceTooltip = function() {
