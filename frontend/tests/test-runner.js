@@ -85,7 +85,7 @@ export class TestRunner {
       }
       
       // Store original methods before mocking
-      ['connectMetaMask', 'connectKeplr', 'disconnectMetaMask', 'disconnectKeplr'].forEach(method => {
+      ['connectMetaMask', 'connectKeplr', 'connectKeplrLegacy', 'connectCosmosWallet', 'disconnectMetaMask', 'disconnectKeplr', 'switchCosmosNetwork'].forEach(method => {
         if (window.App[method]) {
           window.App._originalMethods[method] = window.App[method];
         }
@@ -101,6 +101,21 @@ export class TestRunner {
     }
     if (window.keplr) {
       delete window.keplr;
+    }
+    if (window.cosmosWalletAdapter) {
+      delete window.cosmosWalletAdapter;
+    }
+    if (window.cosmjs) {
+      delete window.cosmjs;
+    }
+    
+    // Reset App state
+    if (window.App) {
+      window.App.cosmosChainId = 'layertest-4'; // Default to testnet
+      window.App.isKeplrConnected = false;
+      window.App.isConnected = false;
+      window.App.keplrAddress = null;
+      window.App.account = '0x0';
     }
   }
 

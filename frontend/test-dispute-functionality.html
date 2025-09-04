@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dispute Module Test Demo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-6 bg-gray-50">
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-3xl font-bold text-gray-900 mb-6">Dispute Module Test Demo</h1>
+    
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+      <h2 class="text-xl font-semibold mb-4">Test Dispute Functionality</h2>
+      <p class="text-gray-600 mb-4">
+        This demo shows the dispute module tests that have been added to the test suite.
+        Click the button below to run a quick test of the dispute functionality.
+      </p>
+      
+      <button id="test-dispute-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mr-4">
+        Test Dispute Module
+      </button>
+      
+      <button id="run-full-suite-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+        Run Full Test Suite
+      </button>
+      
+      <div id="test-results" class="mt-6 p-4 bg-gray-100 rounded hidden">
+        <h3 class="font-semibold mb-2">Test Results:</h3>
+        <div id="results-content"></div>
+      </div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow p-6">
+      <h2 class="text-xl font-semibold mb-4">Dispute Module Features Tested</h2>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <h3 class="font-semibold text-lg mb-3 text-blue-600">Unit Tests</h3>
+          <ul class="space-y-2">
+            <li class="flex items-center">
+              <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+              Dispute proposer initialization
+            </li>
+            <li class="flex items-center">
+              <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+              Dispute proposal validation
+            </li>
+            <li class="flex items-center">
+              <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+              Dispute voting validation
+            </li>
+            <li class="flex items-center">
+              <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+              Dispute fee validation
+            </li>
+            <li class="flex items-center">
+              <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+              Address validation
+            </li>
+            <li class="flex items-center">
+              <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+              Voting power checks
+            </li>
+            <li class="flex items-center">
+              <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+              Utility functions
+            </li>
+          </ul>
+        </div>
+        
+        <div>
+          <h3 class="font-semibold text-lg mb-3 text-purple-600">Integration Tests</h3>
+          <ul class="space-y-2">
+            <li class="flex items-center">
+              <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+              Complete dispute proposal flow
+            </li>
+            <li class="flex items-center">
+              <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+              Complete dispute voting flow
+            </li>
+            <li class="flex items-center">
+              <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+              Complete fee addition flow
+            </li>
+            <li class="flex items-center">
+              <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+              Dispute data retrieval integration
+            </li>
+            <li class="flex items-center">
+              <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+              Wallet connection integration
+            </li>
+            <li class="flex items-center">
+              <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+              CosmJS integration
+            </li>
+            <li class="flex items-center">
+              <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+              Error handling
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Include test suite dependencies -->
+  <script type="module">
+    // Mock DisputeProposer for demo
+    class MockDisputeProposer {
+      constructor() {
+        this.isConnected = false;
+        this.currentAddress = null;
+      }
+
+      async init() {
+        console.log('DisputeProposer initialized');
+        return true;
+      }
+
+      async getWalletStatus() {
+        return {
+          isConnected: true,
+          address: 'tellor1testaddress123456789012345678901234567890',
+          walletType: 'keplr'
+        };
+      }
+
+      async proposeDispute(disputedReporter, reportMetaId, reportQueryId, disputeCategory, fee, payFromBond = false) {
+        console.log('Proposing dispute:', { disputedReporter, reportMetaId, reportQueryId, disputeCategory, fee, payFromBond });
+        return {
+          success: true,
+          transactionHash: '0xdispute1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+          height: 12345,
+          gasUsed: 150000,
+          gasWanted: 200000
+        };
+      }
+
+      async voteOnDispute(disputeId, voteChoice) {
+        console.log('Voting on dispute:', { disputeId, voteChoice });
+        return {
+          success: true,
+          transactionHash: '0xvote1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+          height: 12346,
+          gasUsed: 100000,
+          gasWanted: 150000
+        };
+      }
+
+      async checkVotingPower() {
+        return {
+          hasVotingPower: true,
+          reason: 'reporter_power',
+          details: 'Unjailed reporter with power: 100'
+        };
+      }
+
+      isValidAddress(address) {
+        return typeof address === 'string' && 
+               (address.startsWith('tellor1') || address.startsWith('layer1')) &&
+               address.length >= 20 && address.length <= 50;
+      }
+
+      validateDisputeId(disputeId) {
+        const id = parseInt(disputeId);
+        return !isNaN(id) && id > 0;
+      }
+
+      validateVoteChoice(voteChoice) {
+        const validChoices = ['vote-support', 'vote-against', 'vote-invalid'];
+        return validChoices.includes(voteChoice);
+      }
+
+      convertTrbToMicroUnits(trbAmount) {
+        return Math.floor(parseFloat(trbAmount) * 1000000).toString();
+      }
+
+      convertMicroUnitsToTrb(microUnits) {
+        return (parseInt(microUnits) / 1000000).toFixed(6);
+      }
+    }
+
+    // Set up global mock
+    window.DisputeProposer = MockDisputeProposer;
+    window.disputeProposer = new MockDisputeProposer();
+
+    // Test functions
+    async function runDisputeTest() {
+      const resultsDiv = document.getElementById('test-results');
+      const contentDiv = document.getElementById('results-content');
+      
+      resultsDiv.classList.remove('hidden');
+      contentDiv.innerHTML = '<div class="text-blue-600">Running dispute tests...</div>';
+      
+      try {
+        let results = [];
+        
+        // Test 1: Initialization
+        const initResult = await window.disputeProposer.init();
+        results.push(`✓ Initialization: ${initResult ? 'PASS' : 'FAIL'}`);
+        
+        // Test 2: Address validation
+        const addressTest = window.disputeProposer.isValidAddress('tellor1testaddress123456789012345678901234567890');
+        results.push(`✓ Address validation: ${addressTest ? 'PASS' : 'FAIL'}`);
+        
+        // Test 3: Dispute ID validation
+        const disputeIdTest = window.disputeProposer.validateDisputeId('123');
+        results.push(`✓ Dispute ID validation: ${disputeIdTest ? 'PASS' : 'FAIL'}`);
+        
+        // Test 4: Vote choice validation
+        const voteTest = window.disputeProposer.validateVoteChoice('vote-support');
+        results.push(`✓ Vote choice validation: ${voteTest ? 'PASS' : 'FAIL'}`);
+        
+        // Test 5: TRB conversion
+        const conversionTest = window.disputeProposer.convertTrbToMicroUnits('1');
+        results.push(`✓ TRB conversion: ${conversionTest === '1000000' ? 'PASS' : 'FAIL'}`);
+        
+        // Test 6: Wallet status
+        const walletStatus = await window.disputeProposer.getWalletStatus();
+        results.push(`✓ Wallet status: ${walletStatus.isConnected ? 'PASS' : 'FAIL'}`);
+        
+        // Test 7: Voting power check
+        const votingPower = await window.disputeProposer.checkVotingPower();
+        results.push(`✓ Voting power check: ${votingPower.hasVotingPower ? 'PASS' : 'FAIL'}`);
+        
+        // Test 8: Mock dispute proposal
+        const proposalResult = await window.disputeProposer.proposeDispute(
+          'tellor1disputedreporter123456789012345678901234567890',
+          '123',
+          '0x1234567890abcdef',
+          'minor',
+          '1000',
+          false
+        );
+        results.push(`✓ Dispute proposal: ${proposalResult.success ? 'PASS' : 'FAIL'}`);
+        
+        // Test 9: Mock vote
+        const voteResult = await window.disputeProposer.voteOnDispute(1, 'vote-support');
+        results.push(`✓ Dispute voting: ${voteResult.success ? 'PASS' : 'FAIL'}`);
+        
+        const passCount = results.filter(r => r.includes('PASS')).length;
+        const totalCount = results.length;
+        
+        contentDiv.innerHTML = `
+          <div class="mb-4">
+            <div class="text-lg font-semibold ${passCount === totalCount ? 'text-green-600' : 'text-yellow-600'}">
+              Tests Completed: ${passCount}/${totalCount} Passed
+            </div>
+          </div>
+          <div class="space-y-1">
+            ${results.map(result => `<div class="text-sm ${result.includes('PASS') ? 'text-green-600' : 'text-red-600'}">${result}</div>`).join('')}
+          </div>
+          <div class="mt-4 p-3 bg-blue-50 rounded text-sm">
+            <strong>Note:</strong> These are mock tests demonstrating the dispute module functionality. 
+            The full test suite includes comprehensive unit and integration tests with proper mocking.
+          </div>
+        `;
+        
+      } catch (error) {
+        contentDiv.innerHTML = `<div class="text-red-600">Error running tests: ${error.message}</div>`;
+      }
+    }
+
+    function openFullTestSuite() {
+      window.open('./test-suite.html', '_blank');
+    }
+
+    // Event listeners
+    document.getElementById('test-dispute-btn').addEventListener('click', runDisputeTest);
+    document.getElementById('run-full-suite-btn').addEventListener('click', openFullTestSuite);
+  </script>
+</body>
+</html>

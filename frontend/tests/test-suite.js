@@ -257,12 +257,38 @@ export class TestSuite {
           rest: 'https://test-rest.com'
         };
       },
+      getChainId: async () => {
+        // Default to testnet, but can be overridden
+        return 'layertest-4';
+      },
       getKey: async (chainId) => {
         return {
           name: 'Test Wallet',
-          address: 'cosmos1testaddress123456789012345678901234567890',
+          address: 'tellor1testaddress123456789012345678901234567890',
           pubKey: new Uint8Array([1, 2, 3, 4, 5]),
           addressBytes: new Uint8Array([1, 2, 3, 4, 5])
+        };
+      },
+      getOfflineSigner: (chainId) => {
+        return {
+          getAccounts: async () => [{
+            address: 'tellor1testaddress123456789012345678901234567890',
+            pubkey: new Uint8Array([1, 2, 3, 4, 5])
+          }],
+          signAmino: async (signer, signDoc) => ({
+            signed: signDoc,
+            signature: {
+              pub_key: { type: 'tendermint/PubKeySecp256k1', value: 'test' },
+              signature: 'test-signature'
+            }
+          }),
+          signDirect: async (signer, signDoc) => ({
+            signature: {
+              pub_key: { type: 'tendermint/PubKeySecp256k1', value: 'test' },
+              signature: 'test-signature'
+            },
+            signed: signDoc
+          })
         };
       },
       signAmino: async (chainId, signer, signDoc) => {
@@ -282,11 +308,42 @@ export class TestSuite {
           },
           signed: signDoc
         };
+      },
+      experimentalSuggestChain: async (chainConfig) => {
+        return true;
       }
     };
     
     this.mocks.set('keplr', provider);
     return provider;
+  }
+
+  // Mock CosmJS Stargate Client
+  mockCosmjsStargate() {
+    const client = {
+      connectWithSigner: async (rpcEndpoint, offlineSigner, options = {}) => {
+        return {
+          signAndBroadcastDirect: async (address, messages, fee, memo) => {
+            return {
+              code: 0,
+              txhash: 'test-tx-hash-1234567890abcdef',
+              height: 12345,
+              gasUsed: 50000,
+              gasWanted: 100000
+            };
+          },
+          getBalance: async (address) => {
+            return {
+              amount: '1000000000', // 1000 TRB in micro units
+              denom: 'loya'
+            };
+          }
+        };
+      }
+    };
+    
+    this.mocks.set('cosmjsStargate', client);
+    return client;
   }
 
   // Mock Web3 Instance
@@ -444,6 +501,281 @@ export class TestSuite {
     
     this.mocks.set('ethers', ethers);
     return ethers;
+  }
+
+  // Mock DisputeProposer Instance
+  mockDisputeProposer() {
+    const disputeProposer = {
+      init: async () => true,
+      isConnected: false,
+      currentAddress: null,
+      currentNetwork: null,
+      
+      getWalletStatus: async () => ({
+        isConnected: true,
+        address: 'tellor1testaddress123456789012345678901234567890',
+        walletType: 'keplr'
+      }),
+      
+      disconnectWallet: () => {
+        disputeProposer.isConnected = false;
+        disputeProposer.currentAddress = null;
+      },
+      
+      proposeDispute: async (disputedReporter, reportMetaId, reportQueryId, disputeCategory, fee, payFromBond = false) => {
+        return {
+          success: true,
+          transactionHash: '0xdispute1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+          height: 12345,
+          gasUsed: 150000,
+          gasWanted: 200000
+        };
+      },
+      
+      voteOnDispute: async (disputeId, voteChoice) => {
+        return {
+          success: true,
+          transactionHash: '0xvote1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+          height: 12346,
+          gasUsed: 100000,
+          gasWanted: 150000
+        };
+      },
+      
+      addFeeToDispute: async (disputeId, amount, payFromBond = false) => {
+        return {
+          success: true,
+          transactionHash: '0xaddfee1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+          height: 12347,
+          gasUsed: 80000,
+          gasWanted: 120000
+        };
+      },
+      
+      getBalance: async () => 1000.0, // 1000 TRB
+      
+      getDisputeInfo: async (disputeId) => ({
+        disputeId: disputeId.toString(),
+        disputeStatus: 'DISPUTE_STATUS_VOTING',
+        metadata: {
+          dispute_status: 'DISPUTE_STATUS_VOTING',
+          dispute_fee: '1000000000', // 1000 TRB in micro units
+          fee_total: '500000000',    // 500 TRB paid
+          slash_amount: '1000000000',
+          dispute_start_time: '2024-01-01T00:00:00Z',
+          dispute_end_time: '2024-01-08T00:00:00Z',
+          initial_evidence: {
+            reporter: 'tellor1reporter123456789012345678901234567890',
+            query_id: '0x1234567890abcdef'
+          }
+        }
+      }),
+      
+      getVotingInfo: async (disputeId) => ({
+        disputeId: disputeId,
+        status: 'DISPUTE_STATUS_VOTING',
+        endTime: '2024-01-08T00:00:00Z',
+        message: 'Mock voting info'
+      }),
+      
+      hasVoted: async (disputeId) => ({
+        hasVoted: false,
+        vote: null
+      }),
+      
+      checkVotingPower: async () => ({
+        hasVotingPower: true,
+        reason: 'reporter_power',
+        details: 'Unjailed reporter with power: 100'
+      }),
+      
+      getAllDisputes: async () => [
+        {
+          disputeId: '1',
+          metadata: {
+            dispute_status: 'DISPUTE_STATUS_VOTING',
+            dispute_fee: '1000000000',
+            fee_total: '500000000',
+            slash_amount: '1000000000',
+            initial_evidence: {
+              reporter: 'tellor1reporter123456789012345678901234567890',
+              query_id: '0x1234567890abcdef'
+            }
+          }
+        },
+        {
+          disputeId: '2',
+          metadata: {
+            dispute_status: 'DISPUTE_STATUS_RESOLVED',
+            dispute_fee: '2000000000',
+            fee_total: '2000000000',
+            slash_amount: '2000000000',
+            initial_evidence: {
+              reporter: 'tellor1reporter987654321098765432109876543210',
+              query_id: '0xfedcba0987654321'
+            }
+          }
+        }
+      ],
+      
+      getAllDisputesForQuery: async () => ({
+        disputes: [
+          {
+            disputeId: '1',
+            displayData: {
+              disputeId: '1',
+              disputeCategory: 'MINOR',
+              disputeStatus: 'DISPUTE_STATUS_VOTING',
+              disputeFee: '1000.000000',
+              feeTotal: '500.000000',
+              feeRemaining: '500.000000',
+              reporter: 'tellor1reporter123456789012345678901234567890',
+              queryId: '0x1234567890abcdef'
+            }
+          }
+        ],
+        pagination: { total: "1" }
+      }),
+      
+      getOpenDisputes: async () => [
+        {
+          id: '1',
+          status: 'DISPUTE_STATUS_VOTING',
+          feeRequired: '1000000000',
+          feePaid: '500000000',
+          feeRemaining: 500000000,
+          canVote: true
+        }
+      ],
+      
+      validateDisputeId: (disputeId) => {
+        const id = parseInt(disputeId);
+        return !isNaN(id) && id > 0;
+      },
+      
+      validateVoteChoice: (voteChoice) => {
+        const validChoices = ['vote-support', 'vote-against', 'vote-invalid'];
+        return validChoices.includes(voteChoice);
+      },
+      
+      isValidAddress: (address) => {
+        return typeof address === 'string' && 
+               (address.startsWith('tellor1') || address.startsWith('layer1')) &&
+               address.length >= 20 && address.length <= 50;
+      },
+      
+      validateReportMetaId: (reportMetaId) => {
+        return typeof reportMetaId === 'string' && reportMetaId.trim() !== '';
+      },
+      
+      validateReportQueryId: (reportQueryId) => {
+        return typeof reportQueryId === 'string' && reportQueryId.trim() !== '';
+      },
+      
+      convertTrbToMicroUnits: (trbAmount) => {
+        return Math.floor(parseFloat(trbAmount) * 1000000).toString();
+      },
+      
+      convertMicroUnitsToTrb: (microUnits) => {
+        return (parseInt(microUnits) / 1000000).toFixed(6);
+      },
+      
+      getConnectionStatus: () => ({
+        isConnected: disputeProposer.isConnected,
+        address: disputeProposer.currentAddress,
+        network: disputeProposer.currentNetwork
+      })
+    };
+    
+    this.mocks.set('disputeProposer', disputeProposer);
+    return disputeProposer;
+  }
+
+  // Mock CosmJS Stargate Client
+  mockStargateClient() {
+    const client = {
+      connectWithSigner: async (rpcEndpoint, offlineSigner) => ({
+        signAndBroadcastDirect: async (address, messages, fee, memo) => ({
+          code: 0,
+          transactionHash: '0xstargate1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+          height: 12345,
+          gasUsed: 150000,
+          gasWanted: 200000,
+          tx_response: {
+            txhash: '0xstargate1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+            height: 12345,
+            gas_used: '150000',
+            gas_wanted: '200000'
+          }
+        }),
+        
+        getBalance: async (address, denom) => ({
+          amount: '1000000000', // 1000 TRB in micro units
+          denom: denom || 'loya'
+        }),
+        
+        getAllBalances: async (address) => [
+          {
+            amount: '1000000000',
+            denom: 'loya'
+          }
+        ],
+        
+        disconnect: () => {}
+      })
+    };
+    
+    this.mocks.set('stargateClient', client);
+    return client;
+  }
+
+  // Mock Layer Proto Definitions
+  mockLayerProto() {
+    const layerProto = {
+      createMsgProposeDispute: (creator, disputedReporter, reportMetaId, reportQueryId, disputeCategory, fee, payFromBond) => ({
+        typeUrl: '/layer.dispute.MsgProposeDispute',
+        value: {
+          creator,
+          disputedReporter,
+          reportMetaId,
+          reportQueryId,
+          disputeCategory,
+          fee,
+          payFromBond
+        }
+      }),
+      
+      createMsgVote: (voter, disputeId, voteChoice) => ({
+        typeUrl: '/layer.dispute.MsgVote',
+        value: {
+          voter,
+          id: disputeId,
+          vote: layerProto.convertVoteChoiceToEnum(voteChoice)
+        }
+      }),
+      
+      createMsgAddFeeToDispute: (creator, disputeId, amount, payFromBond) => ({
+        typeUrl: '/layer.dispute.MsgAddFeeToDispute',
+        value: {
+          creator,
+          disputeId,
+          amount,
+          payFromBond
+        }
+      }),
+      
+      convertVoteChoiceToEnum: (voteChoice) => {
+        const voteMap = {
+          'vote-support': 1,
+          'vote-against': 2,
+          'vote-invalid': 3
+        };
+        return voteMap[voteChoice] || 0;
+      }
+    };
+    
+    this.mocks.set('layerProto', layerProto);
+    return layerProto;
   }
 
   // Mock Contract Methods

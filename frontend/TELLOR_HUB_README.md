@@ -1,4 +1,4 @@
-# Space Station Layout - Tellor Hub
+# Tellor Hub Layout
 
 ## Overview
 
@@ -12,7 +12,7 @@ The Tellor Hub has been transformed from a bridge-focused interface into a space
 - **Animation**: Continuous pulsing glow animation
 
 ### 2. Orbiting Pods
-Four pods orbit around the central hub, each representing a different function:
+Modules surround the central hub, each representing a different function:
 
 #### 🌉 Bridge to Tellor
 - **Function**: Transfer TRB tokens from Ethereum to Tellor Layer
@@ -42,11 +42,6 @@ Four pods orbit around the central hub, each representing a different function:
 
 ## Features
 
-### Orbital Animation
-- **Default State**: Pods are stationary (animation paused)
-- **Hover Effect**: Pods begin orbiting when hovered
-- **Active State**: Selected pod orbits continuously and scales up
-- **Orbit Pattern**: Each pod has a different animation delay for staggered movement
 
 ### Interactive Elements
 - **Pod Selection**: Click any pod to activate its function
@@ -101,14 +96,13 @@ frontend/
 ## Customization
 
 ### Colors
-The space station theme uses Tellor's brand colors:
+The hub theme uses Tellor's brand colors:
 - Primary: `#003734` (Dark Teal)
 - Secondary: `#38A8A3` (Medium Teal)  
 - Accent: `#88FFEC` (Light Teal)
 - Background: `#C4EDEB` (Light Background)
 
 ### Animations
-- **Orbit Speed**: Adjustable via CSS animation duration
 - **Glow Effects**: Customizable intensity and colors
 - **Transition Timing**: Smooth transitions with configurable easing
 

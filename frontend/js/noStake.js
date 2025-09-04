@@ -126,7 +126,9 @@ class NoStakeReporter {
             if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
                 offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
             } else if (window.keplr) {
-                offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+                // Use the detected chain ID instead of hardcoded fallback
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                offlineSigner = window.keplr.getOfflineSigner(chainId);
             } else {
                 throw new Error('No wallet connected.');
             }

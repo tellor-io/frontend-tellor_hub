@@ -149,7 +149,9 @@ class DisputeProposer {
             if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
                 offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
             } else if (window.keplr) {
-                offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+                // Use the detected chain ID instead of hardcoded fallback
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                offlineSigner = window.keplr.getOfflineSigner(chainId);
             } else {
                 throw new Error('No wallet connected.');
             }
@@ -392,7 +394,9 @@ class DisputeProposer {
             if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
                 offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
             } else if (window.keplr) {
-                offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+                // Use the detected chain ID instead of hardcoded fallback
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                offlineSigner = window.keplr.getOfflineSigner(chainId);
             } else {
                 throw new Error('No wallet connected.');
             }
@@ -549,7 +553,9 @@ class DisputeProposer {
             if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
                 offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
             } else if (window.keplr) {
-                offlineSigner = window.keplr.getOfflineSigner('layertest-4');
+                // Use the detected chain ID instead of hardcoded fallback
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                offlineSigner = window.keplr.getOfflineSigner(chainId);
             } else {
                 throw new Error('No wallet connected.');
             }
@@ -790,7 +796,64 @@ class DisputeProposer {
 
             console.log('Checking voting power for address:', this.currentAddress);
 
-            // Check condition 1: Is team address
+            // Check condition 1: Is selector address (check if connected wallet is a selector)
+            try {
+                const selectorResponse = await fetch(`${rpcEndpoint}/tellor-io/layer/reporter/selector-reporter/${this.currentAddress}`);
+                if (selectorResponse.ok) {
+                    const selectorData = await selectorResponse.json();
+                    if (selectorData.code === 0 && selectorData.message) {
+                        // Selector found, now check if the returned reporter address has voting power
+                        const reporterAddress = selectorData.message;
+                        console.log('User is selector, checking reporter address:', reporterAddress);
+                        
+                        // Query the reporters endpoint with the returned address
+                        const reportersResponse = await fetch(`${rpcEndpoint}/tellor-io/layer/reporter/reporters`);
+                        if (reportersResponse.ok) {
+                            const reportersData = await reportersResponse.json();
+                            const reporter = reportersData.reporters?.find(r => r.address === reporterAddress);
+                            
+                            if (reporter) {
+                                const power = parseInt(reporter.power || '0');
+                                const isJailed = reporter.metadata?.jailed === true;
+                                
+                                if (!isJailed && power >= 1) {
+                                    console.log('Selector\'s reporter is unjailed with sufficient power - has voting power:', power);
+                                    return {
+                                        hasVotingPower: true,
+                                        reason: 'selector_reporter_power',
+                                        details: `Selector for unjailed reporter ${reporterAddress} with power: ${power}`
+                                    };
+                                } else if (isJailed) {
+                                    console.log('Selector\'s reporter is jailed - no voting power');
+                                } else {
+                                    console.log('Selector\'s reporter has insufficient power:', power);
+                                }
+                            } else {
+                                console.log('Selector\'s reporter address not found in reporters list');
+                            }
+                        }
+                    }
+                } else if (selectorResponse.status === 500) {
+                    // Check if this is the expected "not found" error
+                    try {
+                        const errorData = await selectorResponse.json();
+                        if (errorData.code === 2 && errorData.message && errorData.message.includes('not found')) {
+                            console.log('Address is not a selector (not found in selector registry)');
+                            // Continue to other checks
+                        } else {
+                            console.warn('Unexpected selector query error:', errorData);
+                        }
+                    } catch (parseError) {
+                        console.warn('Failed to parse selector error response:', parseError);
+                    }
+                } else {
+                    console.warn('Selector query failed with status:', selectorResponse.status);
+                }
+            } catch (error) {
+                console.warn('Failed to check selector status:', error);
+            }
+
+            // Check condition 2: Is team address
             try {
                 const teamResponse = await fetch(`${rpcEndpoint}/tellor-io/layer/dispute/team-address`);
                 if (teamResponse.ok) {
@@ -808,7 +871,7 @@ class DisputeProposer {
                 console.warn('Failed to check team address:', error);
             }
 
-            // Check condition 2: Has sufficient tips (>= 10,000 loya)
+            // Check condition 3: Has sufficient tips (>= 10,000 loya)
             try {
                 const tipsResponse = await fetch(`${rpcEndpoint}/tellor-io/layer/oracle/get_user_tip_total/${this.currentAddress}`);
                 if (tipsResponse.ok) {
@@ -827,7 +890,7 @@ class DisputeProposer {
                 console.warn('Failed to check user tips:', error);
             }
 
-            // Check condition 3: Is unjailed reporter with power >= 1
+            // Check condition 4: Is unjailed reporter with power >= 1
             try {
                 const reportersResponse = await fetch(`${rpcEndpoint}/tellor-io/layer/reporter/reporters`);
                 if (reportersResponse.ok) {

@@ -556,13 +556,10 @@
 /* Side Navigation Menu */
 .side-nav-menu {
   width: 250px;
-  background: rgba(196, 237, 235, 0.95);
+  background: white;
   border: 3px solid #003734;
   border-radius: 20px;
   padding: 20px;
-  box-shadow: 
-    0 10px 30px rgba(0, 55, 52, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);
   min-height: fit-content; /* Allow natural content height */
   max-height: calc(100vh - 120px); /* Match function container height for visual consistency */
@@ -609,7 +606,6 @@
 .side-nav-options {
   display: flex;
   flex-direction: column;
-  gap: 12px;
 }
 
 .nav-option {
@@ -662,13 +658,10 @@
 
 
 .function-container {
-  background: rgba(196, 237, 235, 0.95);
+  background: white;
   border: 3px solid #003734;
   border-radius: 20px;
   padding: 25px;
-  box-shadow: 
-    0 10px 30px rgba(0, 55, 52, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(10px);
   height: calc(100vh - 120px); /* Maximize height for dispute module content */
   max-height: calc(100vh - 120px); /* Use almost full viewport height */
@@ -1348,6 +1341,84 @@
 }
 
 /* Add visual indicator for scrollable content */
+
+/* Dispute Header Row - Inline Title and Wallet Message */
+.dispute-header-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.dispute-header-row h3 {
+  margin-bottom: 0 !important;
+}
+
+.wallet-disclaimer-inline {
+  font-size: 12px;
+  color: #64748b;
+  font-style: italic;
+  white-space: nowrap;
+}
+
+/* Ensure scroll indicator is visible when propose dispute tab is active */
+#proposeDisputeTab.active .scroll-indicator-subtle {
+  display: block !important;
+  opacity: 0.7 !important;
+}
+
+/* Hide scroll indicator when propose dispute tab is not active */
+#proposeDisputeTab:not(.active) .scroll-indicator-subtle {
+  display: none !important;
+}
+
+/* Subtle Scroll Indicator Styles */
+.scroll-indicator-subtle {
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+  margin-top: 80px;
+  align-self: center;
+}
+
+.scroll-indicator-subtle:hover {
+  opacity: 1;
+}
+
+.scroll-indicator-subtle-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 400;
+}
+
+.scroll-indicator-dots {
+  font-size: 14px;
+  opacity: 0.6;
+}
+
+.scroll-indicator-text-subtle {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.scroll-indicator-arrow-subtle {
+  font-size: 12px;
+  animation: gentle-bounce 2s ease-in-out infinite;
+}
+
+@keyframes gentle-bounce {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(2px);
+    opacity: 0.9;
+  }
+}
 #disputeSection::after {
   content: '';
   display: block;
@@ -1440,15 +1511,18 @@
   box-sizing: border-box !important;
 }
 
-/* Special handling for containers with refresh buttons */
+/* Special handling for containers with refresh buttons - applies to both dispute and delegate sections */
 .dispute-input-container:has(.refresh-btn) .dispute-input,
-.dispute-input-container:has(.refresh-btn) select {
-  border-radius: 0 !important; /* No right radius when button present */
+.dispute-input-container:has(.refresh-btn) select,
+.input-with-label:has(.refresh-btn) .input-address,
+.input-with-label:has(.refresh-btn) select {
+  border-radius: 8px 0 0 8px !important; /* Rounded left corners only when button present */
   border-right: none !important; /* No right border when button present */
 }
 
-/* Refresh button styling to connect seamlessly */
-.dispute-input-container .refresh-btn {
+/* Refresh button styling to connect seamlessly - works for both dispute and delegate sections */
+.dispute-input-container .refresh-btn,
+.input-with-label .refresh-btn {
   height: 48px !important; /* Match input and label height */
   padding: 12px !important;
   margin: 0 !important;
@@ -1465,9 +1539,15 @@
   min-width: 48px !important;
   flex-shrink: 0 !important;
   box-sizing: border-box !important;
+  position: relative !important; /* Override absolute positioning */
+  top: auto !important;
+  right: auto !important;
+  transform: none !important;
+  z-index: auto !important;
 }
 
-.dispute-input-container .refresh-btn:hover {
+.dispute-input-container .refresh-btn:hover,
+.input-with-label .refresh-btn:hover {
   background-color: #f1f5f9 !important;
   color: #3b82f6 !important;
   border-color: #3b82f6 !important;
@@ -1494,6 +1574,7 @@
   cursor: pointer !important;
 }
 
+/* Default refresh button styling for standalone buttons (like in query disputes header) */
 .refresh-btn {
   padding: 8px !important;
   border: 1px solid #e2e8f0 !important;
@@ -1561,6 +1642,40 @@
   gap: 12px !important;
 }
 
+/* Ensure query disputes refresh button maintains standalone styling */
+.disputes-controls .refresh-btn {
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
+  transform: none !important;
+  border-radius: 6px !important;
+  border: 1px solid #e2e8f0 !important;
+  background-color: #ffffff !important;
+  height: 32px !important;
+  min-width: 32px !important;
+}
+
+/* Override main.css absolute positioning for delegate section refresh button */
+#delegateSection .refresh-btn {
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
+  transform: none !important;
+  z-index: auto !important;
+  height: 45px !important; /* Match delegate section input-address height */
+  padding: 18px 12px !important; /* Match delegate section input padding */
+  margin-top: 12px !important;
+}
+
+/* Ensure vote dispute refresh button gets proper connected styling */
+#voteDisputeTab .dispute-input-container .refresh-btn {
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
+  transform: none !important;
+  z-index: auto !important;
+}
+
 .disputes-count {
   font-size: 14px !important;
   color: #64748b !important;
@@ -1587,10 +1702,10 @@
 .disputes-wallet-required {
   text-align: center !important;
   padding: 40px 20px !important;
-  background: #f0f9ff !important;
-  border: 1px solid #bae6fd !important;
+  background: white !important;
+  border: 1px solid #3c3e3e !important;
   border-radius: 8px !important;
-  color: #0369a1 !important;
+  color: #008D8B !important;
   font-size: 16px !important;
 }
 
@@ -1845,6 +1960,7 @@
 .dispute-submit-container {
   flex: 0 0 auto !important;
   display: flex !important;
+  flex-direction: column !important;
   align-items: flex-start !important;
   padding-top: 45px !important;
 }

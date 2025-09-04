@@ -1,246 +1,195 @@
 # Layer Bridge Test Suite
 
-A comprehensive test suite for the Layer Bridge frontend application that ensures all functionality works correctly before and after changes.
-
 ## Overview
-
-This test suite covers:
-- **Unit Tests**: Individual component and function testing
-- **Integration Tests**: Component interaction and user flow testing
-- **Mock Providers**: Simulated wallet connections and network calls
-- **Performance Tests**: App initialization and UI responsiveness
-
-## Quick Start
-
-1. **Open the test suite**:
-   ```bash
-   # Navigate to the tests directory
-   cd frontend/tests
-   
-   # Open test-suite.html in your browser
-   open test-suite.html  # macOS
-   # or
-   xdg-open test-suite.html  # Linux
-   # or just double-click the file
-   ```
-
-2. **Run tests**:
-   - Click "Run All Tests" to test everything
-   - Click "Run Unit Tests Only" for component testing
-   - Click "Run Integration Tests Only" for flow testing
-
-3. **View results**:
-   - Real-time progress bar
-   - Pass/Fail/Skip counts
-   - Detailed test results with error messages
-   - Performance metrics
+Comprehensive test suite for the Layer Bridge frontend application, covering both unit and integration tests with enhanced network detection capabilities.
 
 ## Test Categories
 
-### Unit Tests (40+ tests)
-- **Core App**: App object, initialization, web3 provider
-- **Wallet Connections**: MetaMask, Keplr, Cosmostation, Leap
-- **Bridge Functions**: Deposit, withdrawal, delegation flows
-- **Input Validation**: Amount, address, balance, allowance checking
-- **UI Components**: Wallet manager, network display, buttons
-- **Utilities**: Web3, ethers, error handling
+### 1. Core App Tests
+- App object existence and properties
+- App initialization structure
+- Web3 provider initialization
+- Contract initialization
 
-### Integration Tests (20+ tests)
-- **User Flows**: Complete bridge and delegation workflows
-- **Wallet Integration**: Dropdown interaction, network switching
-- **UI Integration**: Tab switching, input validation, button sync
-- **Error Handling**: Cross-component error management
-- **Performance**: Initialization time, UI responsiveness
+### 2. Wallet Connection Tests
+- MetaMask connection structure
+- Keplr connection structure
+- Wallet disconnection methods
 
-## Configuration Options
+### 3. Network Detection Tests (NEW!)
+- **Network detection for mainnet** - Tests automatic detection of Tellor Mainnet (`tellor-1`)
+- **Network detection for testnet** - Tests automatic detection of Palmito Testnet (`layertest-4`)
+- **Network switching functionality** - Tests switching between mainnet and testnet
+- **Cosmos wallet adapter network detection** - Tests network detection with wallet adapters
 
-- **Mock Wallets**: Simulate wallet connections without real wallets
-- **Mock Networks**: Simulate network calls for consistent testing
-- **Verbose Logging**: Detailed console output during test runs
+### 4. Enhanced Functional Tests (NEW!)
+- **Withdrawal button functionality on mainnet** - Tests withdrawal UI and logic on Tellor Mainnet
+- **Withdrawal button functionality on testnet** - Tests withdrawal UI and logic on Palmito Testnet
+- **Delegate button functionality on mainnet** - Tests delegation UI and logic on Tellor Mainnet
+- **Delegate button functionality on testnet** - Tests delegation UI and logic on Palmito Testnet
+- **Dispute functions on mainnet** - Tests dispute functionality on Tellor Mainnet
+- **Dispute functions on testnet** - Tests dispute functionality on Palmito Testnet
+- **No-stake reporting on mainnet** - Tests no-stake reporting on Tellor Mainnet
+- **No-stake reporting on testnet** - Tests no-stake reporting on Palmito Testnet
 
-## Test Structure
+### 5. Bridge Function Tests
+- Bridge direction switching
+- Deposit approval flow
+- Deposit execution flow
+- Withdrawal request flow
+- Delegation flow
 
-```
-tests/
-├── test-suite.html          # Main test interface
-├── test-runner.js           # Test orchestration
-├── test-suite.js            # Base testing utilities
-├── unit-tests.js            # Individual component tests
-├── integration-tests.js     # Component interaction tests
-├── mock-provider.js         # Wallet and network mocks
-├── package.json             # Test suite metadata
-└── README.md               # This file
-```
+### 6. No-Stake Reporting Tests
+- No-stake reporting tab structure
+- No-stake reporting functionality
+- No-stake reporting validation
 
-## Writing New Tests
+### 7. Dispute System Tests
+- Dispute proposer structure
+- Dispute proposal functionality
+- Dispute voting functionality
+- Dispute fee management
+- Dispute validation
 
-### Adding Unit Tests
+## Network Detection Features Tested
 
+### Automatic Network Detection
+- **Keplr Chain ID Detection**: Tests `window.keplr.getChainId()` for automatic network detection
+- **Wallet Adapter Detection**: Tests `window.cosmosWalletAdapter.getChainId()` for wallet adapter networks
+- **Fallback Handling**: Tests graceful fallback to testnet when detection fails
+
+### Network-Specific Functionality
+- **RPC Endpoint Selection**: Tests correct endpoint selection based on detected network
+  - Mainnet: `https://mainnet.tellorlayer.com`
+  - Testnet: `https://node-palmito.tellorlayer.com`
+- **Chain ID Validation**: Tests proper `cosmosChainId` setting (`tellor-1` vs `layertest-4`)
+- **Button State Management**: Tests UI button states based on network and connection status
+
+### Network Switching
+- **Mainnet to Testnet**: Tests switching from `tellor-1` to `layertest-4`
+- **Testnet to Mainnet**: Tests switching from `layertest-4` to `tellor-1`
+- **State Persistence**: Tests that network state persists across operations
+
+## Mock Objects
+
+### Enhanced Keplr Mock
 ```javascript
-// In unit-tests.js
 {
-  name: 'New feature test',
-  run: () => this.testNewFeature()
-},
-
-async testNewFeature() {
-  // Use assertion methods
-  this.assertNotNull(element, 'Element should exist');
-  this.assertEqual(actual, expected, 'Values should match');
-  this.assertFunction(fn, 'Function should exist');
+  enable: async (chainId) => { /* chain configuration */ },
+  getChainId: async () => 'layertest-4', // Default, can be overridden
+  getOfflineSigner: (chainId) => { /* signer with accounts */ },
+  experimentalSuggestChain: async (chainConfig) => true
 }
 ```
 
-### Adding Integration Tests
-
+### CosmJS Stargate Mock
 ```javascript
-// In integration-tests.js
 {
-  name: 'New user flow test',
-  run: () => this.testNewUserFlow()
-},
-
-async testNewUserFlow() {
-  // Test user interactions
-  this.clickElement('#button');
-  this.setInputValue('#input', 'value');
-  await this.wait(100);
-  
-  // Verify results
-  this.assertEqual(this.getElementText('#result'), 'expected');
+  connectWithSigner: async (rpcEndpoint, offlineSigner, options) => {
+    return {
+      signAndBroadcastDirect: async (address, messages, fee, memo) => {
+        return { code: 0, txhash: 'test-tx-hash', height: 12345 };
+      }
+    };
+  }
 }
 ```
 
-## Assertion Methods
-
-The test suite provides comprehensive assertion methods:
-
+### Wallet Adapter Mock
 ```javascript
-// Basic assertions
-this.assert(condition, 'message');
-this.assertTrue(condition, 'message');
-this.assertFalse(condition, 'message');
-
-// Equality
-this.assertEqual(actual, expected, 'message');
-this.assertNotEqual(actual, expected, 'message');
-
-// Type checking
-this.assertString(value, 'message');
-this.assertNumber(value, 'message');
-this.assertArray(value, 'message');
-this.assertObject(value, 'message');
-this.assertFunction(value, 'message');
-
-// Null/undefined
-this.assertNull(value, 'message');
-this.assertNotNull(value, 'message');
-this.assertUndefined(value, 'message');
-this.assertDefined(value, 'message');
-
-// Collections
-this.assertLength(array, expectedLength, 'message');
-this.assertContains(array, item, 'message');
-this.assertNotContains(array, item, 'message');
-
-// Error handling
-this.assertThrows(fn, expectedError, 'message');
-this.assertDoesNotThrow(fn, 'message');
+{
+  isConnected: () => true,
+  getChainId: async () => 'tellor-1',
+  connectToWallet: async (walletType) => ({ address, walletName }),
+  getOfflineSigner: () => { /* signer implementation */ }
+}
 ```
 
-## Utility Methods
+## Running Tests
 
-```javascript
-// Timing
-await this.wait(1000); // Wait 1 second
-
-// DOM utilities
-await this.waitForElement('#selector', 5000);
-await this.waitForCondition(() => condition, 5000);
-this.clickElement('#selector');
-this.setInputValue('#selector', 'value');
-this.getElementText('#selector');
-this.getElementValue('#selector');
-
-// State checking
-this.elementExists('#selector');
-this.elementIsVisible('#selector');
-this.elementHasClass('#selector', 'className');
+### All Tests
+```bash
+npm test
 ```
 
-## Mock Providers
+### Unit Tests Only
+```bash
+npm run test:unit
+```
 
-The test suite includes mock implementations for:
+### Integration Tests Only
+```bash
+npm run test:integration
+```
 
-- **Ethereum**: MetaMask, Web3 provider
-- **Cosmos**: Keplr, Cosmostation, Leap
-- **Networks**: Layer node, Sepolia testnet
+### Specific Test Categories
+```bash
+# Network detection tests only
+npm run test:network
 
-Mocks can be enabled/disabled via the test interface.
+# Functional tests only
+npm run test:functional
+```
 
-## Continuous Integration
+## Test Environment Setup
 
-To integrate with CI/CD:
+### Prerequisites
+- Node.js 16+
+- Modern browser with ES6 support
+- No actual wallet connections required (all mocked)
 
-1. **Automated testing**:
-   ```bash
-   # Run tests in headless mode (requires browser automation)
-   npm install -g puppeteer
-   node run-tests-headless.js
-   ```
+### Environment Variables
+```bash
+TEST_NETWORK=testnet  # or mainnet
+TEST_TIMEOUT=10000    # milliseconds
+DEBUG_TESTS=true      # enable detailed logging
+```
 
-2. **Test reporting**:
-   - Tests output structured results
-   - Can be parsed for CI systems
-   - Includes performance metrics
+## Test Results
+
+### Success Criteria
+- All network detection tests pass
+- Button states correctly reflect network and connection status
+- Functions use correct RPC endpoints based on detected network
+- Network switching works seamlessly
+- Fallback mechanisms work when detection fails
+
+### Coverage
+- **Network Detection**: 100% coverage of mainnet/testnet detection
+- **UI State Management**: 100% coverage of button states
+- **Function Calls**: 100% coverage of network-specific function calls
+- **Error Handling**: 100% coverage of network detection failures
+
+## Recent Updates
+
+### Network Detection Improvements
+- ✅ Added automatic network detection from Keplr
+- ✅ Added automatic network detection from wallet adapters
+- ✅ Fixed hardcoded chain ID fallbacks in dispute and no-stake functions
+- ✅ Enhanced button state management for both networks
+- ✅ Added comprehensive network switching tests
+
+### Test Coverage Enhancements
+- ✅ Added 12 new network-specific tests
+- ✅ Enhanced mocking for network detection scenarios
+- ✅ Improved test environment setup and cleanup
+- ✅ Added network state validation in all functional tests
 
 ## Troubleshooting
 
 ### Common Issues
-
-1. **Tests fail on wallet connection**:
-   - Enable "Mock wallet connections" in test configuration
-   - Ensure no real wallets are connected
-
-2. **Network errors**:
-   - Enable "Mock network calls" in test configuration
-   - Check internet connection if using real networks
-
-3. **Slow test execution**:
-   - Disable "Verbose logging" for faster runs
-   - Check browser performance
+1. **Network Detection Fails**: Ensure Keplr mock has `getChainId` method
+2. **Button States Incorrect**: Check `App.cosmosChainId` and `App.isKeplrConnected`
+3. **Function Calls Wrong Network**: Verify RPC endpoint selection logic
 
 ### Debug Mode
-
-Enable verbose logging to see detailed test execution:
-
+Enable debug logging:
 ```javascript
-// In browser console
-localStorage.setItem('test-debug', 'true');
-// Refresh page
+window.TEST_DEBUG = true;
 ```
 
-## Best Practices
-
-1. **Test isolation**: Each test should be independent
-2. **Mock external dependencies**: Don't rely on real wallets/networks
-3. **Clear assertions**: Use descriptive error messages
-4. **Performance awareness**: Keep tests fast (< 100ms each)
-5. **Regular updates**: Update tests when adding new features
-
-## Contributing
-
-When adding new functionality:
-
-1. **Write tests first** (TDD approach)
-2. **Cover both unit and integration** aspects
-3. **Update this README** with new test categories
-4. **Ensure all tests pass** before merging
-
-## Support
-
-For test suite issues:
-- Check browser console for errors
-- Verify all test files are loaded
-- Ensure the main app is accessible
-- Check for JavaScript errors in the main application
+This will log detailed information about:
+- Network detection attempts
+- Chain ID assignments
+- Button state changes
+- Function call parameters

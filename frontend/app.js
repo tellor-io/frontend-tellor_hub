@@ -618,6 +618,18 @@ const App = {
             App.cosmosChainId = 'layertest-4'; // Default to testnet
         }
         
+        // Try to detect the current network from the wallet adapter
+        try {
+            const currentChainId = await window.cosmosWalletAdapter.getChainId();
+            if (currentChainId === 'tellor-1') {
+                App.cosmosChainId = 'tellor-1';
+            } else if (currentChainId === 'layertest-4') {
+                App.cosmosChainId = 'layertest-4';
+            }
+        } catch (error) {
+            console.log('Could not detect current network from wallet adapter, using default');
+        }
+        
         // Connect to the selected wallet
         const connectionResult = await window.cosmosWalletAdapter.connectToWallet(walletType);
         
@@ -707,17 +719,26 @@ const App = {
             restUrl = "https://node-palmito.tellorlayer.com/rpc";
             chainName = "Tellor Layer Testnet";
         }
-        
-        // First try to disable any existing connection
+
+        // Try to detect the current network from Keplr
         try {
-            if (typeof window.keplr.disable === 'function') {
-                await window.keplr.disable(App.cosmosChainId);
+            const currentChainId = await window.keplr.getChainId();
+            if (currentChainId === 'tellor-1') {
+                App.cosmosChainId = 'tellor-1';
+                rpcUrl = "https://mainnet.tellorlayer.com/rpc";
+                restUrl = "https://mainnet.tellorlayer.com/rpc";
+                chainName = "Tellor Layer";
+            } else if (currentChainId === 'layertest-4') {
+                App.cosmosChainId = 'layertest-4';
+                rpcUrl = "https://node-palmito.tellorlayer.com/rpc";
+                restUrl = "https://node-palmito.tellorlayer.com/rpc";
+                chainName = "Tellor Layer Testnet";
             }
         } catch (error) {
-            // console.warn(...);
+            console.log('Could not detect current network from Keplr, using default');
         }
 
-        // Suggest the chain to the user
+        // Suggest adding the chain if it's not already added
         await window.keplr.experimentalSuggestChain({
             chainId: App.cosmosChainId,
             chainName: chainName,
@@ -956,6 +977,9 @@ const App = {
         // Update Cosmos network display
         App.updateCosmosNetworkDisplay();
         
+        // Update network compatibility warning
+        App.updateNetworkCompatibilityWarning();
+        
         // Update page parameters
         App.setPageParams();
         // console.log(...);
@@ -1018,6 +1042,9 @@ const App = {
         
         App.setPageParams();
         this.updateUIForCurrentDirection();
+        
+        // Update network compatibility warning
+        App.updateNetworkCompatibilityWarning();
     } catch (error) {
         // console.error(...);
         App.handleError(error);
@@ -1049,6 +1076,9 @@ const App = {
         document.getElementById("currentBalance").innerHTML = 
             `<span class="connected-address-style">0 TRB</span>`;
         App.updateConnectedAddress();
+        
+        // Update network compatibility warning
+        App.updateNetworkCompatibilityWarning();
         
         // Clear any pending transactions or subscriptions
         if(App.web3 && App.web3.eth) {
@@ -2206,6 +2236,15 @@ const App = {
                 // Hide tooltip immediately when switching sections
                 enhancedHideTooltip();
                 
+                // Check scroll indicator for dispute section
+                if (functionType === 'dispute') {
+                    setTimeout(() => {
+                        if (window.checkScrollIndicatorVisibility) {
+                            window.checkScrollIndicatorVisibility();
+                        }
+                    }, 200);
+                }
+                
                 // Also hide tooltip when any section becomes active
                 setTimeout(() => {
                     if (functionType !== 'noStakeReport') {
@@ -2366,6 +2405,32 @@ const App = {
         if (!App.isKeplrConnected) {
             alert('Please connect your Keplr wallet first');
             return;
+        }
+
+        // Check if we have a valid cosmosChainId
+        if (!App.cosmosChainId) {
+            App.showValidationErrorPopup('Network not detected. Please reconnect your wallet.');
+            return;
+        }
+
+        // Validate network compatibility for withdrawal
+        if (App.isConnected && App.isKeplrConnected) {
+            const isEthereumMainnet = App.chainId === 1;
+            const isCosmosMainnet = App.cosmosChainId === 'tellor-1';
+            
+            if (isEthereumMainnet !== isCosmosMainnet) {
+                const ethereumNetwork = isEthereumMainnet ? 'Ethereum Mainnet' : 'Sepolia Testnet';
+                const cosmosNetwork = isCosmosMainnet ? 'Tellor Mainnet' : 'Tellor Testnet';
+                
+                App.showValidationErrorPopup(
+                    `Network mismatch detected!\n\n` +
+                    `Ethereum Wallet: ${ethereumNetwork}\n` +
+                    `Cosmos Wallet: ${cosmosNetwork}\n\n` +
+                    `Both wallets must be on the same network type (both mainnet or both testnet).\n\n` +
+                    `Please switch one of your wallets to match the other network.`
+                );
+                return;
+            }
         }
 
         const amount = document.getElementById('ethStakeAmount').value;
@@ -4040,6 +4105,9 @@ const App = {
     // Update UI for the new direction
     this.updateUIForCurrentDirection();
     
+    // Update network compatibility warning
+    this.updateNetworkCompatibilityWarning();
+    
     // Update balances when switching directions
     if (App.isConnected) {
         App.updateBalance().catch(error => {
@@ -4072,8 +4140,31 @@ const App = {
         // Update Ethereum section UI
         const withdrawButton = document.getElementById('withdrawButton');
         
+        // Enable withdrawal button if Keplr is connected, regardless of network
         if (App.isKeplrConnected) {
-            if (withdrawButton) withdrawButton.disabled = false;
+            if (withdrawButton) {
+                withdrawButton.disabled = false;
+                
+                // Check network compatibility and update button title
+                if (App.isConnected) {
+                    const isEthereumMainnet = App.chainId === 1;
+                    const isCosmosMainnet = App.cosmosChainId === 'tellor-1';
+                    
+                    if (isEthereumMainnet === isCosmosMainnet) {
+                        withdrawButton.title = 'Request withdrawal from Layer to Ethereum';
+                    } else {
+                        withdrawButton.title = 'Network mismatch detected. Both wallets must be on the same network type.';
+                    }
+                } else {
+                    withdrawButton.title = 'Connect your Ethereum wallet to withdraw';
+                }
+            }
+        } else {
+            // If not connected, show a helpful message but keep button enabled for UX
+            if (withdrawButton) {
+                withdrawButton.disabled = false;
+                withdrawButton.title = 'Connect your Cosmos wallet to withdraw';
+            }
         }
     } else if (this.currentBridgeDirection === 'delegate') {
         // Update Delegate section UI
@@ -4089,6 +4180,88 @@ const App = {
     if (transactionsContainer) {
         transactionsContainer.classList.toggle('active', this.currentBridgeDirection === 'ethereum');
     }
+  },
+
+  // Add function to update network compatibility warning
+  updateNetworkCompatibilityWarning: function() {
+    const warningElement = document.getElementById('networkCompatibilityWarning');
+    
+    if (warningElement) {
+      if (App.isConnected && App.isKeplrConnected) {
+        const isEthereumMainnet = App.chainId === 1;
+        const isCosmosMainnet = App.cosmosChainId === 'tellor-1';
+        
+        if (isEthereumMainnet !== isCosmosMainnet) {
+          const ethereumNetwork = isEthereumMainnet ? 'Ethereum Mainnet' : 'Sepolia Testnet';
+          const cosmosNetwork = isCosmosMainnet ? 'Tellor Mainnet' : 'Tellor Testnet';
+          
+          warningElement.innerHTML = `
+            <strong>⚠️ Network Mismatch Detected</strong><br>
+            Your wallets are on different networks:<br>
+            • Ethereum: ${ethereumNetwork}<br>
+            • Cosmos: ${cosmosNetwork}<br><br>
+            <strong>Withdrawals will fail with mismatched networks.</strong><br>
+            Please switch one wallet to match the other network.
+          `;
+          warningElement.style.display = 'block';
+        } else {
+          warningElement.style.display = 'none';
+        }
+      } else {
+        warningElement.style.display = 'none';
+      }
+    }
+  },
+
+  // Add debug function to check network status
+  debugNetworkStatus: function() {
+    const status = {
+      cosmosChainId: App.cosmosChainId,
+      isKeplrConnected: App.isKeplrConnected,
+      currentBridgeDirection: App.currentBridgeDirection,
+      keplrAddress: App.keplrAddress,
+      connectedWallet: App.connectedWallet,
+      ethereumChainId: App.chainId,
+      isEthereumConnected: App.isConnected,
+      ethereumAccount: App.account
+    };
+    
+    // Check network compatibility
+    if (App.isConnected && App.isKeplrConnected) {
+      const isEthereumMainnet = App.chainId === 1;
+      const isCosmosMainnet = App.cosmosChainId === 'tellor-1';
+      status.networkCompatible = isEthereumMainnet === isCosmosMainnet;
+      status.ethereumNetwork = isEthereumMainnet ? 'Mainnet' : 'Testnet';
+      status.cosmosNetwork = isCosmosMainnet ? 'Mainnet' : 'Testnet';
+    }
+    
+    console.log('Network Status:', status);
+    
+    // Check button states
+    const withdrawButton = document.getElementById('withdrawButton');
+    if (withdrawButton) {
+      console.log('Withdrawal Button State:', {
+        disabled: withdrawButton.disabled,
+        text: withdrawButton.textContent,
+        title: withdrawButton.title
+      });
+    }
+    
+    // Show network compatibility status
+    if (App.isConnected && App.isKeplrConnected) {
+      const isEthereumMainnet = App.chainId === 1;
+      const isCosmosMainnet = App.cosmosChainId === 'tellor-1';
+      
+      if (isEthereumMainnet === isCosmosMainnet) {
+        console.log('✅ Networks are compatible - withdrawals should work');
+      } else {
+        console.log('❌ Networks are incompatible - withdrawals will fail');
+        console.log('Ethereum:', isEthereumMainnet ? 'Mainnet' : 'Testnet');
+        console.log('Cosmos:', isCosmosMainnet ? 'Mainnet' : 'Testnet');
+      }
+    }
+    
+    return status;
   },
 
   // Add new function to fetch validators from Layer network
@@ -4486,7 +4659,6 @@ const App = {
                 if (errorDiv) {
                     errorDiv.innerHTML = `
                         <div class="wallet-connection-required">
-                            <span class="connection-icon">🔗</span>
                             <span class="connection-text">Please connect your Cosmos wallet to view disputes</span>
                         </div>
                     `;

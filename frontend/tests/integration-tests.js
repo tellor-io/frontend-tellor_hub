@@ -36,6 +36,24 @@ export class IntegrationTests extends TestSuite {
         run: () => this.testCompleteNoStakeFlow()
       },
 
+      // Dispute Module Integration Tests
+      {
+        name: 'Complete dispute proposal flow',
+        run: () => this.testCompleteDisputeProposalFlow()
+      },
+      {
+        name: 'Complete dispute voting flow',
+        run: () => this.testCompleteDisputeVotingFlow()
+      },
+      {
+        name: 'Complete dispute fee addition flow',
+        run: () => this.testCompleteDisputeFeeAdditionFlow()
+      },
+      {
+        name: 'Dispute data retrieval integration',
+        run: () => this.testDisputeDataRetrievalIntegration()
+      },
+
       // Wallet Integration Tests
       {
         name: 'Wallet manager dropdown interaction',
@@ -850,5 +868,212 @@ export class IntegrationTests extends TestSuite {
       // Verify app handles network switch failure gracefully
       this.assertDefined(networkToggleBtn, 'Network toggle button should still exist after failed switch');
     }
+  }
+
+  // Dispute Module Integration Tests
+  async testCompleteDisputeProposalFlow() {
+    // Mock everything needed for dispute proposal
+    const mockDisputeProposer = this.mockDisputeProposer();
+    const mockKeplr = this.mockKeplrProvider();
+    const mockStargateClient = this.mockStargateClient();
+    const mockLayerProto = this.mockLayerProto();
+    
+    // Set up global mocks
+    window.disputeProposer = mockDisputeProposer;
+    window.keplr = mockKeplr;
+    window.cosmjs = { stargate: mockStargateClient };
+    window.layerProto = mockLayerProto;
+    
+    // Wait for DisputeProposer to be available
+    await this.waitForCondition(() => typeof window.DisputeProposer !== 'undefined', 10000);
+    
+    // Step 1: Initialize dispute proposer
+    const initResult = await mockDisputeProposer.init();
+    this.assertTrue(initResult, 'Dispute proposer initialization should succeed');
+    
+    // Step 2: Check wallet status (should be connected via mock)
+    const walletStatus = await mockDisputeProposer.getWalletStatus();
+    this.assertTrue(walletStatus.isConnected, 'Wallet should be connected');
+    this.assertString(walletStatus.address, 'Wallet address should be available');
+    this.assertEqual(walletStatus.walletType, 'keplr', 'Should use Keplr wallet');
+    
+    // Step 3: Propose a dispute
+    const disputeResult = await mockDisputeProposer.proposeDispute(
+      'tellor1disputedreporter123456789012345678901234567890',
+      '123',
+      '0x1234567890abcdef',
+      'minor',
+      '1000',
+      false
+    );
+    
+    this.assertTrue(disputeResult.success, 'Dispute proposal should succeed');
+    this.assertString(disputeResult.transactionHash, 'Should return transaction hash');
+    this.assertNumber(disputeResult.height, 'Should return block height');
+    this.assertNumber(disputeResult.gasUsed, 'Should return gas used');
+    this.assertNumber(disputeResult.gasWanted, 'Should return gas wanted');
+    
+    // Step 4: Verify the proposal was processed
+    this.assertEqual(disputeResult.height, 12345, 'Should match mock block height');
+    this.assertEqual(disputeResult.gasUsed, 150000, 'Should match mock gas used');
+  }
+
+  async testCompleteDisputeVotingFlow() {
+    // Mock everything needed for dispute voting
+    const mockDisputeProposer = this.mockDisputeProposer();
+    const mockKeplr = this.mockKeplrProvider();
+    const mockStargateClient = this.mockStargateClient();
+    const mockLayerProto = this.mockLayerProto();
+    
+    // Set up global mocks
+    window.disputeProposer = mockDisputeProposer;
+    window.keplr = mockKeplr;
+    window.cosmjs = { stargate: mockStargateClient };
+    window.layerProto = mockLayerProto;
+    
+    // Wait for DisputeProposer to be available
+    await this.waitForCondition(() => typeof window.DisputeProposer !== 'undefined', 10000);
+    
+    // Step 1: Check voting power
+    const votingPowerResult = await mockDisputeProposer.checkVotingPower();
+    this.assertTrue(votingPowerResult.hasVotingPower, 'Should have voting power');
+    this.assertEqual(votingPowerResult.reason, 'reporter_power', 'Should have reporter power');
+    
+    // Step 2: Get dispute info
+    const disputeInfo = await mockDisputeProposer.getDisputeInfo(1);
+    this.assertObject(disputeInfo, 'Dispute info should be an object');
+    this.assertEqual(disputeInfo.disputeId, '1', 'Should return correct dispute ID');
+    this.assertEqual(disputeInfo.disputeStatus, 'DISPUTE_STATUS_VOTING', 'Should be in voting status');
+    
+    // Step 3: Check if already voted
+    const votedStatus = await mockDisputeProposer.hasVoted(1);
+    this.assertObject(votedStatus, 'Voted status should be an object');
+    this.assertFalse(votedStatus.hasVoted, 'Mock should not have voted yet');
+    
+    // Step 4: Vote on the dispute
+    const voteResult = await mockDisputeProposer.voteOnDispute(1, 'vote-support');
+    
+    this.assertTrue(voteResult.success, 'Vote should succeed');
+    this.assertString(voteResult.transactionHash, 'Should return transaction hash');
+    this.assertNumber(voteResult.height, 'Should return block height');
+    this.assertNumber(voteResult.gasUsed, 'Should return gas used');
+    
+    // Step 5: Verify vote was processed
+    this.assertEqual(voteResult.height, 12346, 'Should match mock block height');
+    this.assertEqual(voteResult.gasUsed, 100000, 'Should match mock gas used');
+  }
+
+  async testCompleteDisputeFeeAdditionFlow() {
+    // Mock everything needed for dispute fee addition
+    const mockDisputeProposer = this.mockDisputeProposer();
+    const mockKeplr = this.mockKeplrProvider();
+    const mockStargateClient = this.mockStargateClient();
+    const mockLayerProto = this.mockLayerProto();
+    
+    // Set up global mocks
+    window.disputeProposer = mockDisputeProposer;
+    window.keplr = mockKeplr;
+    window.cosmjs = { stargate: mockStargateClient };
+    window.layerProto = mockLayerProto;
+    
+    // Wait for DisputeProposer to be available
+    await this.waitForCondition(() => typeof window.DisputeProposer !== 'undefined', 10000);
+    
+    // Step 1: Check wallet balance
+    const balance = await mockDisputeProposer.getBalance();
+    this.assertNumber(balance, 'Balance should be a number');
+    this.assert(balance >= 500, 'Should have sufficient balance for fee addition');
+    
+    // Step 2: Get dispute info to check fee status
+    const disputeInfo = await mockDisputeProposer.getDisputeInfo(1);
+    this.assertObject(disputeInfo, 'Dispute info should be an object');
+    this.assertObject(disputeInfo.metadata, 'Dispute should have metadata');
+    
+    // Step 3: Add fee to dispute
+    const feeResult = await mockDisputeProposer.addFeeToDispute(1, '500', false);
+    
+    this.assertTrue(feeResult.success, 'Fee addition should succeed');
+    this.assertString(feeResult.transactionHash, 'Should return transaction hash');
+    this.assertNumber(feeResult.height, 'Should return block height');
+    this.assertNumber(feeResult.gasUsed, 'Should return gas used');
+    
+    // Step 4: Verify fee addition was processed
+    this.assertEqual(feeResult.height, 12347, 'Should match mock block height');
+    this.assertEqual(feeResult.gasUsed, 80000, 'Should match mock gas used');
+    
+    // Step 5: Test fee conversion utilities
+    const microUnits = mockDisputeProposer.convertTrbToMicroUnits('500');
+    this.assertEqual(microUnits, '500000000', 'Should convert 500 TRB to micro units');
+    
+    const trbAmount = mockDisputeProposer.convertMicroUnitsToTrb(microUnits);
+    this.assertEqual(trbAmount, '500.000000', 'Should convert back to TRB');
+  }
+
+  async testDisputeDataRetrievalIntegration() {
+    // Mock everything needed for dispute data retrieval
+    const mockDisputeProposer = this.mockDisputeProposer();
+    
+    // Set up global mock
+    window.disputeProposer = mockDisputeProposer;
+    
+    // Wait for DisputeProposer to be available
+    await this.waitForCondition(() => typeof window.DisputeProposer !== 'undefined', 10000);
+    
+    // Step 1: Get all disputes
+    const allDisputes = await mockDisputeProposer.getAllDisputes();
+    this.assertArray(allDisputes, 'All disputes should be an array');
+    this.assert(allDisputes.length > 0, 'Should have at least one dispute');
+    
+    const firstDispute = allDisputes[0];
+    this.assertObject(firstDispute, 'First dispute should be an object');
+    this.assertString(firstDispute.disputeId, 'Dispute should have ID');
+    this.assertObject(firstDispute.metadata, 'Dispute should have metadata');
+    
+    // Step 2: Get disputes for query interface
+    const disputesForQuery = await mockDisputeProposer.getAllDisputesForQuery();
+    this.assertObject(disputesForQuery, 'Disputes for query should be an object');
+    this.assertArray(disputesForQuery.disputes, 'Should have disputes array');
+    this.assertObject(disputesForQuery.pagination, 'Should have pagination info');
+    
+    const firstQueryDispute = disputesForQuery.disputes[0];
+    this.assertObject(firstQueryDispute.displayData, 'Dispute should have display data');
+    this.assertString(firstQueryDispute.displayData.disputeId, 'Should have dispute ID');
+    this.assertString(firstQueryDispute.displayData.disputeStatus, 'Should have dispute status');
+    this.assertString(firstQueryDispute.displayData.disputeFee, 'Should have dispute fee');
+    
+    // Step 3: Get open disputes
+    const openDisputes = await mockDisputeProposer.getOpenDisputes();
+    this.assertArray(openDisputes, 'Open disputes should be an array');
+    
+    if (openDisputes.length > 0) {
+      const firstOpenDispute = openDisputes[0];
+      this.assertObject(firstOpenDispute, 'Open dispute should be an object');
+      this.assertString(firstOpenDispute.id, 'Should have dispute ID');
+      this.assertString(firstOpenDispute.status, 'Should have status');
+      this.assertNumber(firstOpenDispute.feeRequired, 'Should have required fee');
+      this.assertNumber(firstOpenDispute.feePaid, 'Should have paid fee');
+      this.assertNumber(firstOpenDispute.feeRemaining, 'Should have remaining fee');
+    }
+    
+    // Step 4: Get specific dispute info
+    const specificDispute = await mockDisputeProposer.getDisputeInfo(1);
+    this.assertObject(specificDispute, 'Specific dispute should be an object');
+    this.assertEqual(specificDispute.disputeId, '1', 'Should return correct dispute ID');
+    this.assertObject(specificDispute.metadata, 'Should have metadata');
+    this.assertString(specificDispute.metadata.dispute_status, 'Should have dispute status');
+    this.assertString(specificDispute.metadata.dispute_fee, 'Should have dispute fee');
+    
+    // Step 5: Get voting info
+    const votingInfo = await mockDisputeProposer.getVotingInfo(1);
+    this.assertObject(votingInfo, 'Voting info should be an object');
+    this.assertEqual(votingInfo.disputeId, 1, 'Should have correct dispute ID');
+    this.assertString(votingInfo.status, 'Should have status');
+    this.assertString(votingInfo.endTime, 'Should have end time');
+    
+    // Step 6: Check voting status
+    const hasVotedResult = await mockDisputeProposer.hasVoted(1);
+    this.assertObject(hasVotedResult, 'Has voted result should be an object');
+    this.assertDefined(hasVotedResult.hasVoted, 'Should have hasVoted property');
+    this.assertFalse(hasVotedResult.hasVoted, 'Mock should not have voted');
   }
 }

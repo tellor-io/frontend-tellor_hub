@@ -70,6 +70,58 @@ export class UnitTests extends TestSuite {
         run: () => this.testNoStakeReportButtonFunctionality()
       },
 
+      // Network Detection Tests - NEW!
+      {
+        name: 'Network detection for mainnet',
+        run: () => this.testNetworkDetectionMainnet()
+      },
+      {
+        name: 'Network detection for testnet',
+        run: () => this.testNetworkDetectionTestnet()
+      },
+      {
+        name: 'Network switching functionality',
+        run: () => this.testNetworkSwitching()
+      },
+      {
+        name: 'Cosmos wallet adapter network detection',
+        run: () => this.testCosmosWalletAdapterNetworkDetection()
+      },
+
+      // Enhanced Functional Tests
+      {
+        name: 'Withdrawal button functionality on mainnet',
+        run: () => this.testWithdrawalButtonFunctionalityMainnet()
+      },
+      {
+        name: 'Withdrawal button functionality on testnet',
+        run: () => this.testWithdrawalButtonFunctionalityTestnet()
+      },
+      {
+        name: 'Delegate button functionality on mainnet',
+        run: () => this.testDelegateButtonFunctionalityMainnet()
+      },
+      {
+        name: 'Delegate button functionality on testnet',
+        run: () => this.testDelegateButtonFunctionalityTestnet()
+      },
+      {
+        name: 'Dispute functions on mainnet',
+        run: () => this.testDisputeFunctionsMainnet()
+      },
+      {
+        name: 'Dispute functions on testnet',
+        run: () => this.testDisputeFunctionsTestnet()
+      },
+      {
+        name: 'No-stake reporting on mainnet',
+        run: () => this.testNoStakeReportingMainnet()
+      },
+      {
+        name: 'No-stake reporting on testnet',
+        run: () => this.testNoStakeReportingTestnet()
+      },
+
       // Bridge Function Tests
       {
         name: 'Bridge direction switching',
@@ -104,6 +156,36 @@ export class UnitTests extends TestSuite {
       {
         name: 'No-stake input validation',
         run: () => this.testNoStakeInputValidation()
+      },
+
+      // Dispute Module Tests
+      {
+        name: 'Dispute proposer initialization',
+        run: () => this.testDisputeProposerInitialization()
+      },
+      {
+        name: 'Dispute proposal validation',
+        run: () => this.testDisputeProposalValidation()
+      },
+      {
+        name: 'Dispute voting validation',
+        run: () => this.testDisputeVotingValidation()
+      },
+      {
+        name: 'Dispute fee validation',
+        run: () => this.testDisputeFeeValidation()
+      },
+      {
+        name: 'Dispute address validation',
+        run: () => this.testDisputeAddressValidation()
+      },
+      {
+        name: 'Dispute voting power check',
+        run: () => this.testDisputeVotingPowerCheck()
+      },
+      {
+        name: 'Dispute utility functions',
+        run: () => this.testDisputeUtilityFunctions()
       },
 
       // Input Validation Tests
@@ -993,5 +1075,570 @@ export class UnitTests extends TestSuite {
     
     // Verify button state changes during submission
     this.assertDefined(submitButton.textContent, 'Submit button should have text content');
+  }
+
+  // Dispute Module Tests
+  async testDisputeProposerInitialization() {
+    // Wait for DisputeProposer to be available
+    await this.waitForCondition(() => typeof window.DisputeProposer !== 'undefined', 10000);
+    
+    this.assertFunction(window.DisputeProposer, 'DisputeProposer class should exist');
+    
+    // Test that global instance exists
+    this.assertNotNull(window.disputeProposer, 'Global disputeProposer instance should exist');
+    this.assertObject(window.disputeProposer, 'Global disputeProposer should be an object');
+    
+    // Test essential methods exist
+    this.assertFunction(window.disputeProposer.init, 'init method should exist');
+    this.assertFunction(window.disputeProposer.proposeDispute, 'proposeDispute method should exist');
+    this.assertFunction(window.disputeProposer.voteOnDispute, 'voteOnDispute method should exist');
+    this.assertFunction(window.disputeProposer.addFeeToDispute, 'addFeeToDispute method should exist');
+    this.assertFunction(window.disputeProposer.getWalletStatus, 'getWalletStatus method should exist');
+    this.assertFunction(window.disputeProposer.checkVotingPower, 'checkVotingPower method should exist');
+    
+    // Test initialization
+    const initResult = await window.disputeProposer.init();
+    this.assertTrue(initResult, 'Initialization should succeed');
+  }
+
+  async testDisputeProposalValidation() {
+    // Mock DisputeProposer
+    const mockDisputeProposer = this.mockDisputeProposer();
+    window.disputeProposer = mockDisputeProposer;
+    
+    // Test address validation
+    this.assertTrue(mockDisputeProposer.isValidAddress('tellor1testaddress123456789012345678901234567890'), 'Valid tellor address should pass');
+    this.assertTrue(mockDisputeProposer.isValidAddress('layer1testaddress123456789012345678901234567890'), 'Valid layer address should pass');
+    this.assertFalse(mockDisputeProposer.isValidAddress('invalid'), 'Invalid address should fail');
+    this.assertFalse(mockDisputeProposer.isValidAddress('eth0x1234'), 'Ethereum address should fail');
+    this.assertFalse(mockDisputeProposer.isValidAddress(''), 'Empty address should fail');
+    
+    // Test report meta ID validation
+    this.assertTrue(mockDisputeProposer.validateReportMetaId('123'), 'Valid report meta ID should pass');
+    this.assertTrue(mockDisputeProposer.validateReportMetaId('456789'), 'Numeric string should pass');
+    this.assertFalse(mockDisputeProposer.validateReportMetaId(''), 'Empty report meta ID should fail');
+    this.assertFalse(mockDisputeProposer.validateReportMetaId('   '), 'Whitespace-only report meta ID should fail');
+    
+    // Test report query ID validation
+    this.assertTrue(mockDisputeProposer.validateReportQueryId('0x1234567890abcdef'), 'Valid query ID should pass');
+    this.assertTrue(mockDisputeProposer.validateReportQueryId('query123'), 'String query ID should pass');
+    this.assertFalse(mockDisputeProposer.validateReportQueryId(''), 'Empty query ID should fail');
+    this.assertFalse(mockDisputeProposer.validateReportQueryId('   '), 'Whitespace-only query ID should fail');
+  }
+
+  async testDisputeVotingValidation() {
+    // Mock DisputeProposer
+    const mockDisputeProposer = this.mockDisputeProposer();
+    window.disputeProposer = mockDisputeProposer;
+    
+    // Test dispute ID validation
+    this.assertTrue(mockDisputeProposer.validateDisputeId('1'), 'Valid string dispute ID should pass');
+    this.assertTrue(mockDisputeProposer.validateDisputeId(123), 'Valid numeric dispute ID should pass');
+    this.assertTrue(mockDisputeProposer.validateDisputeId('999'), 'Large dispute ID should pass');
+    this.assertFalse(mockDisputeProposer.validateDisputeId('0'), 'Zero dispute ID should fail');
+    this.assertFalse(mockDisputeProposer.validateDisputeId('-1'), 'Negative dispute ID should fail');
+    this.assertFalse(mockDisputeProposer.validateDisputeId('invalid'), 'Non-numeric dispute ID should fail');
+    this.assertFalse(mockDisputeProposer.validateDisputeId(''), 'Empty dispute ID should fail');
+    
+    // Test vote choice validation
+    this.assertTrue(mockDisputeProposer.validateVoteChoice('vote-support'), 'vote-support should be valid');
+    this.assertTrue(mockDisputeProposer.validateVoteChoice('vote-against'), 'vote-against should be valid');
+    this.assertTrue(mockDisputeProposer.validateVoteChoice('vote-invalid'), 'vote-invalid should be valid');
+    this.assertFalse(mockDisputeProposer.validateVoteChoice('support'), 'support should be invalid');
+    this.assertFalse(mockDisputeProposer.validateVoteChoice('against'), 'against should be invalid');
+    this.assertFalse(mockDisputeProposer.validateVoteChoice('invalid-vote'), 'invalid-vote should be invalid');
+    this.assertFalse(mockDisputeProposer.validateVoteChoice(''), 'Empty vote choice should be invalid');
+  }
+
+  async testDisputeFeeValidation() {
+    // Mock DisputeProposer
+    const mockDisputeProposer = this.mockDisputeProposer();
+    window.disputeProposer = mockDisputeProposer;
+    
+    // Test TRB to micro units conversion
+    this.assertEqual(mockDisputeProposer.convertTrbToMicroUnits('1'), '1000000', '1 TRB should convert to 1000000 micro units');
+    this.assertEqual(mockDisputeProposer.convertTrbToMicroUnits('0.5'), '500000', '0.5 TRB should convert to 500000 micro units');
+    this.assertEqual(mockDisputeProposer.convertTrbToMicroUnits('1000'), '1000000000', '1000 TRB should convert to 1000000000 micro units');
+    this.assertEqual(mockDisputeProposer.convertTrbToMicroUnits('0.000001'), '1', '0.000001 TRB should convert to 1 micro unit');
+    
+    // Test micro units to TRB conversion
+    this.assertEqual(mockDisputeProposer.convertMicroUnitsToTrb('1000000'), '1.000000', '1000000 micro units should convert to 1.000000 TRB');
+    this.assertEqual(mockDisputeProposer.convertMicroUnitsToTrb('500000'), '0.500000', '500000 micro units should convert to 0.500000 TRB');
+    this.assertEqual(mockDisputeProposer.convertMicroUnitsToTrb('1'), '0.000001', '1 micro unit should convert to 0.000001 TRB');
+    this.assertEqual(mockDisputeProposer.convertMicroUnitsToTrb('0'), '0.000000', '0 micro units should convert to 0.000000 TRB');
+  }
+
+  async testDisputeAddressValidation() {
+    // Mock DisputeProposer
+    const mockDisputeProposer = this.mockDisputeProposer();
+    window.disputeProposer = mockDisputeProposer;
+    
+    // Test valid Tellor addresses
+    this.assertTrue(mockDisputeProposer.isValidAddress('tellor1abc123def456ghi789jkl012mno345pqr678stu'), 'Valid tellor1 address should pass');
+    this.assertTrue(mockDisputeProposer.isValidAddress('tellor1testaddress123456789012345678901234567890'), 'Valid tellor1 test address should pass');
+    
+    // Test valid Layer addresses
+    this.assertTrue(mockDisputeProposer.isValidAddress('layer1abc123def456ghi789jkl012mno345pqr678stu'), 'Valid layer1 address should pass');
+    this.assertTrue(mockDisputeProposer.isValidAddress('layer1testaddress123456789012345678901234567890'), 'Valid layer1 test address should pass');
+    
+    // Test invalid addresses
+    this.assertFalse(mockDisputeProposer.isValidAddress('0x1234567890123456789012345678901234567890'), 'Ethereum address should fail');
+    this.assertFalse(mockDisputeProposer.isValidAddress('cosmos1abc123def456ghi789jkl012mno345pqr678stu'), 'Cosmos address should fail');
+    this.assertFalse(mockDisputeProposer.isValidAddress('tellor1'), 'Too short tellor address should fail');
+    this.assertFalse(mockDisputeProposer.isValidAddress('layer1'), 'Too short layer address should fail');
+    this.assertFalse(mockDisputeProposer.isValidAddress(''), 'Empty address should fail');
+    this.assertFalse(mockDisputeProposer.isValidAddress(null), 'Null address should fail');
+    this.assertFalse(mockDisputeProposer.isValidAddress(undefined), 'Undefined address should fail');
+    this.assertFalse(mockDisputeProposer.isValidAddress(123), 'Numeric address should fail');
+  }
+
+  async testDisputeVotingPowerCheck() {
+    // Mock DisputeProposer
+    const mockDisputeProposer = this.mockDisputeProposer();
+    window.disputeProposer = mockDisputeProposer;
+    
+    // Test voting power check method exists and returns expected structure
+    const votingPowerResult = await mockDisputeProposer.checkVotingPower();
+    
+    this.assertObject(votingPowerResult, 'Voting power result should be an object');
+    this.assertDefined(votingPowerResult.hasVotingPower, 'Result should have hasVotingPower property');
+    this.assertDefined(votingPowerResult.reason, 'Result should have reason property');
+    this.assertDefined(votingPowerResult.details, 'Result should have details property');
+    
+    // Test that the mock returns positive voting power
+    this.assertTrue(votingPowerResult.hasVotingPower, 'Mock should have voting power');
+    this.assertEqual(votingPowerResult.reason, 'reporter_power', 'Mock should return reporter_power reason');
+    this.assertString(votingPowerResult.details, 'Details should be a string');
+  }
+
+  async testDisputeUtilityFunctions() {
+    // Mock DisputeProposer
+    const mockDisputeProposer = this.mockDisputeProposer();
+    window.disputeProposer = mockDisputeProposer;
+    
+    // Test connection status
+    const connectionStatus = mockDisputeProposer.getConnectionStatus();
+    this.assertObject(connectionStatus, 'Connection status should be an object');
+    this.assertDefined(connectionStatus.isConnected, 'Connection status should have isConnected property');
+    this.assertDefined(connectionStatus.address, 'Connection status should have address property');
+    this.assertDefined(connectionStatus.network, 'Connection status should have network property');
+    
+    // Test wallet status
+    const walletStatus = await mockDisputeProposer.getWalletStatus();
+    this.assertObject(walletStatus, 'Wallet status should be an object');
+    this.assertDefined(walletStatus.isConnected, 'Wallet status should have isConnected property');
+    this.assertDefined(walletStatus.address, 'Wallet status should have address property');
+    this.assertDefined(walletStatus.walletType, 'Wallet status should have walletType property');
+    
+    // Test that mock returns connected status
+    this.assertTrue(walletStatus.isConnected, 'Mock wallet should be connected');
+    this.assertString(walletStatus.address, 'Wallet address should be a string');
+    this.assertEqual(walletStatus.walletType, 'keplr', 'Mock should use keplr wallet type');
+    
+    // Test balance retrieval
+    const balance = await mockDisputeProposer.getBalance();
+    this.assertNumber(balance, 'Balance should be a number');
+    this.assert(balance > 0, 'Mock balance should be positive');
+    this.assertEqual(balance, 1000.0, 'Mock balance should be 1000 TRB');
+  }
+
+  // Network Detection Tests
+  async testNetworkDetectionMainnet() {
+    // Mock Keplr with mainnet chain ID
+    const mockKeplr = this.mockKeplrProvider();
+    mockKeplr.getChainId = async () => 'tellor-1';
+    window.keplr = mockKeplr;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Test mainnet detection
+    if (window.App.connectKeplrLegacy) {
+      await window.App.connectKeplrLegacy();
+      await this.wait(500);
+      
+      this.assertEqual(window.App.cosmosChainId, 'tellor-1', 'cosmosChainId should be set to tellor-1 for mainnet');
+      this.assertTrue(window.App.isKeplrConnected, 'Keplr should be connected');
+    }
+  }
+
+  async testNetworkDetectionTestnet() {
+    // Mock Keplr with testnet chain ID
+    const mockKeplr = this.mockKeplrProvider();
+    mockKeplr.getChainId = async () => 'layertest-4';
+    window.keplr = mockKeplr;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Test testnet detection
+    if (window.App.connectKeplrLegacy) {
+      await window.App.connectKeplrLegacy();
+      await this.wait(500);
+      
+      this.assertEqual(window.App.cosmosChainId, 'layertest-4', 'cosmosChainId should be set to layertest-4 for testnet');
+      this.assertTrue(window.App.isKeplrConnected, 'Keplr should be connected');
+    }
+  }
+
+  async testNetworkSwitching() {
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Test network switching functionality
+    if (window.App.switchCosmosNetwork) {
+      // Mock Keplr for network switching
+      const mockKeplr = this.mockKeplrProvider();
+      window.keplr = mockKeplr;
+      
+      // Set initial network to testnet
+      window.App.cosmosChainId = 'layertest-4';
+      window.App.isKeplrConnected = true;
+      
+      // Test switching to mainnet
+      await window.App.switchCosmosNetwork();
+      await this.wait(500);
+      
+      this.assertEqual(window.App.cosmosChainId, 'tellor-1', 'Network should switch to mainnet');
+      
+      // Test switching back to testnet
+      await window.App.switchCosmosNetwork();
+      await this.wait(500);
+      
+      this.assertEqual(window.App.cosmosChainId, 'layertest-4', 'Network should switch back to testnet');
+    }
+  }
+
+  async testCosmosWalletAdapterNetworkDetection() {
+    // Mock cosmos wallet adapter
+    const mockAdapter = {
+      isConnected: () => true,
+      getChainId: async () => 'tellor-1',
+      connectToWallet: async (walletType) => ({
+        address: 'tellor1testaddress123456789012345678901234567890',
+        walletName: 'keplr'
+      }),
+      getOfflineSigner: () => ({
+        getAccounts: async () => [{
+          address: 'tellor1testaddress123456789012345678901234567890'
+        }]
+      })
+    };
+    window.cosmosWalletAdapter = mockAdapter;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Test wallet adapter network detection
+    if (window.App.connectCosmosWallet) {
+      await window.App.connectCosmosWallet('keplr');
+      await this.wait(500);
+      
+      this.assertEqual(window.App.cosmosChainId, 'tellor-1', 'cosmosChainId should be detected from wallet adapter');
+      this.assertTrue(window.App.isKeplrConnected, 'Wallet should be connected');
+    }
+  }
+
+  // Enhanced Functional Tests
+  async testWithdrawalButtonFunctionalityMainnet() {
+    // Mock mainnet environment
+    const mockKeplr = this.mockKeplrProvider();
+    mockKeplr.getChainId = async () => 'tellor-1';
+    window.keplr = mockKeplr;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Connect to mainnet
+    if (window.App.connectKeplrLegacy) {
+      await window.App.connectKeplrLegacy();
+      await this.wait(500);
+    }
+    
+    // Switch to ethereum bridge direction
+    if (window.App.switchBridgeDirection) {
+      window.App.switchBridgeDirection('ethereum');
+      await this.wait(100);
+    }
+    
+    // Test withdrawal button state
+    const withdrawButton = document.getElementById('withdrawButton');
+    this.assertNotNull(withdrawButton, 'Withdrawal button should exist');
+    
+    // Button should be enabled when connected to mainnet
+    this.assertFalse(withdrawButton.disabled, 'Withdrawal button should be enabled on mainnet');
+    
+    // Test withdrawal function with mainnet parameters
+    if (window.App.withdrawFromLayer) {
+      // Mock the function to avoid actual network calls
+      const originalWithdraw = window.App.withdrawFromLayer;
+      let withdrawCalled = false;
+      window.App.withdrawFromLayer = async () => {
+        withdrawCalled = true;
+        return { success: true };
+      };
+      
+      // Set up test inputs
+      this.setInputValue('#ethStakeAmount', '10');
+      this.setInputValue('#ethQueryId', '0x1234567890123456789012345678901234567890');
+      
+      // Trigger withdrawal
+      withdrawButton.click();
+      await this.wait(500);
+      
+      this.assertTrue(withdrawCalled, 'Withdrawal function should be called on mainnet');
+      
+      // Restore original function
+      window.App.withdrawFromLayer = originalWithdraw;
+    }
+  }
+
+  async testWithdrawalButtonFunctionalityTestnet() {
+    // Mock testnet environment
+    const mockKeplr = this.mockKeplrProvider();
+    mockKeplr.getChainId = async () => 'layertest-4';
+    window.keplr = mockKeplr;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Connect to testnet
+    if (window.App.connectKeplrLegacy) {
+      await window.App.connectKeplrLegacy();
+      await this.wait(500);
+    }
+    
+    // Switch to ethereum bridge direction
+    if (window.App.switchBridgeDirection) {
+      window.App.switchBridgeDirection('ethereum');
+      await this.wait(100);
+    }
+    
+    // Test withdrawal button state
+    const withdrawButton = document.getElementById('withdrawButton');
+    this.assertNotNull(withdrawButton, 'Withdrawal button should exist');
+    
+    // Button should be enabled when connected to testnet
+    this.assertFalse(withdrawButton.disabled, 'Withdrawal button should be enabled on testnet');
+    
+    // Test withdrawal function with testnet parameters
+    if (window.App.withdrawFromLayer) {
+      // Mock the function to avoid actual network calls
+      const originalWithdraw = window.App.withdrawFromLayer;
+      let withdrawCalled = false;
+      window.App.withdrawFromLayer = async () => {
+        withdrawCalled = true;
+        return { success: true };
+      };
+      
+      // Set up test inputs
+      this.setInputValue('#ethStakeAmount', '5');
+      this.setInputValue('#ethQueryId', '0xabcdef1234567890abcdef1234567890abcdef12');
+      
+      // Trigger withdrawal
+      withdrawButton.click();
+      await this.wait(500);
+      
+      this.assertTrue(withdrawCalled, 'Withdrawal function should be called on testnet');
+      
+      // Restore original function
+      window.App.withdrawFromLayer = originalWithdraw;
+    }
+  }
+
+  async testDelegateButtonFunctionalityMainnet() {
+    // Mock mainnet environment
+    const mockKeplr = this.mockKeplrProvider();
+    mockKeplr.getChainId = async () => 'tellor-1';
+    window.keplr = mockKeplr;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Connect to mainnet
+    if (window.App.connectKeplrLegacy) {
+      await window.App.connectKeplrLegacy();
+      await this.wait(500);
+    }
+    
+    // Switch to delegate bridge direction
+    if (window.App.switchBridgeDirection) {
+      window.App.switchBridgeDirection('delegate');
+      await this.wait(100);
+    }
+    
+    // Test delegate button state
+    const delegateButton = document.getElementById('delegateButton');
+    this.assertNotNull(delegateButton, 'Delegate button should exist');
+    
+    // Button should be enabled when connected to mainnet
+    this.assertFalse(delegateButton.disabled, 'Delegate button should be enabled on mainnet');
+  }
+
+  async testDelegateButtonFunctionalityTestnet() {
+    // Mock testnet environment
+    const mockKeplr = this.mockKeplrProvider();
+    mockKeplr.getChainId = async () => 'layertest-4';
+    window.keplr = mockKeplr;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Connect to testnet
+    if (window.App.connectKeplrLegacy) {
+      await window.App.connectKeplrLegacy();
+      await this.wait(500);
+    }
+    
+    // Switch to delegate bridge direction
+    if (window.App.switchBridgeDirection) {
+      window.App.switchBridgeDirection('delegate');
+      await this.wait(100);
+    }
+    
+    // Test delegate button state
+    const delegateButton = document.getElementById('delegateButton');
+    this.assertNotNull(delegateButton, 'Delegate button should exist');
+    
+    // Button should be enabled when connected to testnet
+    this.assertFalse(delegateButton.disabled, 'Delegate button should be enabled on testnet');
+  }
+
+  async testDisputeFunctionsMainnet() {
+    // Mock mainnet environment
+    const mockKeplr = this.mockKeplrProvider();
+    mockKeplr.getChainId = async () => 'tellor-1';
+    window.keplr = mockKeplr;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Connect to mainnet
+    if (window.App.connectKeplrLegacy) {
+      await window.App.connectKeplrLegacy();
+      await this.wait(500);
+    }
+    
+    // Test dispute functions with mainnet chain ID
+    this.assertEqual(window.App.cosmosChainId, 'tellor-1', 'Should be on mainnet for dispute tests');
+    
+    // Test that dispute functions can be called (mocked)
+    if (window.disputeProposer) {
+      const mockDisputeProposer = this.mockDisputeProposer();
+      window.disputeProposer = mockDisputeProposer;
+      
+      // Test dispute proposal
+      const result = await mockDisputeProposer.proposeDispute(
+        'tellor1testaddress123456789012345678901234567890',
+        '1',
+        '0x1234567890123456789012345678901234567890',
+        'malicious_value',
+        '10'
+      );
+      
+      this.assertTrue(result.success, 'Dispute proposal should succeed on mainnet');
+    }
+  }
+
+  async testDisputeFunctionsTestnet() {
+    // Mock testnet environment
+    const mockKeplr = this.mockKeplrProvider();
+    mockKeplr.getChainId = async () => 'layertest-4';
+    window.keplr = mockKeplr;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Connect to testnet
+    if (window.App.connectKeplrLegacy) {
+      await window.App.connectKeplrLegacy();
+      await this.wait(500);
+    }
+    
+    // Test dispute functions with testnet chain ID
+    this.assertEqual(window.App.cosmosChainId, 'layertest-4', 'Should be on testnet for dispute tests');
+    
+    // Test that dispute functions can be called (mocked)
+    if (window.disputeProposer) {
+      const mockDisputeProposer = this.mockDisputeProposer();
+      window.disputeProposer = mockDisputeProposer;
+      
+      // Test dispute proposal
+      const result = await mockDisputeProposer.proposeDispute(
+        'tellor1testaddress123456789012345678901234567890',
+        '1',
+        '0x1234567890123456789012345678901234567890',
+        'malicious_value',
+        '5'
+      );
+      
+      this.assertTrue(result.success, 'Dispute proposal should succeed on testnet');
+    }
+  }
+
+  async testNoStakeReportingMainnet() {
+    // Mock mainnet environment
+    const mockKeplr = this.mockKeplrProvider();
+    mockKeplr.getChainId = async () => 'tellor-1';
+    window.keplr = mockKeplr;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Connect to mainnet
+    if (window.App.connectKeplrLegacy) {
+      await window.App.connectKeplrLegacy();
+      await this.wait(500);
+    }
+    
+    // Test no-stake reporting with mainnet chain ID
+    this.assertEqual(window.App.cosmosChainId, 'tellor-1', 'Should be on mainnet for no-stake tests');
+    
+    // Test that no-stake reporting can be called (mocked)
+    if (window.noStakeReporter) {
+      const mockNoStakeReporter = this.mockNoStakeReporter();
+      window.noStakeReporter = mockNoStakeReporter;
+      
+      // Test no-stake report submission
+      const result = await mockNoStakeReporter.submitReport(
+        '0x1234567890123456789012345678901234567890',
+        '100'
+      );
+      
+      this.assertTrue(result.success, 'No-stake report should succeed on mainnet');
+    }
+  }
+
+  async testNoStakeReportingTestnet() {
+    // Mock testnet environment
+    const mockKeplr = this.mockKeplrProvider();
+    mockKeplr.getChainId = async () => 'layertest-4';
+    window.keplr = mockKeplr;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Connect to testnet
+    if (window.App.connectKeplrLegacy) {
+      await window.App.connectKeplrLegacy();
+      await this.wait(500);
+    }
+    
+    // Test no-stake reporting with testnet chain ID
+    this.assertEqual(window.App.cosmosChainId, 'layertest-4', 'Should be on testnet for no-stake tests');
+    
+    // Test that no-stake reporting can be called (mocked)
+    if (window.noStakeReporter) {
+      const mockNoStakeReporter = this.mockNoStakeReporter();
+      window.noStakeReporter = mockNoStakeReporter;
+      
+      // Test no-stake report submission
+      const result = await mockNoStakeReporter.submitReport(
+        '0xabcdef1234567890abcdef1234567890abcdef12',
+        '50'
+      );
+      
+      this.assertTrue(result.success, 'No-stake report should succeed on testnet');
+    }
   }
 }

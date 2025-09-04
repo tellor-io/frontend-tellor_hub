@@ -283,8 +283,8 @@
                           <select class="input-address" id="delegateValidatorDropdown">
                               <option value="">Select a validator...</option>
                           </select>
-                          <input type="hidden" id="delegateValidatorAddress" />
                           <button type="button" id="refreshValidatorsBtn" class="refresh-btn" title="Refresh validator list">↻</button>
+                          <input type="hidden" id="delegateValidatorAddress" />
                           <span class="info-icon" data-tooltip="Select a validator from the list to delegate your tokens to">ⓘ</span>
                       </div>
                   </div>
@@ -337,8 +337,10 @@
               
               <!-- Propose Dispute Tab -->
               <div class="dispute-tab-content active" id="proposeDisputeTab">
-                <h3 class="text-lg font-semibold mb-4">Propose New Dispute</h3>
-                <div class="wallet-disclaimer">*Please connect your Cosmos wallet*</div>
+                <div class="dispute-header-row">
+                  <h3 class="text-lg font-semibold mb-4">Propose New Dispute</h3>
+                  <div class="wallet-disclaimer-inline">*Please connect your Cosmos wallet*</div>
+                </div>
                 <div class="balance-info dispute-horizontal-layout">
                   <div class="dispute-row">
                     <div class="dispute-left-column">
@@ -375,6 +377,14 @@
                     </div>
                     <div class="dispute-submit-container">
                       <button id="proposeDisputeBtn" class="button-style-3" onclick="App.proposeDispute()">Propose Dispute</button>
+                      <!-- Subtle scroll indicator positioned next to button -->
+                      <div class="scroll-indicator-subtle" id="proposeDisputeScrollIndicator">
+                        <div class="scroll-indicator-subtle-content">
+                          <span class="scroll-indicator-dots">⋯</span>
+                          <span class="scroll-indicator-text-subtle">Scroll down for more fields</span>
+                          <span class="scroll-indicator-arrow-subtle">↓</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1113,6 +1123,40 @@
     <!-- Global dispute tab switching function -->
     <script>
       // Global function for dispute tab switching
+      // Helper function to check if scroll indicator should be shown
+      window.checkScrollIndicatorVisibility = function() {
+        const proposeTab = document.getElementById('proposeDisputeTab');
+        const scrollIndicator = document.getElementById('proposeDisputeScrollIndicator');
+        
+        if (!proposeTab || !scrollIndicator) {
+          return;
+        }
+        
+        // Only proceed if propose dispute tab is active
+        if (!proposeTab.classList.contains('active')) {
+          return;
+        }
+        
+        // Get the submit button (last element that needs to be visible)
+        const submitButton = document.getElementById('proposeDisputeBtn');
+        if (!submitButton) {
+          return;
+        }
+        
+        // Check if submit button is visible in viewport
+        const rect = submitButton.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        
+        // If submit button is visible, hide the indicator
+        if (rect.top <= viewportHeight - 50) {
+          scrollIndicator.style.display = 'none';
+        } else {
+          // If submit button is not visible, show the indicator
+          scrollIndicator.style.display = 'block';
+          scrollIndicator.style.opacity = '0.7';
+        }
+      };
+
       window.switchDisputeTab = function(tabId) {
         // Hide all tab contents
         document.querySelectorAll('.dispute-tab-content').forEach(tab => {
@@ -1129,6 +1173,24 @@
         
         // Add active class to clicked button
         event.target.classList.add('active');
+        
+        // Handle scroll indicator for propose dispute tab
+        if (tabId === 'proposeDisputeTab') {
+          // Check visibility after a short delay to ensure DOM is updated
+          setTimeout(() => {
+            checkScrollIndicatorVisibility();
+            
+            // Add event listeners
+            const functionDisplayArea = document.querySelector('.function-display-area');
+            if (functionDisplayArea) {
+              functionDisplayArea.removeEventListener('scroll', checkScrollIndicatorVisibility);
+              functionDisplayArea.addEventListener('scroll', checkScrollIndicatorVisibility);
+            }
+            
+            window.removeEventListener('resize', checkScrollIndicatorVisibility);
+            window.addEventListener('resize', checkScrollIndicatorVisibility);
+          }, 200);
+        }
         
         // Auto-load open disputes and check voting power when Vote on Dispute tab is selected (only if wallet is connected)
         if (tabId === 'voteDisputeTab') {

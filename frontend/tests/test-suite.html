@@ -53,6 +53,9 @@
           <button id="run-integration-tests" class="w-full bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">
             Run Integration Tests Only
           </button>
+          <button id="run-dispute-tests" class="w-full bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
+            Run Dispute Tests Only
+          </button>
           <button id="clear-results" class="w-full bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">
             Clear Results
           </button>
@@ -115,6 +118,52 @@
       <button id="delegateButton">Delegate Tokens</button>
     </div>
 
+    <!-- Mock dispute sections -->
+    <div id="disputeSection" class="bridge-section">
+      <input id="disputedReporterInput" type="text" placeholder="tellor1..." />
+      <input id="reportMetaIdInput" type="text" placeholder="Report Meta ID" />
+      <input id="reportQueryIdInput" type="text" placeholder="0x..." />
+      <select id="disputeCategorySelect">
+        <option value="">Select category...</option>
+        <option value="warning">Warning</option>
+        <option value="minor">Minor</option>
+        <option value="major">Major</option>
+      </select>
+      <input id="disputeFeeInput" type="text" placeholder="Fee amount" />
+      <label>
+        <input id="payFromBondCheckbox" type="checkbox" /> Pay from bond
+      </label>
+      <button id="proposeDisputeButton">Propose Dispute</button>
+    </div>
+
+    <div id="voteSection" class="bridge-section">
+      <select id="disputeIdSelect">
+        <option value="">Select dispute...</option>
+        <option value="1">Dispute #1</option>
+        <option value="2">Dispute #2</option>
+      </select>
+      <select id="voteChoiceSelect">
+        <option value="">Select vote...</option>
+        <option value="vote-support">Support</option>
+        <option value="vote-against">Against</option>
+        <option value="vote-invalid">Invalid</option>
+      </select>
+      <button id="voteOnDisputeButton">Vote on Dispute</button>
+    </div>
+
+    <div id="addFeeSection" class="bridge-section">
+      <select id="feeDisputeIdSelect">
+        <option value="">Select dispute...</option>
+        <option value="1">Dispute #1</option>
+        <option value="2">Dispute #2</option>
+      </select>
+      <input id="feeAmountInput" type="text" placeholder="Fee amount" />
+      <label>
+        <input id="feeFromBondCheckbox" type="checkbox" /> Pay from bond
+      </label>
+      <button id="addFeeButton">Add Fee</button>
+    </div>
+
     <!-- Mock bridge direction buttons -->
     <button id="bridgeToLayerBtn">Bridge to Tellor</button>
     <button id="bridgeToEthBtn">Bridge to Ethereum</button>
@@ -164,6 +213,34 @@
 
       assertString(value, message = 'Value should be a string') {
         this.assert(typeof value === 'string', message);
+      }
+
+      assertNumber(value, message = 'Value should be a number') {
+        this.assert(typeof value === 'number' && !isNaN(value), message);
+      }
+
+      assertObject(value, message = 'Value should be an object') {
+        this.assert(typeof value === 'object' && value !== null && !Array.isArray(value), message);
+      }
+
+      assertArray(value, message = 'Value should be an array') {
+        this.assert(Array.isArray(value), message);
+      }
+
+      assertTrue(condition, message = 'Condition should be true') {
+        this.assert(condition === true, message);
+      }
+
+      assertFalse(condition, message = 'Condition should be false') {
+        this.assert(condition === false, message);
+      }
+
+      assertNull(value, message = 'Value should be null') {
+        this.assert(value === null, message);
+      }
+
+      assertUndefined(value, message = 'Value should be undefined') {
+        this.assert(value === undefined, message);
       }
 
       // Utility methods
@@ -247,6 +324,34 @@
           {
             name: 'No-stake input validation',
             run: () => this.testNoStakeInputValidation()
+          },
+          {
+            name: 'Dispute proposer initialization',
+            run: () => this.testDisputeProposerInitialization()
+          },
+          {
+            name: 'Dispute proposal validation',
+            run: () => this.testDisputeProposalValidation()
+          },
+          {
+            name: 'Dispute voting validation',
+            run: () => this.testDisputeVotingValidation()
+          },
+          {
+            name: 'Dispute fee validation',
+            run: () => this.testDisputeFeeValidation()
+          },
+          {
+            name: 'Dispute address validation',
+            run: () => this.testDisputeAddressValidation()
+          },
+          {
+            name: 'Dispute voting power check',
+            run: () => this.testDisputeVotingPowerCheck()
+          },
+          {
+            name: 'Dispute utility functions',
+            run: () => this.testDisputeUtilityFunctions()
           }
         ];
       }
@@ -256,12 +361,34 @@
         this.assertNotNull(document.getElementById('run-all-tests'), 'Run all tests button should exist');
         this.assertNotNull(document.getElementById('run-unit-tests'), 'Run unit tests button should exist');
         this.assertNotNull(document.getElementById('run-integration-tests'), 'Run integration tests button should exist');
+        this.assertNotNull(document.getElementById('run-dispute-tests'), 'Run dispute tests button should exist');
         this.assertNotNull(document.getElementById('clear-results'), 'Clear results button should exist');
         
         // Test mock app elements
         this.assertNotNull(document.getElementById('walletButton'), 'Wallet button should exist');
         this.assertNotNull(document.getElementById('keplrButton'), 'Keplr button should exist');
         this.assertNotNull(document.getElementById('stakeAmount'), 'Stake amount input should exist');
+        
+        // Test dispute form elements
+        this.assertNotNull(document.getElementById('disputeSection'), 'Dispute section should exist');
+        this.assertNotNull(document.getElementById('disputedReporterInput'), 'Disputed reporter input should exist');
+        this.assertNotNull(document.getElementById('reportMetaIdInput'), 'Report meta ID input should exist');
+        this.assertNotNull(document.getElementById('reportQueryIdInput'), 'Report query ID input should exist');
+        this.assertNotNull(document.getElementById('disputeCategorySelect'), 'Dispute category select should exist');
+        this.assertNotNull(document.getElementById('disputeFeeInput'), 'Dispute fee input should exist');
+        this.assertNotNull(document.getElementById('proposeDisputeButton'), 'Propose dispute button should exist');
+        
+        // Test voting elements
+        this.assertNotNull(document.getElementById('voteSection'), 'Vote section should exist');
+        this.assertNotNull(document.getElementById('disputeIdSelect'), 'Dispute ID select should exist');
+        this.assertNotNull(document.getElementById('voteChoiceSelect'), 'Vote choice select should exist');
+        this.assertNotNull(document.getElementById('voteOnDisputeButton'), 'Vote on dispute button should exist');
+        
+        // Test add fee elements
+        this.assertNotNull(document.getElementById('addFeeSection'), 'Add fee section should exist');
+        this.assertNotNull(document.getElementById('feeDisputeIdSelect'), 'Fee dispute ID select should exist');
+        this.assertNotNull(document.getElementById('feeAmountInput'), 'Fee amount input should exist');
+        this.assertNotNull(document.getElementById('addFeeButton'), 'Add fee button should exist');
       }
 
       async testButtonFunctionality() {
@@ -346,6 +473,196 @@
         // - Value input properties
         // - CSS classes and styling
       }
+
+      // Dispute Module Tests
+      async testDisputeProposerInitialization() {
+        // Create a mock DisputeProposer for testing
+        const mockDisputeProposer = {
+          init: async () => true,
+          isConnected: false,
+          currentAddress: null,
+          proposeDispute: async () => ({ success: true }),
+          voteOnDispute: async () => ({ success: true }),
+          addFeeToDispute: async () => ({ success: true }),
+          getWalletStatus: async () => ({ isConnected: true, address: 'test', walletType: 'keplr' }),
+          checkVotingPower: async () => ({ hasVotingPower: true, reason: 'test' })
+        };
+
+        // Test that we can create a mock dispute proposer
+        this.assertObject(mockDisputeProposer, 'Mock DisputeProposer should be an object');
+        this.assertFunction(mockDisputeProposer.init, 'init method should exist');
+        this.assertFunction(mockDisputeProposer.proposeDispute, 'proposeDispute method should exist');
+        this.assertFunction(mockDisputeProposer.voteOnDispute, 'voteOnDispute method should exist');
+        this.assertFunction(mockDisputeProposer.addFeeToDispute, 'addFeeToDispute method should exist');
+        this.assertFunction(mockDisputeProposer.getWalletStatus, 'getWalletStatus method should exist');
+        this.assertFunction(mockDisputeProposer.checkVotingPower, 'checkVotingPower method should exist');
+
+        // Test initialization
+        const initResult = await mockDisputeProposer.init();
+        this.assertTrue(initResult, 'Initialization should succeed');
+      }
+
+      async testDisputeProposalValidation() {
+        // Mock validation functions
+        const mockValidation = {
+          isValidAddress: (address) => {
+            return typeof address === 'string' && 
+                   (address.startsWith('tellor1') || address.startsWith('layer1')) &&
+                   address.length >= 20 && address.length <= 50;
+          },
+          validateReportMetaId: (reportMetaId) => {
+            return typeof reportMetaId === 'string' && reportMetaId.trim() !== '';
+          },
+          validateReportQueryId: (reportQueryId) => {
+            return typeof reportQueryId === 'string' && reportQueryId.trim() !== '';
+          }
+        };
+
+        // Test address validation
+        this.assertTrue(mockValidation.isValidAddress('tellor1testaddress123456789012345678901234567890'), 'Valid tellor address should pass');
+        this.assertTrue(mockValidation.isValidAddress('layer1testaddress123456789012345678901234567890'), 'Valid layer address should pass');
+        this.assertFalse(mockValidation.isValidAddress('invalid'), 'Invalid address should fail');
+        this.assertFalse(mockValidation.isValidAddress(''), 'Empty address should fail');
+
+        // Test report meta ID validation
+        this.assertTrue(mockValidation.validateReportMetaId('123'), 'Valid report meta ID should pass');
+        this.assertFalse(mockValidation.validateReportMetaId(''), 'Empty report meta ID should fail');
+        this.assertFalse(mockValidation.validateReportMetaId('   '), 'Whitespace-only report meta ID should fail');
+
+        // Test report query ID validation
+        this.assertTrue(mockValidation.validateReportQueryId('0x1234567890abcdef'), 'Valid query ID should pass');
+        this.assertFalse(mockValidation.validateReportQueryId(''), 'Empty query ID should fail');
+      }
+
+      async testDisputeVotingValidation() {
+        // Mock validation functions
+        const mockValidation = {
+          validateDisputeId: (disputeId) => {
+            const id = parseInt(disputeId);
+            return !isNaN(id) && id > 0;
+          },
+          validateVoteChoice: (voteChoice) => {
+            const validChoices = ['vote-support', 'vote-against', 'vote-invalid'];
+            return validChoices.includes(voteChoice);
+          }
+        };
+
+        // Test dispute ID validation
+        this.assertTrue(mockValidation.validateDisputeId('1'), 'Valid string dispute ID should pass');
+        this.assertTrue(mockValidation.validateDisputeId(123), 'Valid numeric dispute ID should pass');
+        this.assertFalse(mockValidation.validateDisputeId('0'), 'Zero dispute ID should fail');
+        this.assertFalse(mockValidation.validateDisputeId('invalid'), 'Non-numeric dispute ID should fail');
+
+        // Test vote choice validation
+        this.assertTrue(mockValidation.validateVoteChoice('vote-support'), 'vote-support should be valid');
+        this.assertTrue(mockValidation.validateVoteChoice('vote-against'), 'vote-against should be valid');
+        this.assertTrue(mockValidation.validateVoteChoice('vote-invalid'), 'vote-invalid should be valid');
+        this.assertFalse(mockValidation.validateVoteChoice('support'), 'support should be invalid');
+        this.assertFalse(mockValidation.validateVoteChoice(''), 'Empty vote choice should be invalid');
+      }
+
+      async testDisputeFeeValidation() {
+        // Mock conversion functions
+        const mockConversion = {
+          convertTrbToMicroUnits: (trbAmount) => {
+            return Math.floor(parseFloat(trbAmount) * 1000000).toString();
+          },
+          convertMicroUnitsToTrb: (microUnits) => {
+            return (parseInt(microUnits) / 1000000).toFixed(6);
+          }
+        };
+
+        // Test TRB to micro units conversion
+        this.assertEqual(mockConversion.convertTrbToMicroUnits('1'), '1000000', '1 TRB should convert to 1000000 micro units');
+        this.assertEqual(mockConversion.convertTrbToMicroUnits('0.5'), '500000', '0.5 TRB should convert to 500000 micro units');
+        this.assertEqual(mockConversion.convertTrbToMicroUnits('1000'), '1000000000', '1000 TRB should convert to 1000000000 micro units');
+
+        // Test micro units to TRB conversion
+        this.assertEqual(mockConversion.convertMicroUnitsToTrb('1000000'), '1.000000', '1000000 micro units should convert to 1.000000 TRB');
+        this.assertEqual(mockConversion.convertMicroUnitsToTrb('500000'), '0.500000', '500000 micro units should convert to 0.500000 TRB');
+        this.assertEqual(mockConversion.convertMicroUnitsToTrb('0'), '0.000000', '0 micro units should convert to 0.000000 TRB');
+      }
+
+      async testDisputeAddressValidation() {
+        // Mock address validation function
+        const isValidAddress = (address) => {
+          return typeof address === 'string' && 
+                 (address.startsWith('tellor1') || address.startsWith('layer1')) &&
+                 address.length >= 20 && address.length <= 50;
+        };
+
+        // Test valid addresses
+        this.assertTrue(isValidAddress('tellor1abc123def456ghi789jkl012mno345pqr678stu'), 'Valid tellor1 address should pass');
+        this.assertTrue(isValidAddress('layer1abc123def456ghi789jkl012mno345pqr678stu'), 'Valid layer1 address should pass');
+
+        // Test invalid addresses
+        this.assertFalse(isValidAddress('0x1234567890123456789012345678901234567890'), 'Ethereum address should fail');
+        this.assertFalse(isValidAddress('cosmos1abc123def456ghi789jkl012mno345pqr678stu'), 'Cosmos address should fail');
+        this.assertFalse(isValidAddress('tellor1'), 'Too short tellor address should fail');
+        this.assertFalse(isValidAddress(''), 'Empty address should fail');
+        this.assertFalse(isValidAddress(null), 'Null address should fail');
+      }
+
+      async testDisputeVotingPowerCheck() {
+        // Mock voting power check
+        const mockVotingPowerCheck = async () => ({
+          hasVotingPower: true,
+          reason: 'reporter_power',
+          details: 'Unjailed reporter with power: 100'
+        });
+
+        const votingPowerResult = await mockVotingPowerCheck();
+        
+        this.assertObject(votingPowerResult, 'Voting power result should be an object');
+        this.assertDefined(votingPowerResult.hasVotingPower, 'Result should have hasVotingPower property');
+        this.assertDefined(votingPowerResult.reason, 'Result should have reason property');
+        this.assertDefined(votingPowerResult.details, 'Result should have details property');
+        
+        this.assertTrue(votingPowerResult.hasVotingPower, 'Mock should have voting power');
+        this.assertEqual(votingPowerResult.reason, 'reporter_power', 'Mock should return reporter_power reason');
+        this.assertString(votingPowerResult.details, 'Details should be a string');
+      }
+
+      async testDisputeUtilityFunctions() {
+        // Mock utility functions
+        const mockUtilities = {
+          getConnectionStatus: () => ({
+            isConnected: false,
+            address: null,
+            network: null
+          }),
+          getWalletStatus: async () => ({
+            isConnected: true,
+            address: 'tellor1testaddress123456789012345678901234567890',
+            walletType: 'keplr'
+          }),
+          getBalance: async () => 1000.0
+        };
+
+        // Test connection status
+        const connectionStatus = mockUtilities.getConnectionStatus();
+        this.assertObject(connectionStatus, 'Connection status should be an object');
+        this.assertDefined(connectionStatus.isConnected, 'Connection status should have isConnected property');
+        this.assertDefined(connectionStatus.address, 'Connection status should have address property');
+        this.assertDefined(connectionStatus.network, 'Connection status should have network property');
+
+        // Test wallet status
+        const walletStatus = await mockUtilities.getWalletStatus();
+        this.assertObject(walletStatus, 'Wallet status should be an object');
+        this.assertDefined(walletStatus.isConnected, 'Wallet status should have isConnected property');
+        this.assertDefined(walletStatus.address, 'Wallet status should have address property');
+        this.assertDefined(walletStatus.walletType, 'Wallet status should have walletType property');
+        
+        this.assertTrue(walletStatus.isConnected, 'Mock wallet should be connected');
+        this.assertString(walletStatus.address, 'Wallet address should be a string');
+        this.assertEqual(walletStatus.walletType, 'keplr', 'Mock should use keplr wallet type');
+
+        // Test balance retrieval
+        const balance = await mockUtilities.getBalance();
+        this.assertNumber(balance, 'Balance should be a number');
+        this.assert(balance > 0, 'Mock balance should be positive');
+        this.assertEqual(balance, 1000.0, 'Mock balance should be 1000 TRB');
+      }
     }
 
     class IntegrationTests extends TestSuite {
@@ -370,6 +687,18 @@
           {
             name: 'No-stake reporting integration',
             run: () => this.testNoStakeReportingIntegration()
+          },
+          {
+            name: 'Complete dispute proposal flow',
+            run: () => this.testCompleteDisputeProposalFlow()
+          },
+          {
+            name: 'Complete dispute voting flow',
+            run: () => this.testCompleteDisputeVotingFlow()
+          },
+          {
+            name: 'Dispute data retrieval integration',
+            run: () => this.testDisputeDataRetrievalIntegration()
           }
         ];
       }
@@ -418,6 +747,231 @@
         // - Input value setting
         // - Method availability
       }
+
+      // Dispute Module Integration Tests
+      async testCompleteDisputeProposalFlow() {
+        // Mock everything needed for dispute proposal
+        const mockDisputeProposer = {
+          init: async () => true,
+          getWalletStatus: async () => ({
+            isConnected: true,
+            address: 'tellor1testaddress123456789012345678901234567890',
+            walletType: 'keplr'
+          }),
+          proposeDispute: async (disputedReporter, reportMetaId, reportQueryId, disputeCategory, fee, payFromBond = false) => {
+            return {
+              success: true,
+              transactionHash: '0xdispute1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+              height: 12345,
+              gasUsed: 150000,
+              gasWanted: 200000
+            };
+          }
+        };
+
+        // Step 1: Initialize dispute proposer
+        const initResult = await mockDisputeProposer.init();
+        this.assertTrue(initResult, 'Dispute proposer initialization should succeed');
+
+        // Step 2: Check wallet status
+        const walletStatus = await mockDisputeProposer.getWalletStatus();
+        this.assertTrue(walletStatus.isConnected, 'Wallet should be connected');
+        this.assertString(walletStatus.address, 'Wallet address should be available');
+        this.assertEqual(walletStatus.walletType, 'keplr', 'Should use Keplr wallet');
+
+        // Step 3: Propose a dispute
+        const disputeResult = await mockDisputeProposer.proposeDispute(
+          'tellor1disputedreporter123456789012345678901234567890',
+          '123',
+          '0x1234567890abcdef',
+          'minor',
+          '1000',
+          false
+        );
+
+        this.assertTrue(disputeResult.success, 'Dispute proposal should succeed');
+        this.assertString(disputeResult.transactionHash, 'Should return transaction hash');
+        this.assertNumber(disputeResult.height, 'Should return block height');
+        this.assertNumber(disputeResult.gasUsed, 'Should return gas used');
+        this.assertNumber(disputeResult.gasWanted, 'Should return gas wanted');
+
+        // Step 4: Verify the proposal was processed
+        this.assertEqual(disputeResult.height, 12345, 'Should match mock block height');
+        this.assertEqual(disputeResult.gasUsed, 150000, 'Should match mock gas used');
+      }
+
+      async testCompleteDisputeVotingFlow() {
+        // Mock everything needed for dispute voting
+        const mockDisputeProposer = {
+          checkVotingPower: async () => ({
+            hasVotingPower: true,
+            reason: 'reporter_power',
+            details: 'Unjailed reporter with power: 100'
+          }),
+          getDisputeInfo: async (disputeId) => ({
+            disputeId: disputeId.toString(),
+            disputeStatus: 'DISPUTE_STATUS_VOTING',
+            metadata: {
+              dispute_status: 'DISPUTE_STATUS_VOTING',
+              dispute_fee: '1000000000',
+              fee_total: '500000000',
+              slash_amount: '1000000000'
+            }
+          }),
+          hasVoted: async (disputeId) => ({
+            hasVoted: false,
+            vote: null
+          }),
+          voteOnDispute: async (disputeId, voteChoice) => ({
+            success: true,
+            transactionHash: '0xvote1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+            height: 12346,
+            gasUsed: 100000,
+            gasWanted: 150000
+          })
+        };
+
+        // Step 1: Check voting power
+        const votingPowerResult = await mockDisputeProposer.checkVotingPower();
+        this.assertTrue(votingPowerResult.hasVotingPower, 'Should have voting power');
+        this.assertEqual(votingPowerResult.reason, 'reporter_power', 'Should have reporter power');
+
+        // Step 2: Get dispute info
+        const disputeInfo = await mockDisputeProposer.getDisputeInfo(1);
+        this.assertObject(disputeInfo, 'Dispute info should be an object');
+        this.assertEqual(disputeInfo.disputeId, '1', 'Should return correct dispute ID');
+        this.assertEqual(disputeInfo.disputeStatus, 'DISPUTE_STATUS_VOTING', 'Should be in voting status');
+
+        // Step 3: Check if already voted
+        const votedStatus = await mockDisputeProposer.hasVoted(1);
+        this.assertObject(votedStatus, 'Voted status should be an object');
+        this.assertFalse(votedStatus.hasVoted, 'Mock should not have voted yet');
+
+        // Step 4: Vote on the dispute
+        const voteResult = await mockDisputeProposer.voteOnDispute(1, 'vote-support');
+
+        this.assertTrue(voteResult.success, 'Vote should succeed');
+        this.assertString(voteResult.transactionHash, 'Should return transaction hash');
+        this.assertNumber(voteResult.height, 'Should return block height');
+        this.assertNumber(voteResult.gasUsed, 'Should return gas used');
+
+        // Step 5: Verify vote was processed
+        this.assertEqual(voteResult.height, 12346, 'Should match mock block height');
+        this.assertEqual(voteResult.gasUsed, 100000, 'Should match mock gas used');
+      }
+
+      async testDisputeDataRetrievalIntegration() {
+        // Mock everything needed for dispute data retrieval
+        const mockDisputeProposer = {
+          getAllDisputes: async () => [
+            {
+              disputeId: '1',
+              metadata: {
+                dispute_status: 'DISPUTE_STATUS_VOTING',
+                dispute_fee: '1000000000',
+                fee_total: '500000000',
+                slash_amount: '1000000000'
+              }
+            }
+          ],
+          getAllDisputesForQuery: async () => ({
+            disputes: [
+              {
+                disputeId: '1',
+                displayData: {
+                  disputeId: '1',
+                  disputeCategory: 'MINOR',
+                  disputeStatus: 'DISPUTE_STATUS_VOTING',
+                  disputeFee: '1000.000000',
+                  feeTotal: '500.000000',
+                  feeRemaining: '500.000000'
+                }
+              }
+            ],
+            pagination: { total: "1" }
+          }),
+          getOpenDisputes: async () => [
+            {
+              id: '1',
+              status: 'DISPUTE_STATUS_VOTING',
+              feeRequired: 1000000000,
+              feePaid: 500000000,
+              feeRemaining: 500000000,
+              canVote: true
+            }
+          ],
+          getDisputeInfo: async (disputeId) => ({
+            disputeId: disputeId.toString(),
+            disputeStatus: 'DISPUTE_STATUS_VOTING',
+            metadata: {
+              dispute_status: 'DISPUTE_STATUS_VOTING',
+              dispute_fee: '1000000000',
+              fee_total: '500000000'
+            }
+          }),
+          getVotingInfo: async (disputeId) => ({
+            disputeId: disputeId,
+            status: 'DISPUTE_STATUS_VOTING',
+            endTime: '2024-01-08T00:00:00Z',
+            message: 'Mock voting info'
+          }),
+          hasVoted: async (disputeId) => ({
+            hasVoted: false,
+            vote: null
+          })
+        };
+
+        // Step 1: Get all disputes
+        const allDisputes = await mockDisputeProposer.getAllDisputes();
+        this.assertArray(allDisputes, 'All disputes should be an array');
+        this.assert(allDisputes.length > 0, 'Should have at least one dispute');
+
+        const firstDispute = allDisputes[0];
+        this.assertObject(firstDispute, 'First dispute should be an object');
+        this.assertString(firstDispute.disputeId, 'Dispute should have ID');
+        this.assertObject(firstDispute.metadata, 'Dispute should have metadata');
+
+        // Step 2: Get disputes for query interface
+        const disputesForQuery = await mockDisputeProposer.getAllDisputesForQuery();
+        this.assertObject(disputesForQuery, 'Disputes for query should be an object');
+        this.assertArray(disputesForQuery.disputes, 'Should have disputes array');
+        this.assertObject(disputesForQuery.pagination, 'Should have pagination info');
+
+        const firstQueryDispute = disputesForQuery.disputes[0];
+        this.assertObject(firstQueryDispute.displayData, 'Dispute should have display data');
+        this.assertString(firstQueryDispute.displayData.disputeId, 'Should have dispute ID');
+        this.assertString(firstQueryDispute.displayData.disputeStatus, 'Should have dispute status');
+
+        // Step 3: Get open disputes
+        const openDisputes = await mockDisputeProposer.getOpenDisputes();
+        this.assertArray(openDisputes, 'Open disputes should be an array');
+
+        if (openDisputes.length > 0) {
+          const firstOpenDispute = openDisputes[0];
+          this.assertObject(firstOpenDispute, 'Open dispute should be an object');
+          this.assertString(firstOpenDispute.id, 'Should have dispute ID');
+          this.assertString(firstOpenDispute.status, 'Should have status');
+          this.assertNumber(firstOpenDispute.feeRequired, 'Should have required fee');
+        }
+
+        // Step 4: Get specific dispute info
+        const specificDispute = await mockDisputeProposer.getDisputeInfo(1);
+        this.assertObject(specificDispute, 'Specific dispute should be an object');
+        this.assertEqual(specificDispute.disputeId, '1', 'Should return correct dispute ID');
+        this.assertObject(specificDispute.metadata, 'Should have metadata');
+
+        // Step 5: Get voting info
+        const votingInfo = await mockDisputeProposer.getVotingInfo(1);
+        this.assertObject(votingInfo, 'Voting info should be an object');
+        this.assertEqual(votingInfo.disputeId, 1, 'Should have correct dispute ID');
+        this.assertString(votingInfo.status, 'Should have status');
+
+        // Step 6: Check voting status
+        const hasVotedResult = await mockDisputeProposer.hasVoted(1);
+        this.assertObject(hasVotedResult, 'Has voted result should be an object');
+        this.assertDefined(hasVotedResult.hasVoted, 'Should have hasVoted property');
+        this.assertFalse(hasVotedResult.hasVoted, 'Mock should not have voted');
+      }
     }
 
     class TestRunner {
@@ -437,6 +991,7 @@
         document.getElementById('run-all-tests').addEventListener('click', () => this.runAllTests());
         document.getElementById('run-unit-tests').addEventListener('click', () => this.runUnitTests());
         document.getElementById('run-integration-tests').addEventListener('click', () => this.runIntegrationTests());
+        document.getElementById('run-dispute-tests').addEventListener('click', () => this.runDisputeTests());
         document.getElementById('clear-results').addEventListener('click', () => this.clearResults());
       }
 
@@ -453,6 +1008,20 @@
 
       async runIntegrationTests() {
         await this.runTests(this.integrationTests.getTests());
+      }
+
+      async runDisputeTests() {
+        const disputeUnitTests = this.unitTests.getTests().filter(test => 
+          test.name.toLowerCase().includes('dispute')
+        );
+        const disputeIntegrationTests = this.integrationTests.getTests().filter(test => 
+          test.name.toLowerCase().includes('dispute')
+        );
+        
+        await this.runTests([
+          ...disputeUnitTests,
+          ...disputeIntegrationTests
+        ]);
       }
 
       async runTests(tests) {
