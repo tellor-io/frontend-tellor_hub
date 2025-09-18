@@ -124,170 +124,140 @@
   transition: all 0.3s ease;
 }
 
-/* Position pods in a true pentagram formation around the hub using mathematical positioning */
-.orbiting-pod[data-function="bridgeToLayer"] {
+/* Position pods in a 2x2 grid formation around the hub */
+.orbiting-pod[data-function="bridge"] {
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%) translateY(-200px);
-}
-
-.orbiting-pod[data-function="bridgeToEth"] {
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) rotate(72deg) translateY(-200px);
+  transform: translate(-50%, -50%) translate(-150px, -150px);
 }
 
 .orbiting-pod[data-function="delegate"] {
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%) rotate(144deg) translateY(-200px);
+  transform: translate(-50%, -50%) translate(150px, -150px);
 }
 
 .orbiting-pod[data-function="noStakeReport"] {
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%) rotate(216deg) translateY(-200px);
+  transform: translate(-50%, -50%) translate(-150px, 150px);
 }
 
 .orbiting-pod[data-function="dispute"] {
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%) rotate(288deg) translateY(-200px);
+  transform: translate(-50%, -50%) translate(150px, 150px);
 }
 
 /* Mobile pod positioning - bring them closer to center */
 @media (max-width: 768px) {
-  .orbiting-pod[data-function="bridgeToLayer"] {
-    transform: translate(-50%, -50%) translateY(-150px);
-  }
-
-  .orbiting-pod[data-function="bridgeToEth"] {
-    transform: translate(-50%, -50%) rotate(72deg) translateY(-150px);
+  .orbiting-pod[data-function="bridge"] {
+    transform: translate(-50%, -50%) translate(-120px, -120px);
   }
 
   .orbiting-pod[data-function="delegate"] {
-    transform: translate(-50%, -50%) rotate(144deg) translateY(-150px);
+    transform: translate(-50%, -50%) translate(120px, -120px);
   }
 
   .orbiting-pod[data-function="noStakeReport"] {
-    transform: translate(-50%, -50%) rotate(216deg) translateY(-150px);
+    transform: translate(-50%, -50%) translate(-120px, 120px);
   }
 
   .orbiting-pod[data-function="dispute"] {
-    transform: translate(-50%, -50%) rotate(288deg) translateY(-150px);
+    transform: translate(-50%, -50%) translate(120px, 120px);
   }
 }
 
 @media (max-width: 480px) {
-  .orbiting-pod[data-function="bridgeToLayer"] {
-    transform: translate(-50%, -50%) translateY(-120px);
-  }
-
-  .orbiting-pod[data-function="bridgeToEth"] {
-    transform: translate(-50%, -50%) rotate(72deg) translateY(-120px);
+  .orbiting-pod[data-function="bridge"] {
+    transform: translate(-50%, -50%) translate(-100px, -100px);
   }
 
   .orbiting-pod[data-function="delegate"] {
-    transform: translate(-50%, -50%) rotate(144deg) translateY(-120px);
+    transform: translate(-50%, -50%) translate(100px, -100px);
   }
 
   .orbiting-pod[data-function="noStakeReport"] {
-    transform: translate(-50%, -50%) rotate(216deg) translateY(-120px);
+    transform: translate(-50%, -50%) translate(-100px, 100px);
   }
 
   .orbiting-pod[data-function="dispute"] {
-    transform: translate(-50%, -50%) rotate(288deg) translateY(-120px);
+    transform: translate(-50%, -50%) translate(100px, 100px);
   }
 }
 
 /* Staggered floating animations for natural movement */
-.orbiting-pod[data-function="bridgeToLayer"] .pod-content {
+.orbiting-pod[data-function="bridge"] .pod-content {
   animation-delay: 0s;
 }
 
-.orbiting-pod[data-function="bridgeToEth"] .pod-content {
+.orbiting-pod[data-function="delegate"] .pod-content {
   animation-delay: -1.2s;
 }
 
-.orbiting-pod[data-function="delegate"] .pod-content {
+.orbiting-pod[data-function="noStakeReport"] .pod-content {
   animation-delay: -2.4s;
 }
 
-.orbiting-pod[data-function="noStakeReport"] .pod-content {
-  animation-delay: -3.6s;
-}
-
 .orbiting-pod[data-function="dispute"] .pod-content {
-  animation-delay: -4.8s;
+  animation-delay: -3.6s;
 }
 
 .orbiting-pod:hover {
   z-index: 20;
 }
 
-/* Hover effects for each pod that maintain their pentagram position */
-.orbiting-pod[data-function="bridgeToLayer"]:hover {
-  transform: translate(-50%, -50%) translateY(-200px) scale(1.1);
-}
-
-.orbiting-pod[data-function="bridgeToEth"]:hover {
-  transform: translate(-50%, -50%) rotate(72deg) translateY(-200px) scale(1.1);
+/* Hover effects for each pod that maintain their 2x2 grid position */
+.orbiting-pod[data-function="bridge"]:hover {
+  transform: translate(-50%, -50%) translate(-150px, -150px) scale(1.1);
 }
 
 .orbiting-pod[data-function="delegate"]:hover {
-  transform: translate(-50%, -50%) rotate(144deg) translateY(-200px) scale(1.1);
+  transform: translate(-50%, -50%) translate(150px, -150px) scale(1.1);
 }
 
 .orbiting-pod[data-function="noStakeReport"]:hover {
-  transform: translate(-50%, -50%) rotate(216deg) translateY(-200px) scale(1.1);
+  transform: translate(-50%, -50%) translate(-150px, 150px) scale(1.1);
 }
 
 .orbiting-pod[data-function="dispute"]:hover {
-  transform: translate(-50%, -50%) rotate(288deg) translateY(-200px) scale(1.1);
+  transform: translate(-50%, -50%) translate(150px, 150px) scale(1.1);
 }
 
 /* Mobile hover effects - maintain proper positioning */
 @media (max-width: 768px) {
-  .orbiting-pod[data-function="bridgeToLayer"]:hover {
-    transform: translate(-50%, -50%) translateY(-150px) scale(1.1);
-  }
-
-  .orbiting-pod[data-function="bridgeToEth"]:hover {
-    transform: translate(-50%, -50%) rotate(72deg) translateY(-150px) scale(1.1);
+  .orbiting-pod[data-function="bridge"]:hover {
+    transform: translate(-50%, -50%) translate(-120px, -120px) scale(1.1);
   }
 
   .orbiting-pod[data-function="delegate"]:hover {
-    transform: translate(-50%, -50%) rotate(144deg) translateY(-150px) scale(1.1);
+    transform: translate(-50%, -50%) translate(120px, -120px) scale(1.1);
   }
 
   .orbiting-pod[data-function="noStakeReport"]:hover {
-    transform: translate(-50%, -50%) rotate(216deg) translateY(-150px) scale(1.1);
+    transform: translate(-50%, -50%) translate(-120px, 120px) scale(1.1);
   }
 
   .orbiting-pod[data-function="dispute"]:hover {
-    transform: translate(-50%, -50%) rotate(288deg) translateY(-150px) scale(1.1);
+    transform: translate(-50%, -50%) translate(120px, 120px) scale(1.1);
   }
 }
 
 @media (max-width: 480px) {
-  .orbiting-pod[data-function="bridgeToLayer"]:hover {
-    transform: translate(-50%, -50%) translateY(-120px) scale(1.1);
-  }
-
-  .orbiting-pod[data-function="bridgeToEth"]:hover {
-    transform: translate(-50%, -50%) rotate(72deg) translateY(-120px) scale(1.1);
+  .orbiting-pod[data-function="bridge"]:hover {
+    transform: translate(-50%, -50%) translate(-100px, -100px) scale(1.1);
   }
 
   .orbiting-pod[data-function="delegate"]:hover {
-    transform: translate(-50%, -50%) rotate(144deg) translateY(-120px) scale(1.1);
+    transform: translate(-50%, -50%) translate(100px, -100px) scale(1.1);
   }
 
   .orbiting-pod[data-function="noStakeReport"]:hover {
-    transform: translate(-50%, -50%) rotate(216deg) translateY(-120px) scale(1.1);
+    transform: translate(-50%, -50%) translate(-100px, 100px) scale(1.1);
   }
 
   .orbiting-pod[data-function="dispute"]:hover {
-    transform: translate(-50%, -50%) rotate(288deg) translateY(-120px) scale(1.1);
+    transform: translate(-50%, -50%) translate(100px, 100px) scale(1.1);
   }
 }
 
@@ -332,37 +302,27 @@
   }
 }
 
-@keyframes staticBridgeToEth {
-  0%, 100% {
-    transform: rotate(-72deg);
-  }
-}
-
 @keyframes staticDelegate {
   0%, 100% {
-    transform: rotate(-144deg);
+    transform: rotate(0deg);
   }
 }
 
 @keyframes staticNoStakeReport {
   0%, 100% {
-    transform: rotate(-216deg);
+    transform: rotate(0deg);
   }
 }
 
 @keyframes staticDispute {
   0%, 100% {
-    transform: rotate(-288deg);
+    transform: rotate(0deg);
   }
 }
 
 /* Use static positioning to maintain upright orientation */
-.orbiting-pod[data-function="bridgeToLayer"] .pod-content {
+.orbiting-pod[data-function="bridge"] .pod-content {
   animation: staticBridgeToLayer 1s ease-in-out infinite;
-}
-
-.orbiting-pod[data-function="bridgeToEth"] .pod-content {
-  animation: staticBridgeToEth 1s ease-in-out infinite;
 }
 
 .orbiting-pod[data-function="delegate"] .pod-content {
@@ -397,35 +357,29 @@
   animation: hoseGlow 3s ease-in-out infinite;
 }
 
-/* Position hoses for each pod to connect to hub center */
-.orbiting-pod[data-function="bridgeToLayer"]::after {
+/* Position hoses for each pod to connect to hub center in 2x2 grid formation */
+.orbiting-pod[data-function="bridge"]::after {
   top: 140px;
   left: 140px;
-  transform: rotate(90deg);
-}
-
-.orbiting-pod[data-function="bridgeToEth"]::after {
-  top: 140px;
-  left: 140px;
-  transform: rotate(90deg);
-}
-
-.orbiting-pod[data-function="noStakeReport"]::after {
-  top: 140px;
-  left: 140px;
-  transform: rotate(90deg);
+  transform: rotate(45deg);
 }
 
 .orbiting-pod[data-function="delegate"]::after {
   top: 140px;
   left: 140px;
-  transform: rotate(90deg);
+  transform: rotate(135deg);
+}
+
+.orbiting-pod[data-function="noStakeReport"]::after {
+  top: 140px;
+  left: 140px;
+  transform: rotate(315deg);
 }
 
 .orbiting-pod[data-function="dispute"]::after {
   top: 140px;
   left: 140px;
-  transform: rotate(90deg);
+  transform: rotate(225deg);
 }
 
 /* Mobile hose positioning - adjust for closer pods */
@@ -435,10 +389,9 @@
     height: 6px;
   }
   
-  .orbiting-pod[data-function="bridgeToLayer"]::after,
-  .orbiting-pod[data-function="bridgeToEth"]::after,
-  .orbiting-pod[data-function="noStakeReport"]::after,
+  .orbiting-pod[data-function="bridge"]::after,
   .orbiting-pod[data-function="delegate"]::after,
+  .orbiting-pod[data-function="noStakeReport"]::after,
   .orbiting-pod[data-function="dispute"]::after {
     top: 120px;
     left: 120px;
@@ -451,10 +404,9 @@
     height: 5px;
   }
   
-  .orbiting-pod[data-function="bridgeToLayer"]::after,
-  .orbiting-pod[data-function="bridgeToEth"]::after,
-  .orbiting-pod[data-function="noStakeReport"]::after,
+  .orbiting-pod[data-function="bridge"]::after,
   .orbiting-pod[data-function="delegate"]::after,
+  .orbiting-pod[data-function="noStakeReport"]::after,
   .orbiting-pod[data-function="dispute"]::after {
     top: 100px;
     left: 100px;

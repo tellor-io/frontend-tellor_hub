@@ -1942,13 +1942,6 @@ const App = {
     const stakeAmountInput = document.getElementById('stakeAmount');
     const ethStakeAmountInput = document.getElementById('ethStakeAmount');
     
-    // Preserve the original input widths
-    const originalWidth = stakeAmountInput.offsetWidth;
-    stakeAmountInput.style.width = originalWidth + 'px';
-    if (ethStakeAmountInput) {
-        ethStakeAmountInput.style.width = originalWidth + 'px';
-    }
-    
     // Create tooltip element
     const tooltip = document.createElement('div');
     tooltip.className = 'trb-price-tooltip';
@@ -2277,17 +2270,14 @@ const App = {
 
     // Function to check if tooltip should be visible based on current section
     function shouldTooltipBeVisible() {
-        const bridgeToLayerSection = document.getElementById('bridgeToLayerSection');
-        const bridgeToEthSection = document.getElementById('bridgeToEthSection');
+        const bridgeSection = document.getElementById('bridgeSection');
         const delegateSection = document.getElementById('delegateSection');
         
-        const result = (bridgeToLayerSection && bridgeToLayerSection.classList.contains('active')) ||
-               (bridgeToEthSection && bridgeToEthSection.classList.contains('active')) ||
+        const result = (bridgeSection && bridgeSection.classList.contains('active')) ||
                (delegateSection && delegateSection.classList.contains('active'));
         
         console.log('shouldTooltipBeVisible:', { 
-            bridgeToLayer: bridgeToLayerSection?.classList.contains('active'),
-            bridgeToEth: bridgeToEthSection?.classList.contains('active'),
+            bridge: bridgeSection?.classList.contains('active'),
             delegate: delegateSection?.classList.contains('active'),
             result: result
         });
@@ -3888,24 +3878,24 @@ const App = {
     },
 
   initBridgeDirectionUI: function() {
-    const bridgeToLayerBtn = document.getElementById('bridgeToLayerBtn');
-    const bridgeToEthBtn = document.getElementById('bridgeToEthBtn');
+    const bridgeToggle = document.getElementById('bridgeDirectionToggle');
+    const bridgeSection = document.getElementById('bridgeSection');
+    const bridgeToTellorContent = document.getElementById('bridgeToTellorContent');
+    const bridgeToEthereumContent = document.getElementById('bridgeToEthereumContent');
     const delegateBtn = document.getElementById('delegateBtn');
-    const bridgeToLayerSection = document.getElementById('bridgeToLayerSection');
-    const bridgeToEthSection = document.getElementById('bridgeToEthSection');
     const delegateSection = document.getElementById('delegateSection');
     const transactionsContainer = document.getElementById('bridgeTransactionsContainer');
 
-    if (!bridgeToLayerBtn || !bridgeToEthBtn || !delegateBtn || !bridgeToLayerSection || !bridgeToEthSection || !delegateSection) {
-        // console.error(...);
-        return;
+    if (!bridgeToggle || !bridgeSection || !bridgeToTellorContent || !bridgeToEthereumContent || !delegateBtn || !delegateSection) {
+      // console.error(...);
+      return;
     }
 
-    // Set initial state
+    // Set initial state - Bridge to Tellor is default
     this.currentBridgeDirection = 'layer';
-    bridgeToLayerBtn.classList.add('active');
-    bridgeToLayerSection.classList.add('active');
-    bridgeToEthSection.classList.remove('active');
+    bridgeToTellorContent.style.display = 'block';
+    bridgeToEthereumContent.style.display = 'none';
+    bridgeToggle.checked = false;
     delegateSection.classList.remove('active');
 
     // Initially hide transactions container
@@ -3919,17 +3909,13 @@ const App = {
         frontendCodeLink.style.display = 'block';
     }
 
-    // Add click event listeners
-    bridgeToLayerBtn.addEventListener('click', () => {
-        if (this.currentBridgeDirection !== 'layer') {
-            this.switchBridgeDirection('layer');
-        }
-    });
-
-    bridgeToEthBtn.addEventListener('click', () => {
-        if (this.currentBridgeDirection !== 'ethereum') {
-            this.switchBridgeDirection('ethereum');
-        }
+    // Add toggle event listener
+    bridgeToggle.addEventListener('change', () => {
+      if (bridgeToggle.checked) {
+        this.switchBridgeDirection('ethereum');
+      } else {
+        this.switchBridgeDirection('layer');
+      }
     });
 
     delegateBtn.addEventListener('click', () => {
@@ -4048,31 +4034,41 @@ const App = {
         return;
     }
 
-    const bridgeToLayerBtn = document.getElementById('bridgeToLayerBtn');
-    const bridgeToEthBtn = document.getElementById('bridgeToEthBtn');
+    const bridgeToggle = document.getElementById('bridgeDirectionToggle');
+    const bridgeSection = document.getElementById('bridgeSection');
+    const bridgeToTellorContent = document.getElementById('bridgeToTellorContent');
+    const bridgeToEthereumContent = document.getElementById('bridgeToEthereumContent');
     const delegateBtn = document.getElementById('delegateBtn');
     const noStakeReportBtn = document.getElementById('noStakeReportBtn');
-    const bridgeToLayerSection = document.getElementById('bridgeToLayerSection');
-    const bridgeToEthSection = document.getElementById('bridgeToEthSection');
     const delegateSection = document.getElementById('delegateSection');
     const noStakeReportSection = document.getElementById('noStakeReportSection');
     const transactionsContainer = document.getElementById('bridgeTransactionsContainer');
     const boxWrapper = document.querySelector('.box-wrapper');
 
-    if (!bridgeToLayerBtn || !bridgeToEthBtn || !delegateBtn || !noStakeReportBtn || !bridgeToLayerSection || !bridgeToEthSection || !delegateSection || !noStakeReportSection) {
+    if (!bridgeSection || !bridgeToTellorContent || !bridgeToEthereumContent || !delegateBtn || !delegateSection) {
         // console.error(...);
         return;
     }
 
-    // Update active states
-    bridgeToLayerBtn.classList.toggle('active', direction === 'layer');
-    bridgeToEthBtn.classList.toggle('active', direction === 'ethereum');
-    delegateBtn.classList.toggle('active', direction === 'delegate');
-    noStakeReportBtn.classList.toggle('active', direction === 'noStakeReport');
-    bridgeToLayerSection.classList.toggle('active', direction === 'layer');
-    bridgeToEthSection.classList.toggle('active', direction === 'ethereum');
-    delegateSection.classList.toggle('active', direction === 'delegate');
-    noStakeReportSection.classList.toggle('active', direction === 'noStakeReport');
+    // Update bridge toggle state
+    if (bridgeToggle) {
+        bridgeToggle.checked = direction === 'ethereum';
+    }
+
+    // Update bridge content visibility
+    if (direction === 'layer' || direction === 'ethereum') {
+        bridgeToTellorContent.style.display = direction === 'layer' ? 'block' : 'none';
+        bridgeToEthereumContent.style.display = direction === 'ethereum' ? 'block' : 'none';
+        bridgeSection.classList.add('active');
+        delegateSection.classList.remove('active');
+        noStakeReportSection.classList.remove('active');
+    } else {
+        bridgeToTellorContent.style.display = 'none';
+        bridgeToEthereumContent.style.display = 'none';
+        bridgeSection.classList.remove('active');
+        delegateSection.classList.toggle('active', direction === 'delegate');
+        noStakeReportSection.classList.toggle('active', direction === 'noStakeReport');
+    }
     
     // Update box wrapper classes for animation
     if (boxWrapper) {

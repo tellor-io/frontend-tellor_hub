@@ -98,17 +98,10 @@
           <div class="spoke-line spoke-diagonal-1"></div>
           <div class="spoke-line spoke-diagonal-2"></div>
           
-          <!-- Bridge to Layer Pod -->
-          <div class="orbiting-pod" data-function="bridgeToLayer">
+          <!-- Bridge Pod (Consolidated) -->
+          <div class="orbiting-pod" data-function="bridge">
             <div class="pod-content">
-              <img src="Orb_Bridge_Tellor.png" alt="Bridge to Layer" class="pod-icon">
-            </div>
-          </div>
-
-          <!-- Bridge to Ethereum Pod -->
-          <div class="orbiting-pod" data-function="bridgeToEth">
-            <div class="pod-content">
-              <img src="Orb_Bridge_Eth.png" alt="Bridge to Ethereum" class="pod-icon">
+              <img src="Orb_Bridge_Tellor.png" alt="Bridge" class="pod-icon">
             </div>
           </div>
 
@@ -147,14 +140,9 @@
           </div>
           
           <div class="side-nav-options">
-            <div class="nav-option" data-function="bridgeToLayer">
-              <img class="nav-option-icon" src="./symbol_bridge_tellor.png" alt="Bridge to Tellor"/>
-              <div class="nav-option-title">Bridge to Tellor</div>
-            </div>
-            
-            <div class="nav-option" data-function="bridgeToEth">
-              <img class="nav-option-icon"src="./symbol_bridge_eth.png" alt="Bridge to Ethereum"/>
-              <div class="nav-option-title">Bridge to Ethereum</div>
+            <div class="nav-option" data-function="bridge">
+              <img class="nav-option-icon" src="./symbol_bridge_tellor.png" alt="Bridge"/>
+              <div class="nav-option-title">Bridge Tokens</div>
             </div>
             
             <div class="nav-option" data-function="delegate">
@@ -177,88 +165,94 @@
         <!-- Function Display Area -->
         <div class="function-display-area">
           <div class="function-container">
-            <!-- Bridge to Layer Section -->
-            <div id="bridgeToLayerSection" class="function-section">
+            <!-- Bridge Section (Consolidated) -->
+            <div id="bridgeSection" class="function-section">
               <div class="section-header">
-                <h2>Bridge to Tellor </h2>
-                <p class="section-description">Transfer your TRB tokens from Ethereum to the Tellor Layer</p>
-              </div>
-              <div class="wallet-disclaimer">*Please connect your Ethereum wallet to bridge tokens*</div>
-              <w3m-button></w3m-button>
-              <div class="balance-info">
-                <div class="input-button-container">
-                  <div class="input-with-label">
-                    <span class="input-label">TRB</span>
-                    <input class="input" type="text" id="stakeAmount" placeholder="0" />
+                <div class="bridge-header-container">
+                  <h2 id="bridgeTitle">Bridge TRB To Tellor</h2>
+                  <div class="bridge-toggle-container">
+                    <label class="bridge-toggle-switch">
+                      <input type="checkbox" id="bridgeDirectionToggle">
+                      <span class="bridge-toggle-slider">
+                        <span class="bridge-toggle-label-left">To Tellor</span>
+                        <span class="bridge-toggle-label-right">To Ethereum</span>
+                      </span>
+                    </label>
                   </div>
                 </div>
-                <div class="Deposit-limit">
-                  <p class="info-text">(Deposit limit: <span id="depositLimit"></span>)</p>
-                </div>
-                <div class="input-button-container">
-                  <div class="input-with-label">
-                    <input class="input-address" type="text" id="_queryId" placeholder="To address (e.g. tellor1py3fs...)" />
-                    <span class="info-icon" data-tooltip="Don't have a tellor prefix address? <a href='https://docs.tellor.io/layer-docs/running-tellor-layer/node-setup' target='_blank'>Click here</a> to learn how to create one">ⓘ</span>
-                  </div>
-                </div>
-                <div class="bridge-direction">
-                  <button id="approveButton" class="button-style-1" onclick="App.approveDeposit()">Approve Deposit</button>
-                  <button id="depositButton" class="button-style-3" onclick="App.depositToLayer()">Bridge to Layer</button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Bridge to Ethereum Section -->
-            <div id="bridgeToEthSection" class="function-section">
-              <div class="section-header">
-                <h2>Bridge to Ethereum</h2>
-                <p class="section-description">Withdraw your TRB tokens from Tellor Layer back to Ethereum</p>
+                <p class="section-description" id="bridgeDescription">Transfer your TRB tokens from Ethereum to the Tellor Layer</p>
               </div>
               
-              <!-- Use standard classes like other sections -->
-              <div class="balance-info">
+              <!-- Bridge to Tellor Content -->
+              <div id="bridgeToTellorContent" class="bridge-content">
+                <div class="wallet-disclaimer">*Please connect your Ethereum wallet to bridge tokens*</div>
+                <w3m-button></w3m-button>
+                <div class="balance-info">
+                  <div class="input-button-container">
+                    <div class="input-with-label">
+                      <span class="input-label">TRB</span>
+                      <input class="input" type="text" id="stakeAmount" placeholder="0" />
+                    </div>
+                  </div>
+                  <div class="Deposit-limit">
+                    <p class="info-text">(Deposit limit: <span id="depositLimit"></span>)</p>
+                  </div>
+                  <div class="input-button-container">
+                    <div class="input-with-label">
+                      <input class="input-address" type="text" id="_queryId" placeholder="To address (e.g. tellor1py3fs...)" />
+                      <span class="info-icon" data-tooltip="Don't have a tellor prefix address? <a href='https://docs.tellor.io/layer-docs/running-tellor-layer/node-setup' target='_blank'>Click here</a> to learn how to create one">ⓘ</span>
+                    </div>
+                  </div>
+                  <div class="bridge-direction">
+                    <button id="approveButton" class="button-style-1" onclick="App.approveDeposit()">Approve Deposit</button>
+                    <button id="depositButton" class="button-style-3" onclick="App.depositToLayer()">Bridge to Layer</button>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Bridge to Ethereum Content -->
+              <div id="bridgeToEthereumContent" class="bridge-content" style="display: none;">
                 <div class="wallet-disclaimer">*Please connect both wallets to bridge to Ethereum*</div>
                 <div class="wallet-connection-container">
                 </div>
                 
-                <!-- Form using standard input-button-container structure -->
-                <div class="input-button-container">
-                  <div class="input-with-label">
-                    <span class="input-label">TRB</span>
-                    <input class="trb-input" type="text" id="ethStakeAmount" placeholder="0" />
+                <div class="balance-info">
+                  <div class="input-button-container">
+                    <div class="input-with-label">
+                      <span class="input-label">TRB</span>
+                      <input class="input" type="text" id="ethStakeAmount" placeholder="0" />
+                    </div>
+                    <div class="input-with-label">
+                      <input class="input-address" type="text" id="ethQueryId" placeholder="To address (e.g. 0x...)" />
+                    </div>
+                    <button id="withdrawButton" class="button-style-3" onclick="App.withdrawFromLayer()">Request Withdrawal</button>
                   </div>
-                  <div class="input-with-label">
-                    <input class="address-input" type="text" id="ethQueryId" placeholder="To address (e.g. 0x...)" />
-                    <span class="info-icon" data-tooltip="Enter your Ethereum address (0x...)">ⓘ</span>
+                </div>
+                
+                <div class="transactions-container active">
+                  <div class="history-header">
+                    <h3>Withdrawal Transactions: View & Claim your withdrawal requests and their status</h3>
                   </div>
-                  <button id="withdrawButton" class="button-style-3" onclick="App.withdrawFromLayer()">1. Request Withdrawal</button>
-                </div>
-              </div>
-              
-              <!-- Table using standard transactions-container structure -->
-              <div class="transactions-container active">
-                <div class="history-header">
-                  <h3>Withdrawal Transactions: View & Claim your withdrawal requests and their status</h3>
-                </div>
-                <div class="withdrawal-table-container">
-                  <table id="withdrawal-history" class="withdrawal-table">
-                    <thead>
-                      <tr>
-                        <th>Actions</th>
-                        <th>ID</th>
-                        <th>Sender</th>
-                        <th>Recipient</th>
-                        <th class="amount-column">Amount (TRB)</th>
-                        <th>Time</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td colspan="7" class="loading-message">Waiting for wallet connections...</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <div class="withdrawal-table-container">
+                    <table id="withdrawal-history" class="withdrawal-table">
+                      <thead>
+                        <tr>
+                          <th>Actions</th>
+                          <th>ID</th>
+                          <th>Sender</th>
+                          <th>Recipient</th>
+                          <th class="amount-column">Amount (TRB)</th>
+                          <th>Time</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td colspan="7" class="loading-message">Waiting for wallet connections...</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
@@ -696,11 +690,8 @@
             // Show corresponding section
             let sectionId = '';
             switch(functionType) {
-              case 'bridgeToLayer':
-                sectionId = 'bridgeToLayerSection';
-                break;
-              case 'bridgeToEth':
-                sectionId = 'bridgeToEthSection';
+              case 'bridge':
+                sectionId = 'bridgeSection';
                 break;
               case 'delegate':
                 sectionId = 'delegateSection';
@@ -787,11 +778,8 @@
             // Show corresponding section
             let sectionId = '';
             switch(functionType) {
-              case 'bridgeToLayer':
-                sectionId = 'bridgeToLayerSection';
-                break;
-              case 'bridgeToEth':
-                sectionId = 'bridgeToEthSection';
+              case 'bridge':
+                sectionId = 'bridgeSection';
                 break;
               case 'delegate':
                 sectionId = 'delegateSection';
@@ -847,8 +835,8 @@
         });
         
         infoIcons.forEach(icon => {
-            // Add tooltip functionality to icons in the Bridge to Layer section and Delegate section
-            if (icon.closest('#bridgeToLayerSection') || icon.closest('#delegateSection')) {
+            // Add tooltip functionality to icons in the Bridge section and Delegate section
+            if (icon.closest('#bridgeSection') || icon.closest('#delegateSection')) {
                 const tooltip = document.createElement('div');
                 tooltip.className = 'tooltip';
                 tooltip.innerHTML = icon.getAttribute('data-tooltip');
@@ -856,8 +844,8 @@
                 
                 // Show tooltip on hover
                 icon.addEventListener('mouseenter', function(e) {
-                    // Only show tooltip if we're in the Bridge to Layer section or Delegate section
-                    if (!document.getElementById('bridgeToLayerSection').classList.contains('active') && 
+                    // Only show tooltip if we're in the Bridge section or Delegate section
+                    if (!document.getElementById('bridgeSection').classList.contains('active') && 
                         !document.getElementById('delegateSection').classList.contains('active')) {
                         return;
                     }
@@ -903,8 +891,8 @@
                 
                 // Also handle click for mobile devices
                 icon.addEventListener('click', function(e) {
-                    // Only show tooltip if we're in the Bridge to Layer section or Delegate section
-                    if (!document.getElementById('bridgeToLayerSection').classList.contains('active') && 
+                    // Only show tooltip if we're in the Bridge section or Delegate section
+                    if (!document.getElementById('bridgeSection').classList.contains('active') && 
                         !document.getElementById('delegateSection').classList.contains('active')) {
                         return;
                     }
@@ -963,7 +951,7 @@
             document.querySelectorAll('.tooltip').forEach(tooltip => {
                 if (tooltip.style.display === 'block') {
                     const icon = document.querySelector('.info-icon[data-tooltip="' + tooltip.innerHTML + '"]');
-                    if (icon && (document.getElementById('bridgeToLayerSection').classList.contains('active') || 
+                    if (icon && (document.getElementById('bridgeSection').classList.contains('active') || 
                                 document.getElementById('delegateSection').classList.contains('active'))) {
                         const iconRect = icon.getBoundingClientRect();
                         const tooltipRect = tooltip.getBoundingClientRect();
@@ -1098,6 +1086,38 @@
         
         // Start waiting for App
         waitForAppAndInitialize();
+
+        // Bridge toggle functionality
+        const bridgeToggle = document.getElementById('bridgeDirectionToggle');
+        const bridgeTitle = document.getElementById('bridgeTitle');
+        const bridgeDescription = document.getElementById('bridgeDescription');
+        const bridgeToTellorContent = document.getElementById('bridgeToTellorContent');
+        const bridgeToEthereumContent = document.getElementById('bridgeToEthereumContent');
+
+        if (bridgeToggle) {
+          bridgeToggle.addEventListener('change', function() {
+            if (this.checked) {
+              // Switch to Bridge to Ethereum
+              bridgeTitle.textContent = 'Bridge TRB to Ethereum';
+              bridgeDescription.textContent = 'Withdraw your TRB tokens from Tellor back to Ethereum';
+              bridgeToTellorContent.style.display = 'none';
+              bridgeToEthereumContent.style.display = 'block';
+              
+              // Update withdrawal history when switching to Ethereum bridge
+              if (window.App && window.App.updateWithdrawalHistory) {
+                setTimeout(() => {
+                  window.App.updateWithdrawalHistory();
+                }, 100);
+              }
+            } else {
+              // Switch to Bridge to Tellor
+              bridgeTitle.textContent = 'Bridge TRB';
+              bridgeDescription.textContent = 'Transfer your TRB tokens from Ethereum to the Tellor';
+              bridgeToTellorContent.style.display = 'block';
+              bridgeToEthereumContent.style.display = 'none';
+            }
+          });
+        }
 
         // Dispute tab switching function
         function switchDisputeTab(tabId) {
