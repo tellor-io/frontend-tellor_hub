@@ -675,9 +675,13 @@ const App = {
             }
             // Refresh validator dropdown when connecting in delegate section
             await App.populateValidatorDropdown();
+            await App.populateReporterDropdown();
+            await App.refreshCurrentStatus();
         } else {
             // If not in delegate section, still populate validators for when user switches to delegate
             await App.populateValidatorDropdown();
+            await App.populateReporterDropdown();
+            await App.refreshCurrentStatus();
         }
         
         App.setPageParams();
@@ -829,9 +833,13 @@ const App = {
             }
             // Refresh validator dropdown when connecting in delegate section
             await App.populateValidatorDropdown();
+            await App.populateReporterDropdown();
+            await App.refreshCurrentStatus();
         } else {
             // If not in delegate section, still populate validators for when user switches to delegate
             await App.populateValidatorDropdown();
+            await App.populateReporterDropdown();
+            await App.refreshCurrentStatus();
         }
         
         App.setPageParams();
@@ -969,6 +977,13 @@ const App = {
         if (validatorDropdown) {
             validatorDropdown.innerHTML = '<option value="">Connect Cosmos wallet to view validators</option>';
             validatorDropdown.disabled = true;
+        }
+
+        // Reset reporter dropdown when disconnecting
+        const reporterDropdown = document.getElementById('reporterDropdown');
+        if (reporterDropdown) {
+            reporterDropdown.innerHTML = '<option value="">Connect Cosmos wallet to view reporters</option>';
+            reporterDropdown.disabled = true;
         }
 
         // Update withdrawal history to reflect wallet disconnection
@@ -1481,9 +1496,11 @@ const App = {
       // Always refresh validator dropdown when switching networks
       try {
         await App.populateValidatorDropdown(true); // true = isNetworkSwitch
-        console.log('Validator dropdown refreshed after network switch');
+        await App.populateReporterDropdown(true); // true = isNetworkSwitch
+        await App.refreshCurrentStatus();
+        console.log('Validator and reporter dropdowns refreshed after network switch');
       } catch (error) {
-        console.error('Failed to refresh validator dropdown after network switch:', error);
+        console.error('Failed to refresh dropdowns after network switch:', error);
       }
       
       // Update balance for the new network after a small delay to ensure wallet is ready
@@ -3267,6 +3284,8 @@ const App = {
             document.getElementById('delegateStakeAmount').value = '';
             document.getElementById('delegateValidatorAddress').value = '';
             document.getElementById('delegateValidatorDropdown').value = '';
+            // Refresh status to show new delegation
+            await App.refreshCurrentStatus();
         } else {
             throw new Error(result?.rawLog || "Delegation failed");
         }
@@ -3280,6 +3299,102 @@ const App = {
         if (delegateButton) {
             delegateButton.disabled = false;
             delegateButton.innerHTML = '<span>Delegate</span><span>Tokens</span>';
+        }
+    }
+  },
+
+  // Add function to handle reporter selection
+  selectReporter: async function() {
+    try {
+        if (!App.isKeplrConnected) {
+            alert('Please connect your Cosmos wallet first');
+            return;
+        }
+
+        // Verify wallet is still enabled for the chain
+        try {
+            if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+                // Re-enable the chain using wallet adapter
+                await window.cosmosWalletAdapter.enableChain();
+            } else if (window.keplr) {
+                // Fallback to legacy Keplr method
+                await window.keplr.enable(App.cosmosChainId);
+            } else {
+                throw new Error('No wallet available');
+            }
+        } catch (error) {
+            App.isKeplrConnected = false;
+            App.keplrAddress = null;
+            const keplrButton = document.getElementById('keplrButton');
+            if (keplrButton) {
+                keplrButton.innerHTML = 'Connect Cosmos Wallet';
+            }
+            alert('Please reconnect your Cosmos wallet');
+            return;
+        }
+
+        // Get selected reporter address
+        const reporterAddress = document.getElementById('selectedReporterAddress').value;
+
+        // Validate inputs
+        if (!reporterAddress || !reporterAddress.trim()) {
+            App.showValidationErrorPopup('Please select a reporter from the dropdown');
+            return;
+        }
+
+        // Validate reporter address format (should be a valid bech32 address)
+        if (!reporterAddress.startsWith('tellor')) {
+            App.showValidationErrorPopup('Please select a valid reporter from the dropdown');
+            return;
+        }
+
+        // Disable the button during processing
+        const selectReporterButton = document.getElementById('selectReporterButton');
+        if (selectReporterButton) {
+            selectReporterButton.disabled = true;
+            selectReporterButton.innerHTML = 'Selecting...';
+        }
+
+        // Get offline signer
+        let offlineSigner;
+        if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+            offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+        } else if (window.getOfflineSigner) {
+            offlineSigner = window.getOfflineSigner(App.cosmosChainId);
+        } else {
+            throw new Error('No offline signer available');
+        }
+
+        const accounts = await offlineSigner.getAccounts();
+        const layerAccount = accounts[0].address;
+
+        // Call the reporter selection function
+        const result = await window.cosmjs.stargate.selectReporter(
+            layerAccount,
+            reporterAddress
+        );
+
+        if (result && result.txhash) {
+            // Get transaction hash from the result
+            const txHash = result.txhash || result.tx_response?.txhash;
+            App.showSuccessPopup("Reporter selection successful!", txHash, 'cosmos');
+            // Clear the selection
+            document.getElementById('selectedReporterAddress').value = '';
+            document.getElementById('reporterDropdown').value = '';
+            // Refresh status to show new selection
+            await App.refreshCurrentStatus();
+        } else {
+            throw new Error(result?.rawLog || "Reporter selection failed");
+        }
+    } catch (error) {
+        console.error('Reporter selection error:', error);
+        App.showBalanceErrorPopup(`Reporter selection failed: ${error.message}`);
+    } finally {
+        // Re-enable the button
+        const selectReporterButton = document.getElementById('selectReporterButton');
+        if (selectReporterButton) {
+            selectReporterButton.disabled = false;
+            selectReporterButton.innerHTML = 'Select Reporter';
         }
     }
   },
@@ -4119,6 +4234,8 @@ const App = {
     // Populate validator dropdown when switching to delegate section
     if (direction === 'delegate') {
         this.populateValidatorDropdown();
+        this.populateReporterDropdown();
+        this.refreshCurrentStatus();
     }
   },
 
@@ -4295,6 +4412,209 @@ const App = {
     }
   },
 
+  // Add function to fetch reporters from Layer network
+  fetchReporters: async function() {
+    try {
+      const response = await fetch(`${App.getCosmosApiEndpoint()}/tellor-io/layer/reporter/reporters`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch reporters: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.reporters || !Array.isArray(data.reporters)) {
+        throw new Error('Invalid reporters response format');
+      }
+      
+      // Sort reporters by address for consistent ordering
+      const sortedReporters = data.reporters.sort((a, b) => {
+        return a.address.localeCompare(b.address);
+      });
+      
+      return sortedReporters.map(reporter => ({
+        address: reporter.address,
+        name: reporter.metadata?.moniker || 'Unknown Reporter',
+        description: `Power: ${reporter.power}, Commission: ${(parseFloat(reporter.metadata?.commission_rate || '0') * 100).toFixed(2)}%`,
+        active: !reporter.metadata?.jailed || false
+      }));
+    } catch (error) {
+      console.error('Error fetching reporters:', error);
+      throw error;
+    }
+  },
+
+  // Add function to fetch current reporter selection
+  fetchCurrentReporter: async function(selectorAddress) {
+    try {
+      const endpoint = `${App.getCosmosApiEndpoint()}/tellor-io/layer/reporter/selector-reporter/${selectorAddress}`;
+      console.log('Fetching current reporter from:', endpoint);
+      
+      const response = await fetch(endpoint);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log('No reporter selected for address:', selectorAddress);
+          return null; // No reporter selected
+        }
+        throw new Error(`Failed to fetch current reporter: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Current reporter data:', data);
+      return data;
+    } catch (error) {
+      console.error('Error fetching current reporter:', error);
+      throw error;
+    }
+  },
+
+  // Add function to fetch current delegations
+  fetchCurrentDelegations: async function(delegatorAddress) {
+    try {
+      const endpoint = `${App.getCosmosApiEndpoint()}/cosmos/staking/v1beta1/delegations/${delegatorAddress}`;
+      console.log('Fetching delegations from:', endpoint);
+      
+      const response = await fetch(endpoint);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch delegations: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('Delegations data:', data);
+      
+      if (!data.delegation_responses || !Array.isArray(data.delegation_responses)) {
+        return [];
+      }
+      
+      return data.delegation_responses.map(delegation => ({
+        validatorAddress: delegation.delegation.validator_address,
+        amount: delegation.balance.amount,
+        denom: delegation.balance.denom
+      }));
+    } catch (error) {
+      console.error('Error fetching delegations:', error);
+      throw error;
+    }
+  },
+
+  // Add function to display current reporter status
+  displayCurrentReporterStatus: async function(selectorAddress) {
+    const statusElement = document.getElementById('currentReporterStatus');
+    if (!statusElement) return;
+
+    try {
+      statusElement.innerHTML = '<div class="status-loading">Loading...</div>';
+      
+      const reporterData = await this.fetchCurrentReporter(selectorAddress);
+      
+      if (!reporterData) {
+        statusElement.innerHTML = '<div class="status-empty">No reporter selected</div>';
+        return;
+      }
+
+      // Display reporter information
+      statusElement.innerHTML = `
+        <div class="status-item">
+          <span class="status-label">Reporter Address:</span>
+          <span class="status-address">${reporterData.reporter || 'Unknown'}</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Status:</span>
+          <span class="status-value">Active</span>
+        </div>
+      `;
+    } catch (error) {
+      console.error('Error displaying reporter status:', error);
+      statusElement.innerHTML = '<div class="status-empty">Error loading reporter status</div>';
+    }
+  },
+
+  // Add function to display current delegations status
+  displayCurrentDelegationsStatus: async function(delegatorAddress) {
+    const statusElement = document.getElementById('currentDelegationsStatus');
+    if (!statusElement) return;
+
+    try {
+      statusElement.innerHTML = '<div class="status-loading">Loading...</div>';
+      
+      const delegations = await this.fetchCurrentDelegations(delegatorAddress);
+      
+      if (!delegations || delegations.length === 0) {
+        statusElement.innerHTML = '<div class="status-empty">No delegations found</div>';
+        return;
+      }
+
+      // Calculate total delegation
+      let totalDelegated = 0;
+      delegations.forEach(delegation => {
+        if (delegation.denom === 'loya') {
+          totalDelegated += parseInt(delegation.amount);
+        }
+      });
+
+      const totalTRB = (totalDelegated / 1000000).toFixed(6);
+
+      // Display delegations
+      let html = `
+        <div class="status-item">
+          <span class="status-label">Total Delegated:</span>
+          <span class="status-amount">${totalTRB} TRB</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Validators:</span>
+          <span class="status-value">${delegations.length}</span>
+        </div>
+      `;
+
+      // Show individual delegations (limit to 3 for space)
+      const displayDelegations = delegations.slice(0, 3);
+      for (const delegation of displayDelegations) {
+        const amountTRB = (parseInt(delegation.amount) / 1000000).toFixed(6);
+        // Truncate validator address for display
+        const validatorDisplay = delegation.validatorAddress.length > 20 
+          ? delegation.validatorAddress.substring(0, 17) + '...'
+          : delegation.validatorAddress;
+        
+        html += `
+          <div class="status-item">
+            <span class="status-label">Validator:</span>
+            <div style="text-align: right;">
+              <div class="status-address" style="font-size: 0.7rem;">${validatorDisplay}</div>
+              <div class="status-amount">${amountTRB} TRB</div>
+            </div>
+          </div>
+        `;
+      }
+
+      if (delegations.length > 3) {
+        html += `<div class="status-item"><span class="status-label">...and ${delegations.length - 3} more</span></div>`;
+      }
+
+      statusElement.innerHTML = html;
+    } catch (error) {
+      console.error('Error displaying delegations status:', error);
+      statusElement.innerHTML = '<div class="status-empty">Error loading delegations</div>';
+    }
+  },
+
+  // Add function to refresh all status
+  refreshCurrentStatus: async function() {
+    if (!App.isKeplrConnected || !App.keplrAddress) {
+      return;
+    }
+
+    try {
+      await Promise.all([
+        this.displayCurrentReporterStatus(App.keplrAddress),
+        this.displayCurrentDelegationsStatus(App.keplrAddress)
+      ]);
+    } catch (error) {
+      console.error('Error refreshing current status:', error);
+    }
+  },
+
 
 
   // Initialize delegate section
@@ -4328,6 +4648,81 @@ const App = {
           await App.populateValidatorDropdown();
         } catch (error) {
           console.error('Error refreshing validators:', error);
+        } finally {
+          this.disabled = false;
+          this.textContent = '↻';
+        }
+      });
+    }
+
+    // Initialize reporter dropdown
+    const reporterDropdown = document.getElementById('reporterDropdown');
+    if (reporterDropdown) {
+      reporterDropdown.innerHTML = '<option value="">Connect Cosmos wallet to view reporters</option>';
+      reporterDropdown.disabled = true;
+    }
+    
+    // Add change event listener to update the hidden input for reporters
+    if (reporterDropdown && !reporterDropdown.hasAttribute('data-initialized')) {
+      reporterDropdown.setAttribute('data-initialized', 'true');
+      reporterDropdown.addEventListener('change', function() {
+        const hiddenInput = document.getElementById('selectedReporterAddress');
+        if (hiddenInput) {
+          hiddenInput.value = this.value;
+        }
+      });
+    }
+    
+    // Add refresh button event listener for reporters if not already added
+    const refreshReportersBtn = document.getElementById('refreshReportersBtn');
+    if (refreshReportersBtn && !refreshReportersBtn.hasAttribute('data-initialized')) {
+      refreshReportersBtn.setAttribute('data-initialized', 'true');
+      refreshReportersBtn.addEventListener('click', async function() {
+        this.disabled = true;
+        this.textContent = '⟳';
+        try {
+          await App.populateReporterDropdown();
+        } catch (error) {
+          console.error('Error refreshing reporters:', error);
+        } finally {
+          this.disabled = false;
+          this.textContent = '↻';
+        }
+      });
+    }
+
+    // Add refresh button event handlers for status cards
+    const refreshReporterStatusBtn = document.getElementById('refreshReporterStatusBtn');
+    if (refreshReporterStatusBtn && !refreshReporterStatusBtn.hasAttribute('data-initialized')) {
+      refreshReporterStatusBtn.setAttribute('data-initialized', 'true');
+      refreshReporterStatusBtn.addEventListener('click', async function() {
+        this.disabled = true;
+        this.textContent = '⟳';
+        try {
+          if (App.isKeplrConnected && App.keplrAddress) {
+            await App.displayCurrentReporterStatus(App.keplrAddress);
+          }
+        } catch (error) {
+          console.error('Error refreshing reporter status:', error);
+        } finally {
+          this.disabled = false;
+          this.textContent = '↻';
+        }
+      });
+    }
+
+    const refreshDelegationsBtn = document.getElementById('refreshDelegationsBtn');
+    if (refreshDelegationsBtn && !refreshDelegationsBtn.hasAttribute('data-initialized')) {
+      refreshDelegationsBtn.setAttribute('data-initialized', 'true');
+      refreshDelegationsBtn.addEventListener('click', async function() {
+        this.disabled = true;
+        this.textContent = '⟳';
+        try {
+          if (App.isKeplrConnected && App.keplrAddress) {
+            await App.displayCurrentDelegationsStatus(App.keplrAddress);
+          }
+        } catch (error) {
+          console.error('Error refreshing delegations status:', error);
         } finally {
           this.disabled = false;
           this.textContent = '↻';
@@ -4389,6 +4784,65 @@ const App = {
       const dropdown = document.getElementById('delegateValidatorDropdown');
       if (dropdown) {
         dropdown.innerHTML = '<option value="">Error loading validators</option>';
+        dropdown.disabled = true;
+      }
+    }
+  },
+
+  // Add function to populate reporter dropdown
+  populateReporterDropdown: async function(isNetworkSwitch = false) {
+    try {
+      const dropdown = document.getElementById('reporterDropdown');
+      if (!dropdown) {
+        console.error('Reporter dropdown not found');
+        return;
+      }
+      
+      // Show appropriate loading state
+      if (isNetworkSwitch) {
+        const networkName = App.cosmosChainId === 'tellor-1' ? 'mainnet' : 'testnet';
+        dropdown.innerHTML = `<option value="">Switching to ${networkName} - loading reporters...</option>`;
+      } else {
+        dropdown.innerHTML = '<option value="">Loading reporters...</option>';
+      }
+      dropdown.disabled = true;
+      
+      const reporters = await this.fetchReporters();
+      
+      // Clear loading state and populate dropdown with network indicator
+      const networkName = App.cosmosChainId === 'tellor-1' ? 'Mainnet' : 'Testnet';
+      dropdown.innerHTML = `<option value="">Select a reporter (${networkName})...</option>`;
+      
+      reporters.forEach(reporter => {
+        if (reporter.active) { // Only show active reporters
+          // Truncate name if it's too long
+          let displayName = reporter.name;
+          if (displayName.length > 20) {
+            displayName = displayName.substring(0, 17) + '...';
+          }
+          
+          const option = document.createElement('option');
+          option.value = reporter.address;
+          const networkName = App.cosmosChainId === 'tellor-1' ? 'MN' : 'TN';
+          // Extract power and commission from description
+          const powerMatch = reporter.description.match(/Power: (\d+)/);
+          const commissionMatch = reporter.description.match(/Commission: ([\d.]+)%/);
+          const power = powerMatch ? powerMatch[1] : '0';
+          const commission = commissionMatch ? commissionMatch[1] : '0';
+          
+          option.textContent = `${displayName} (${power} power, ${commission}%) [${networkName}]`;
+          option.title = `${reporter.name} - ${reporter.description} - ${networkName === 'MN' ? 'Mainnet' : 'Testnet'}`;
+          dropdown.appendChild(option);
+        }
+      });
+      
+      dropdown.disabled = false;
+      
+    } catch (error) {
+      console.error('Error populating reporter dropdown:', error);
+      const dropdown = document.getElementById('reporterDropdown');
+      if (dropdown) {
+        dropdown.innerHTML = '<option value="">Error loading reporters</option>';
         dropdown.disabled = true;
       }
     }

@@ -372,6 +372,22 @@
                         
                         console.log('Encoding MsgAddFeeToDispute:', msgValue);
                         encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
+                    } else if (message.typeUrl === '/layer.reporter.MsgSelectReporter') {
+                        // Encode reporter selection message
+                        const MsgSelectReporter = new protobuf.Type("MsgSelectReporter")
+                            .add(new protobuf.Field("selectorAddress", 1, "string"))
+                            .add(new protobuf.Field("reporterAddress", 2, "string"));
+                        
+                        root.add(MsgSelectReporter);
+                        const MsgType = root.lookupType("MsgSelectReporter");
+                        
+                        const msgValue = {
+                            selectorAddress: message.value.selectorAddress,
+                            reporterAddress: message.value.reporterAddress
+                        };
+                        
+                        console.log('Encoding MsgSelectReporter:', msgValue);
+                        encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else {
                         throw new Error(`Unsupported message type: ${message.typeUrl}`);
                     }
@@ -749,11 +765,57 @@
         }
     }
 
+    // Function to select a reporter
+    async function selectReporter(account, reporterAddress) {
+        try {
+            // Get offline signer from wallet adapter or fallback to legacy method
+            let offlineSigner;
+            if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+                offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+            } else if (window.getOfflineSigner) {
+                offlineSigner = window.getOfflineSigner('layertest-4');
+            } else {
+                throw new Error('No offline signer available');
+            }
+
+            const client = await SigningStargateClient.connectWithSigner(
+                'https://node-palmito.tellorlayer.com/rpc',
+                offlineSigner
+            );
+
+            // Create the MsgSelectReporter message
+            const msg = {
+                typeUrl: '/layer.reporter.MsgSelectReporter',
+                value: {
+                    selectorAddress: account,
+                    reporterAddress: reporterAddress
+                }
+            };
+
+            // Sign and broadcast using direct signing
+            const result = await client.signAndBroadcastDirect(
+                account,
+                [msg],
+                {
+                    amount: [{ denom: 'loya', amount: '5000' }],
+                    gas: '200000'
+                },
+                'Select reporter for data submissions'
+            );
+
+            return result;
+        } catch (error) {
+            console.error('Reporter selection error:', error);
+            throw error;
+        }
+    }
+
     // Export to both module and global scope
     exports.SigningStargateClient = SigningStargateClient;
     exports.withdrawFromLayer = withdrawFromLayer;
     exports.requestAttestations = requestAttestations;
     exports.delegateTokens = delegateTokens;
+    exports.selectReporter = selectReporter;
     exports.pollTransactionStatus = pollTransactionStatus;
 
     // Ensure cosmjs object exists
@@ -765,6 +827,7 @@
     window.cosmjs.stargate.withdrawFromLayer = withdrawFromLayer;
     window.cosmjs.stargate.requestAttestations = requestAttestations;
     window.cosmjs.stargate.delegateTokens = delegateTokens;
+    window.cosmjs.stargate.selectReporter = selectReporter;
     window.cosmjs.stargate.pollTransactionStatus = pollTransactionStatus;
     
     window.cosmjsStargate = {
@@ -772,6 +835,7 @@
         withdrawFromLayer: withdrawFromLayer,
         requestAttestations: requestAttestations,
         delegateTokens: delegateTokens,
+        selectReporter: selectReporter,
         pollTransactionStatus: pollTransactionStatus
     };
 }))); 

@@ -265,26 +265,93 @@
               </div>
               <div class="wallet-disclaimer">*Please connect your Cosmos wallet to delegate tokens*</div>
 
-              <div class="balance-info">
-                  <div class="input-button-container">
-                      <div class="input-with-label">
-                          <span class="input-label">TRB</span>
-                          <input class="input" type="text" id="delegateStakeAmount" placeholder="0" />
+              <!-- Action Sections (Side by Side) -->
+              <div class="action-sections">
+                <!-- Delegate Tokens Section -->
+                <div class="action-section">
+                  <div class="section-header">
+                    <h3>Delegate Tokens</h3>
+                    <p class="section-description">Stake your TRB tokens with validators</p>
+                  </div>
+                  
+                  <div class="balance-info">
+                      <div class="input-button-container">
+                          <div class="input-with-label">
+                              <span class="input-label">TRB</span>
+                              <input class="input" type="text" id="delegateStakeAmount" placeholder="0" />
+                          </div>
+                      </div>
+                      <div class="input-button-container">
+                          <div class="input-with-label">
+                              <select class="input-address" id="delegateValidatorDropdown">
+                                  <option value="">Select a validator...</option>
+                              </select>
+                              <button type="button" id="refreshValidatorsBtn" class="refresh-btn" title="Refresh validator list">↻</button>
+                              <input type="hidden" id="delegateValidatorAddress" />
+                              <span class="info-icon" data-tooltip="Select a validator from the list to delegate your tokens to">ⓘ</span>
+                          </div>
+                      </div>
+                      <div class="bridge-direction">
+                          <button id="delegateButton" class="button-style-3" onclick="App.delegateTokens()">Delegate Tokens</button>
                       </div>
                   </div>
-                  <div class="input-button-container">
-                      <div class="input-with-label">
-                          <select class="input-address" id="delegateValidatorDropdown">
-                              <option value="">Select a validator...</option>
-                          </select>
-                          <button type="button" id="refreshValidatorsBtn" class="refresh-btn" title="Refresh validator list">↻</button>
-                          <input type="hidden" id="delegateValidatorAddress" />
-                          <span class="info-icon" data-tooltip="Select a validator from the list to delegate your tokens to">ⓘ</span>
+                </div>
+
+                <!-- Reporter Selection Section -->
+                <div class="action-section">
+                  <div class="section-header">
+                    <h3>Select Reporter</h3>
+                    <p class="section-description">Choose a reporter for data submissions</p>
+                  </div>
+                  
+                  <div class="balance-info">
+                      <div class="input-button-container">
+                          <div class="input-with-label">
+                              <select class="input-address" id="reporterDropdown">
+                                  <option value="">Select a reporter...</option>
+                              </select>
+                              <button type="button" id="refreshReportersBtn" class="refresh-btn" title="Refresh reporter list">↻</button>
+                              <input type="hidden" id="selectedReporterAddress" />
+                              <span class="info-icon" data-tooltip="Select a reporter from the list to handle data submissions">ⓘ</span>
+                          </div>
+                      </div>
+                      <div class="bridge-direction">
+                          <button id="selectReporterButton" class="button-style-3" onclick="App.selectReporter()">Select Reporter</button>
                       </div>
                   </div>
-                  <div class="bridge-direction">
-                      <button id="delegateButton" class="button-style-3" onclick="App.delegateTokens()">Delegate Tokens</button>
+                </div>
+              </div>
+
+              <!-- Current Status Section -->
+              <div class="current-status-section">
+                <div class="section-header">
+                  <h3>Current Status</h3>
+                  <p class="section-description">Your current staking and reporter selection</p>
+                </div>
+                
+                <div class="status-table">
+                  <div class="status-table-row">
+                    <div class="status-table-cell">
+                      <div class="status-table-header">
+                        <span>Selected Reporter</span>
+                        <button type="button" id="refreshReporterStatusBtn" class="refresh-btn-small" title="Refresh reporter status">↻</button>
+                      </div>
+                      <div class="status-table-content" id="currentReporterStatus">
+                        <div class="status-loading">Loading...</div>
+                      </div>
+                    </div>
+                    
+                    <div class="status-table-cell">
+                      <div class="status-table-header">
+                        <span>Validator Delegations</span>
+                        <button type="button" id="refreshDelegationsBtn" class="refresh-btn-small" title="Refresh delegations">↻</button>
+                      </div>
+                      <div class="status-table-content" id="currentDelegationsStatus">
+                        <div class="status-loading">Loading...</div>
+                      </div>
+                    </div>
                   </div>
+                </div>
               </div>
             </div>
 
