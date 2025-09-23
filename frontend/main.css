@@ -592,7 +592,7 @@ input:not(:placeholder-shown) {
 }
 
 .input-address {
-    font-size: 20px !important;
+    font-size: 16px !important;
     padding: 10px !important;
     width: 100% !important;
     max-width: 400px !important;
@@ -647,7 +647,7 @@ select.input-address option {
     top: 50%;
     transform: translateY(-50%);
     background: none;
-    border: none;
+    border: 2px solid #11321d;
     color: #008D8B;
     font-size: 16px;
     cursor: pointer;
@@ -693,6 +693,8 @@ select.input-address option {
 .refresh-btn:hover {
     background-color: #e0e0e0;
     color: #003734;
+    border-color: #11321d;
+    border-width: 2px;
 }
 
 .refresh-btn:active {
@@ -2690,4 +2692,342 @@ header {
 #bridgeToEthereumContent .input-row .input-with-label,
 #bridgeToEthereumContent .input-with-label {
     flex: 0 0 auto !important;
+}
+
+/* Action Sections Layout */
+.action-sections {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.action-container {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    border: 2px solid #11321d;
+    padding: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.action-section {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 0.75rem 1.5rem 1.5rem 1.5rem;
+}
+
+/* Override balance-info styles for action sections */
+.action-section .balance-info {
+    max-width: none;
+    margin: 0;
+    width: 100%;
+}
+
+.action-section .section-header {
+    margin-bottom: 1rem;
+}
+
+.action-section .section-header h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #003434;
+}
+
+.action-section .section-header .section-description {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #ccc;
+}
+
+/* Main section headers */
+.section-header h2 {
+    color: #003434;
+}
+
+/* Status Section Styles */
+.status-section {
+    margin-bottom: 0.1rem;
+    padding: 0rem;
+    background: rgb(217, 217, 217);
+    border-radius: 1px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    position: relative;
+}
+
+/* Add padding to reporter status section to align with delegations */
+#currentReporterStatus {
+    padding-top: 0.1rem;
+}
+
+.status-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.0rem;
+    padding-bottom: 0.0rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.status-header:hover {
+    background-color: rgb(206, 206, 206);
+    border-radius: 4px;
+    margin: -0.25rem -0.25rem 0.25rem -0.25rem;
+    padding: 0.25rem 0.5rem 0.5rem 0.5rem;
+}
+
+.status-header span {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #003434;
+}
+
+.status-header-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.dropdown-arrow {
+    font-size: 0.7rem;
+    color: #0b381b; /* Green */
+    transition: transform 0.2s ease;
+}
+
+.dropdown-arrow.rotated {
+    transform: rotate(180deg);
+}
+
+.status-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: rgba(228, 228, 228, 0.95); /* Dark background */
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    margin-top: 0.25rem;
+    padding: 0.5rem;
+    backdrop-filter: blur(10px);
+}
+
+.status-dropdown-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.status-content {
+    min-height: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.status-loading {
+    color: #666;
+    font-style: italic;
+    text-align: center;
+    padding: 0.25rem;
+    font-size: 0.75rem;
+}
+
+.status-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.1rem 0;
+    font-size: 0.8rem;
+}
+
+.status-item:last-child {
+    border-bottom: none;
+}
+
+.status-total-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.status-total-container:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.status-total-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex: 1;
+}
+
+.status-total {
+    font-weight: 600;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 0.1rem;
+    padding-bottom: 0.25rem;
+}
+
+.status-delegation {
+    padding: 0.1rem 0;
+    font-size: 0.75rem;
+}
+
+.status-label {
+    font-size: 0.75rem;
+    color: #666;
+}
+
+.status-value {
+    font-size: 0.75rem;
+    color: #000000;
+    font-weight: 500;
+}
+
+.status-address {
+    font-family: monospace;
+    font-size: 0.7rem;
+    color: #123f23;
+    word-break: break-all;
+}
+
+.address-with-copy {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.copy-btn {
+    background: none;
+    border: none;
+    color: #154526;
+    cursor: pointer;
+    font-size: 0.7rem;
+    padding: 0.1rem;
+    border-radius: 2px;
+    transition: all 0.2s ease;
+    opacity: 0.7;
+    position: relative;
+}
+
+.copy-btn:hover {
+    opacity: 1;
+    background: rgba(74, 222, 128, 0.1);
+    transform: scale(1.1);
+}
+
+.copy-btn:active {
+    transform: scale(0.95);
+}
+
+/* Custom tooltip for copy buttons */
+.copy-btn::before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #003434;
+    color: white;
+    padding: 0.4rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease;
+    z-index: 1000;
+    pointer-events: none;
+    margin-bottom: 0.3rem;
+}
+
+.copy-btn::after {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: #003434;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease;
+    z-index: 1000;
+    pointer-events: none;
+    margin-bottom: -0.1rem;
+}
+
+.copy-btn:hover::before,
+.copy-btn:hover::after {
+    opacity: 1;
+    visibility: visible;
+}
+
+.status-amount {
+    color: #0ca277;
+    font-weight: 600;
+    font-size: 0.75rem;
+}
+
+.status-empty {
+    color: #666;
+    font-style: italic;
+    text-align: center;
+    padding: 0.25rem;
+    font-size: 0.75rem;
+}
+
+/* Small refresh button for status table */
+.refresh-btn-small {
+    background: rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+    color: #000000;
+    cursor: pointer;
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.refresh-btn-small:hover {
+    background: rgba(0, 0, 0, 0.15);
+    border-color: rgba(0, 0, 0, 0.3);
+}
+
+.refresh-btn-small:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Responsive design for action sections */
+@media (max-width: 768px) {
+    .action-sections {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .action-container {
+        padding: 1rem;
+    }
+    
+    .action-section {
+        padding: 1rem;
+    }
+    
+    .status-section {
+        padding: 0.5rem;
+    }
 }

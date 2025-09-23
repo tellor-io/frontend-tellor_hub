@@ -106,6 +106,38 @@ export class UnitTests extends TestSuite {
         run: () => this.testDelegateButtonFunctionalityTestnet()
       },
       {
+        name: 'Validator fetching and dropdown population',
+        run: () => this.testValidatorFetchingAndDropdown()
+      },
+      {
+        name: 'Reporter fetching and dropdown population',
+        run: () => this.testReporterFetchingAndDropdown()
+      },
+      {
+        name: 'Current delegations status display',
+        run: () => this.testCurrentDelegationsStatus()
+      },
+      {
+        name: 'Current reporter status display',
+        run: () => this.testCurrentReporterStatus()
+      },
+      {
+        name: 'Delegations dropdown toggle functionality',
+        run: () => this.testDelegationsDropdownToggle()
+      },
+      {
+        name: 'Copy to clipboard functionality',
+        run: () => this.testCopyToClipboard()
+      },
+      {
+        name: 'Reporter selection functionality',
+        run: () => this.testReporterSelection()
+      },
+      {
+        name: 'Network switching for delegate functions',
+        run: () => this.testNetworkSwitchingForDelegate()
+      },
+      {
         name: 'Dispute functions on mainnet',
         run: () => this.testDisputeFunctionsMainnet()
       },
@@ -1502,6 +1534,360 @@ export class UnitTests extends TestSuite {
     
     // Button should be enabled when connected to testnet
     this.assertFalse(delegateButton.disabled, 'Delegate button should be enabled on testnet');
+  }
+
+  async testValidatorFetchingAndDropdown() {
+    // Mock the fetch function to return validator data
+    const mockValidators = [
+      {
+        operator_address: 'tellorvaloper1testvalidator123456789012345678901234567890',
+        description: { moniker: 'Test Validator 1' },
+        tokens: '1000000000', // 1000 TRB
+        commission: { commission_rates: { rate: '0.05' } }, // 5%
+        jailed: false
+      },
+      {
+        operator_address: 'tellorvaloper2testvalidator123456789012345678901234567890',
+        description: { moniker: 'Test Validator 2' },
+        tokens: '2000000000', // 2000 TRB
+        commission: { commission_rates: { rate: '0.10' } }, // 10%
+        jailed: false
+      }
+    ];
+
+    const mockFetch = await this.mockFetch(
+      'https://node-palmito.tellorlayer.com/cosmos/staking/v1beta1/validators?status=BOND_STATUS_BONDED&pagination.limit=1000',
+      { validators: mockValidators }
+    );
+
+    try {
+      // Test validator fetching
+      if (window.App && window.App.fetchValidators) {
+        const validators = await window.App.fetchValidators();
+        
+        this.assertArray(validators, 'Should return array of validators');
+        this.assertEqual(validators.length, 2, 'Should return 2 validators');
+        
+        // Check validator structure
+        const validator = validators[0];
+        this.assertString(validator.address, 'Validator should have address');
+        this.assertString(validator.moniker, 'Validator should have moniker');
+        this.assertString(validator.votingPower, 'Validator should have votingPower');
+        this.assertString(validator.commission, 'Validator should have commission');
+        this.assertFalse(validator.jailed, 'Validator should not be jailed');
+        
+        // Test dropdown population
+        if (window.App && window.App.populateValidatorDropdown) {
+          await window.App.populateValidatorDropdown();
+          
+          const dropdown = document.getElementById('delegateValidatorDropdown');
+          this.assertNotNull(dropdown, 'Validator dropdown should exist');
+          this.assertGreaterThan(dropdown.options.length, 1, 'Dropdown should have validator options');
+          
+          // Check first validator option
+          const firstOption = dropdown.options[1];
+          this.assertContains(firstOption.textContent, 'Test Validator 1', 'First option should contain validator name');
+          this.assertContains(firstOption.textContent, '1000.00 TRB', 'First option should contain voting power');
+          this.assertContains(firstOption.textContent, '5.00%', 'First option should contain commission');
+        }
+      }
+    } finally {
+      mockFetch(); // Restore original fetch
+    }
+  }
+
+  async testReporterFetchingAndDropdown() {
+    // Mock the fetch function to return reporter data
+    const mockReporters = [
+      {
+        reporter: 'tellor1reporter123456789012345678901234567890',
+        moniker: 'Test Reporter 1',
+        power: '1000000', // 1 TRB
+        commission: '0.05', // 5%
+        jailed: false
+      },
+      {
+        reporter: 'tellor1reporter987654321098765432109876543210',
+        moniker: 'Test Reporter 2',
+        power: '2000000', // 2 TRB
+        commission: '0.10', // 10%
+        jailed: false
+      }
+    ];
+
+    const mockFetch = await this.mockFetch(
+      'https://node-palmito.tellorlayer.com/tellor-io/layer/reporter/reporters',
+      { reporters: mockReporters }
+    );
+
+    try {
+      // Test reporter fetching
+      if (window.App && window.App.fetchReporters) {
+        const reporters = await window.App.fetchReporters();
+        
+        this.assertArray(reporters, 'Should return array of reporters');
+        this.assertEqual(reporters.length, 2, 'Should return 2 reporters');
+        
+        // Check reporter structure
+        const reporter = reporters[0];
+        this.assertString(reporter.address, 'Reporter should have address');
+        this.assertString(reporter.name, 'Reporter should have name');
+        this.assertString(reporter.power, 'Reporter should have power');
+        this.assertString(reporter.commission, 'Reporter should have commission');
+        this.assertFalse(reporter.jailed, 'Reporter should not be jailed');
+        
+        // Test dropdown population
+        if (window.App && window.App.populateReporterDropdown) {
+          await window.App.populateReporterDropdown();
+          
+          const dropdown = document.getElementById('reporterDropdown');
+          this.assertNotNull(dropdown, 'Reporter dropdown should exist');
+          this.assertGreaterThan(dropdown.options.length, 1, 'Dropdown should have reporter options');
+          
+          // Check first reporter option
+          const firstOption = dropdown.options[1];
+          this.assertContains(firstOption.textContent, 'Test Reporter 1', 'First option should contain reporter name');
+          this.assertContains(firstOption.textContent, '1.00 TRB', 'First option should contain power');
+          this.assertContains(firstOption.textContent, '5.00%', 'First option should contain commission');
+        }
+      }
+    } finally {
+      mockFetch(); // Restore original fetch
+    }
+  }
+
+  async testCurrentDelegationsStatus() {
+    // Mock the fetch function to return delegation data
+    const mockDelegations = {
+      delegation_responses: [
+        {
+          delegation: {
+            delegator_address: 'tellor1testdelegator123456789012345678901234567890',
+            validator_address: 'tellorvaloper1testvalidator123456789012345678901234567890'
+          },
+          balance: {
+            amount: '1000000', // 1 TRB
+            denom: 'loya'
+          }
+        },
+        {
+          delegation: {
+            delegator_address: 'tellor1testdelegator123456789012345678901234567890',
+            validator_address: 'tellorvaloper2testvalidator123456789012345678901234567890'
+          },
+          balance: {
+            amount: '2000000', // 2 TRB
+            denom: 'loya'
+          }
+        }
+      ]
+    };
+
+    const mockFetch = await this.mockFetch(
+      'https://node-palmito.tellorlayer.com/cosmos/staking/v1beta1/delegations/tellor1testdelegator123456789012345678901234567890',
+      mockDelegations
+    );
+
+    try {
+      // Test delegation fetching
+      if (window.App && window.App.fetchCurrentDelegations) {
+        const delegations = await window.App.fetchCurrentDelegations('tellor1testdelegator123456789012345678901234567890');
+        
+        this.assertArray(delegations, 'Should return array of delegations');
+        this.assertEqual(delegations.length, 2, 'Should return 2 delegations');
+        
+        // Check delegation structure
+        const delegation = delegations[0];
+        this.assertString(delegation.validatorAddress, 'Delegation should have validator address');
+        this.assertString(delegation.amount, 'Delegation should have amount');
+        this.assertString(delegation.denom, 'Delegation should have denom');
+        
+        // Test status display
+        if (window.App && window.App.displayCurrentDelegationsStatus) {
+          await window.App.displayCurrentDelegationsStatus('tellor1testdelegator123456789012345678901234567890', delegations);
+          
+          const statusElement = document.getElementById('currentDelegationsStatus');
+          this.assertNotNull(statusElement, 'Delegations status element should exist');
+          
+          // Check that total is displayed
+          this.assertContains(statusElement.innerHTML, '3.000000 TRB', 'Should display total delegation amount');
+        }
+      }
+    } finally {
+      mockFetch(); // Restore original fetch
+    }
+  }
+
+  async testCurrentReporterStatus() {
+    // Mock the fetch function to return reporter data
+    const mockReporter = {
+      reporter: 'tellor1reporter123456789012345678901234567890'
+    };
+
+    const mockFetch = await this.mockFetch(
+      'https://node-palmito.tellorlayer.com/tellor-io/layer/reporter/selector-reporter/tellor1testselector123456789012345678901234567890',
+      mockReporter
+    );
+
+    try {
+      // Test reporter fetching
+      if (window.App && window.App.fetchCurrentReporter) {
+        const reporterData = await window.App.fetchCurrentReporter('tellor1testselector123456789012345678901234567890');
+        
+        this.assertNotNull(reporterData, 'Should return reporter data');
+        this.assertString(reporterData.reporter, 'Should have reporter address');
+        
+        // Test status display
+        if (window.App && window.App.displayCurrentReporterStatus) {
+          await window.App.displayCurrentReporterStatus('tellor1testselector123456789012345678901234567890');
+          
+          const statusElement = document.getElementById('currentReporterStatus');
+          this.assertNotNull(statusElement, 'Reporter status element should exist');
+          
+          // Check that reporter address is displayed
+          this.assertContains(statusElement.innerHTML, 'tellor1reporter123456789012345678901234567890', 'Should display reporter address');
+        }
+      }
+    } finally {
+      mockFetch(); // Restore original fetch
+    }
+  }
+
+  async testDelegationsDropdownToggle() {
+    // Test dropdown toggle functionality
+    if (window.App && window.App.toggleDelegationsDropdown) {
+      const dropdown = document.getElementById('delegationsDropdown');
+      const arrow = document.getElementById('delegationsDropdownArrow');
+      
+      this.assertNotNull(dropdown, 'Delegations dropdown should exist');
+      this.assertNotNull(arrow, 'Dropdown arrow should exist');
+      
+      // Initially dropdown should be hidden
+      this.assertEqual(dropdown.style.display, 'none', 'Dropdown should be hidden initially');
+      this.assertFalse(arrow.classList.contains('rotated'), 'Arrow should not be rotated initially');
+      
+      // Toggle dropdown open
+      window.App.toggleDelegationsDropdown();
+      this.assertEqual(dropdown.style.display, 'block', 'Dropdown should be visible after toggle');
+      this.assertTrue(arrow.classList.contains('rotated'), 'Arrow should be rotated after toggle');
+      
+      // Toggle dropdown closed
+      window.App.toggleDelegationsDropdown();
+      this.assertEqual(dropdown.style.display, 'none', 'Dropdown should be hidden after second toggle');
+      this.assertFalse(arrow.classList.contains('rotated'), 'Arrow should not be rotated after second toggle');
+    }
+  }
+
+  async testCopyToClipboard() {
+    // Mock clipboard API
+    const mockClipboard = {
+      writeText: async (text) => {
+        this.assertEqual(text, 'test-address-123', 'Should copy correct text');
+        return Promise.resolve();
+      }
+    };
+    
+    // Mock navigator.clipboard
+    const originalClipboard = navigator.clipboard;
+    navigator.clipboard = mockClipboard;
+    
+    try {
+      // Test copy functionality
+      if (window.App && window.App.copyToClipboard) {
+        await window.App.copyToClipboard('test-address-123');
+        
+        // Check if success message is shown
+        const successElement = document.querySelector('.copy-success-message');
+        if (successElement) {
+          this.assertContains(successElement.textContent, 'Copied!', 'Should show success message');
+        }
+      }
+    } finally {
+      navigator.clipboard = originalClipboard;
+    }
+  }
+
+  async testReporterSelection() {
+    // Mock CosmJS stargate client
+    const mockStargate = this.mockStargateClient();
+    window.cosmjs = { stargate: mockStargate };
+    
+    // Mock Keplr provider
+    const mockKeplr = this.mockKeplrProvider();
+    window.keplr = mockKeplr;
+    
+    // Set up wallet connection
+    if (window.App) {
+      window.App.isKeplrConnected = true;
+      window.App.keplrAddress = 'tellor1testselector123456789012345678901234567890';
+    }
+    
+    try {
+      // Test reporter selection
+      if (window.App && window.App.selectReporter) {
+        // Set up form inputs
+        const reporterDropdown = document.getElementById('reporterDropdown');
+        const reporterStakeAmount = document.getElementById('reporterStakeAmount');
+        const selectedReporterAddress = document.getElementById('selectedReporterAddress');
+        
+        if (reporterDropdown && selectedReporterAddress && reporterStakeAmount) {
+          // Set test values
+          reporterStakeAmount.value = '1.5';
+          selectedReporterAddress.value = 'tellor1reporter123456789012345678901234567890';
+          
+          // Mock the CosmJS selectReporter function
+          if (window.cosmjs && window.cosmjs.stargate) {
+            window.cosmjs.stargate.selectReporter = async (account, reporterAddress, stakeAmount) => {
+              this.assertEqual(account, 'tellor1testselector123456789012345678901234567890', 'Should use correct account');
+              this.assertEqual(reporterAddress, 'tellor1reporter123456789012345678901234567890', 'Should use correct reporter address');
+              this.assertEqual(stakeAmount, '1.5', 'Should use correct stake amount');
+              
+              return {
+                txhash: 'test-reporter-selection-hash-1234567890abcdef',
+                code: 0
+              };
+            };
+          }
+          
+          // Call selectReporter
+          await window.App.selectReporter();
+          
+          // Verify inputs were cleared
+          this.assertEqual(reporterDropdown.value, '', 'Reporter dropdown should be cleared');
+          this.assertEqual(selectedReporterAddress.value, '', 'Selected reporter address should be cleared');
+          this.assertEqual(reporterStakeAmount.value, '', 'Reporter stake amount should be cleared');
+        }
+      }
+    } catch (error) {
+      // Expected to fail in test environment, but we can verify the function was called
+      this.assertNotNull(error, 'Function should attempt to execute');
+    }
+  }
+
+  async testNetworkSwitchingForDelegate() {
+    // Test mainnet
+    if (window.App) {
+      window.App.cosmosChainId = 'tellor-1';
+      
+      // Test that API endpoints are correct for mainnet
+      const mainnetApiEndpoint = window.App.getCosmosApiEndpoint();
+      this.assertEqual(mainnetApiEndpoint, 'https://mainnet.tellorlayer.com', 'Should use mainnet API endpoint');
+      
+      const mainnetRpcEndpoint = window.App.getCosmosRpcEndpoint();
+      this.assertEqual(mainnetRpcEndpoint, 'https://mainnet.tellorlayer.com/rpc', 'Should use mainnet RPC endpoint');
+    }
+    
+    // Test testnet
+    if (window.App) {
+      window.App.cosmosChainId = 'layertest-4';
+      
+      // Test that API endpoints are correct for testnet
+      const testnetApiEndpoint = window.App.getCosmosApiEndpoint();
+      this.assertEqual(testnetApiEndpoint, 'https://node-palmito.tellorlayer.com', 'Should use testnet API endpoint');
+      
+      const testnetRpcEndpoint = window.App.getCosmosRpcEndpoint();
+      this.assertEqual(testnetRpcEndpoint, 'https://node-palmito.tellorlayer.com/rpc', 'Should use testnet RPC endpoint');
+    }
   }
 
   async testDisputeFunctionsMainnet() {

@@ -27,6 +27,14 @@ Comprehensive test suite for the Layer Bridge frontend application, covering bot
 - **Withdrawal button functionality on testnet** - Tests withdrawal UI and logic on Palmito Testnet
 - **Delegate button functionality on mainnet** - Tests delegation UI and logic on Tellor Mainnet
 - **Delegate button functionality on testnet** - Tests delegation UI and logic on Palmito Testnet
+- **Validator fetching and dropdown population** - Tests validator data fetching and dropdown population
+- **Reporter fetching and dropdown population** - Tests reporter data fetching and dropdown population
+- **Current delegations status display** - Tests current delegation status display and formatting
+- **Current reporter status display** - Tests current reporter status display and formatting
+- **Delegations dropdown toggle functionality** - Tests delegations dropdown expand/collapse behavior
+- **Copy to clipboard functionality** - Tests address copying functionality with tooltips
+- **Reporter selection functionality** - Tests reporter selection transaction flow
+- **Network switching for delegate functions** - Tests network-specific endpoint usage for delegate functions
 - **Dispute functions on mainnet** - Tests dispute functionality on Tellor Mainnet
 - **Dispute functions on testnet** - Tests dispute functionality on Palmito Testnet
 - **No-stake reporting on mainnet** - Tests no-stake reporting on Tellor Mainnet

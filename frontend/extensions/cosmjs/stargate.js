@@ -68,7 +68,7 @@
                 }
 
                 // Use the correct REST API endpoint
-                const baseUrl = 'https://node-palmito.tellorlayer.com';
+                const baseUrl = window.App && window.App.getCosmosApiEndpoint ? window.App.getCosmosApiEndpoint() : 'https://node-palmito.tellorlayer.com';
                 const balanceUrl = `${baseUrl}/cosmos/bank/v1beta1/balances/${address}`;
                 
                 const response = await fetch(balanceUrl, {
@@ -139,7 +139,9 @@
                 } else if (window.getOfflineSignerDirect) {
                     offlineSigner = window.getOfflineSignerDirect('layertest-4');
                 } else if (window.getOfflineSigner) {
-                    offlineSigner = window.getOfflineSigner('layertest-4');
+                    // Use the current chain ID from the app
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                offlineSigner = window.getOfflineSigner(chainId);
                 } else {
                     throw new Error('No offline signer available');
                 }
@@ -372,6 +374,24 @@
                         
                         console.log('Encoding MsgAddFeeToDispute:', msgValue);
                         encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
+                    } else if (message.typeUrl === '/layer.reporter.MsgSelectReporter') {
+                        // Encode reporter selection message
+                        const MsgSelectReporter = new protobuf.Type("MsgSelectReporter")
+                            .add(new protobuf.Field("selectorAddress", 1, "string"))
+                            .add(new protobuf.Field("reporterAddress", 2, "string"))
+                            .add(new protobuf.Field("stakeAmount", 3, "string"));
+                        
+                        root.add(MsgSelectReporter);
+                        const MsgType = root.lookupType("MsgSelectReporter");
+                        
+                        const msgValue = {
+                            selectorAddress: message.value.selectorAddress,
+                            reporterAddress: message.value.reporterAddress,
+                            stakeAmount: message.value.stakeAmount || '0'
+                        };
+                        
+                        console.log('Encoding MsgSelectReporter:', msgValue);
+                        encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else {
                         throw new Error(`Unsupported message type: ${message.typeUrl}`);
                     }
@@ -528,7 +548,7 @@
         try {
             // Format the hash to match the expected format (remove '0x' if present and ensure uppercase)
             const formattedHash = txHash.replace('0x', '').toUpperCase();
-            const baseUrl = 'https://node-palmito.tellorlayer.com';
+            const baseUrl = window.App && window.App.getCosmosApiEndpoint ? window.App.getCosmosApiEndpoint() : 'https://node-palmito.tellorlayer.com';
             
             // Try both endpoints
             const endpoints = [
@@ -603,13 +623,17 @@
             if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
                 offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
             } else if (window.getOfflineSigner) {
-                offlineSigner = window.getOfflineSigner('layertest-4');
+                // Use the current chain ID from the app
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                offlineSigner = window.getOfflineSigner(chainId);
             } else {
                 throw new Error('No offline signer available');
             }
 
+            // Use the current RPC endpoint from the app
+            const rpcEndpoint = window.App && window.App.getCosmosRpcEndpoint ? window.App.getCosmosRpcEndpoint() : 'https://node-palmito.tellorlayer.com/rpc';
             const client = await SigningStargateClient.connectWithSigner(
-                'https://node-palmito.tellorlayer.com/rpc',
+                rpcEndpoint,
                 offlineSigner
             );
 
@@ -659,13 +683,17 @@
             if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
                 offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
             } else if (window.getOfflineSigner) {
-                offlineSigner = window.getOfflineSigner('layertest-4');
+                // Use the current chain ID from the app
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                offlineSigner = window.getOfflineSigner(chainId);
             } else {
                 throw new Error('No offline signer available');
             }
 
+            // Use the current RPC endpoint from the app
+            const rpcEndpoint = window.App && window.App.getCosmosRpcEndpoint ? window.App.getCosmosRpcEndpoint() : 'https://node-palmito.tellorlayer.com/rpc';
             const client = await SigningStargateClient.connectWithSigner(
-                'https://node-palmito.tellorlayer.com/rpc',
+                rpcEndpoint,
                 offlineSigner
             );
 
@@ -705,13 +733,17 @@
             if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
                 offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
             } else if (window.getOfflineSigner) {
-                offlineSigner = window.getOfflineSigner('layertest-4');
+                // Use the current chain ID from the app
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                offlineSigner = window.getOfflineSigner(chainId);
             } else {
                 throw new Error('No offline signer available');
             }
 
+            // Use the current RPC endpoint from the app
+            const rpcEndpoint = window.App && window.App.getCosmosRpcEndpoint ? window.App.getCosmosRpcEndpoint() : 'https://node-palmito.tellorlayer.com/rpc';
             const client = await SigningStargateClient.connectWithSigner(
-                'https://node-palmito.tellorlayer.com/rpc',
+                rpcEndpoint,
                 offlineSigner
             );
 
@@ -749,11 +781,62 @@
         }
     }
 
+    // Function to select a reporter
+    async function selectReporter(account, reporterAddress, stakeAmount = null) {
+        try {
+            // Get offline signer from wallet adapter or fallback to legacy method
+            let offlineSigner;
+            if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+                offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+            } else if (window.getOfflineSigner) {
+                // Use the current chain ID from the app
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                offlineSigner = window.getOfflineSigner(chainId);
+            } else {
+                throw new Error('No offline signer available');
+            }
+
+            // Use the current RPC endpoint from the app
+            const rpcEndpoint = window.App && window.App.getCosmosRpcEndpoint ? window.App.getCosmosRpcEndpoint() : 'https://node-palmito.tellorlayer.com/rpc';
+            const client = await SigningStargateClient.connectWithSigner(
+                rpcEndpoint,
+                offlineSigner
+            );
+
+            // Create the MsgSelectReporter message
+            const msg = {
+                typeUrl: '/layer.reporter.MsgSelectReporter',
+                value: {
+                    selectorAddress: account,
+                    reporterAddress: reporterAddress,
+                    stakeAmount: stakeAmount || '0'
+                }
+            };
+
+            // Sign and broadcast using direct signing
+            const result = await client.signAndBroadcastDirect(
+                account,
+                [msg],
+                {
+                    amount: [{ denom: 'loya', amount: '5000' }],
+                    gas: '200000'
+                },
+                'Select reporter for data submissions'
+            );
+
+            return result;
+        } catch (error) {
+            console.error('Reporter selection error:', error);
+            throw error;
+        }
+    }
+
     // Export to both module and global scope
     exports.SigningStargateClient = SigningStargateClient;
     exports.withdrawFromLayer = withdrawFromLayer;
     exports.requestAttestations = requestAttestations;
     exports.delegateTokens = delegateTokens;
+    exports.selectReporter = selectReporter;
     exports.pollTransactionStatus = pollTransactionStatus;
 
     // Ensure cosmjs object exists
@@ -765,6 +848,7 @@
     window.cosmjs.stargate.withdrawFromLayer = withdrawFromLayer;
     window.cosmjs.stargate.requestAttestations = requestAttestations;
     window.cosmjs.stargate.delegateTokens = delegateTokens;
+    window.cosmjs.stargate.selectReporter = selectReporter;
     window.cosmjs.stargate.pollTransactionStatus = pollTransactionStatus;
     
     window.cosmjsStargate = {
@@ -772,6 +856,7 @@
         withdrawFromLayer: withdrawFromLayer,
         requestAttestations: requestAttestations,
         delegateTokens: delegateTokens,
+        selectReporter: selectReporter,
         pollTransactionStatus: pollTransactionStatus
     };
 }))); 
