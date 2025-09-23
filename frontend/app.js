@@ -3226,10 +3226,7 @@ const App = {
         // Get current balance using the same method as updateKeplrBalance
         let currentBalance = 0;
         try {
-            const rpcEndpoint = App.cosmosChainId === 'tellor-1' 
-                ? 'https://mainnet.tellorlayer.com/rpc' 
-                : 'https://node-palmito.tellorlayer.com/rpc';
-            const restUrl = rpcEndpoint.replace('/rpc', '');
+            const restUrl = App.getCosmosApiEndpoint();
             const restResponse = await fetch(`${restUrl}/cosmos/bank/v1beta1/balances/${App.keplrAddress}`);
             const restData = await restResponse.json();
             
@@ -3333,8 +3330,9 @@ const App = {
             return;
         }
 
-        // Get selected reporter address
+        // Get inputs
         const reporterAddress = document.getElementById('selectedReporterAddress').value;
+        const stakeAmount = document.getElementById('reporterStakeAmount').value;
 
         // Validate inputs
         if (!reporterAddress || !reporterAddress.trim()) {
@@ -3345,6 +3343,18 @@ const App = {
         // Validate reporter address format (should be a valid bech32 address)
         if (!reporterAddress.startsWith('tellor')) {
             App.showValidationErrorPopup('Please select a valid reporter from the dropdown');
+            return;
+        }
+
+        // Validate stake amount (required for reporter selection)
+        if (!stakeAmount || !stakeAmount.trim()) {
+            App.showValidationErrorPopup('Please enter a TRB amount for reporter selection');
+            return;
+        }
+        
+        const amount = parseFloat(stakeAmount);
+        if (isNaN(amount) || amount <= 0) {
+            App.showValidationErrorPopup('Please enter a valid TRB amount (greater than 0)');
             return;
         }
 
@@ -3371,16 +3381,18 @@ const App = {
         // Call the reporter selection function
         const result = await window.cosmjs.stargate.selectReporter(
             layerAccount,
-            reporterAddress
+            reporterAddress,
+            stakeAmount
         );
 
         if (result && result.txhash) {
             // Get transaction hash from the result
             const txHash = result.txhash || result.tx_response?.txhash;
             App.showSuccessPopup("Reporter selection successful!", txHash, 'cosmos');
-            // Clear the selection
+            // Clear the inputs
             document.getElementById('selectedReporterAddress').value = '';
             document.getElementById('reporterDropdown').value = '';
+            document.getElementById('reporterStakeAmount').value = '';
             // Refresh status to show new selection
             await App.refreshCurrentStatus();
         } else {
@@ -4457,11 +4469,32 @@ const App = {
           console.log('No reporter selected for address:', selectorAddress);
           return null; // No reporter selected
         }
+        
+        // Handle 500 errors that might indicate "not found" on mainnet
+        if (response.status === 500) {
+          try {
+            const errorData = await response.json();
+            if (errorData.message && errorData.message.includes('not found')) {
+              console.log('No reporter selected (500 error format):', selectorAddress);
+              return null;
+            }
+          } catch (e) {
+            // If we can't parse the error response, continue with the original error
+          }
+        }
+        
         throw new Error(`Failed to fetch current reporter: ${response.status}`);
       }
       
       const data = await response.json();
       console.log('Current reporter data:', data);
+      
+      // Handle mainnet-specific error format
+      if (data.code && data.message && data.message.includes('not found')) {
+        console.log('No reporter selected (mainnet format):', selectorAddress);
+        return null;
+      }
+      
       return data;
     } catch (error) {
       console.error('Error fetching current reporter:', error);
@@ -4473,7 +4506,6 @@ const App = {
   fetchCurrentDelegations: async function(delegatorAddress) {
     try {
       const endpoint = `${App.getCosmosApiEndpoint()}/cosmos/staking/v1beta1/delegations/${delegatorAddress}`;
-      console.log('Fetching delegations from:', endpoint);
       
       const response = await fetch(endpoint);
       
@@ -4514,21 +4546,99 @@ const App = {
         return;
       }
 
-      // Display reporter information
+      // Display reporter address with copy tooltip
+      const reporterAddress = reporterData.reporter || 'Unknown';
       statusElement.innerHTML = `
         <div class="status-item">
-          <span class="status-label">Reporter Address:</span>
-          <span class="status-address">${reporterData.reporter || 'Unknown'}</span>
-        </div>
-        <div class="status-item">
-          <span class="status-label">Status:</span>
-          <span class="status-value">Active</span>
+          <span class="status-address">${reporterAddress}</span>
+          <button class="copy-btn" onclick="App.copyToClipboard('${reporterAddress}')" data-tooltip="Copy address">⧉</button>
         </div>
       `;
     } catch (error) {
       console.error('Error displaying reporter status:', error);
       statusElement.innerHTML = '<div class="status-empty">Error loading reporter status</div>';
     }
+  },
+
+  // Toggle delegations dropdown
+  toggleDelegationsDropdown: function() {
+    const dropdown = document.getElementById('delegationsDropdown');
+    const arrow = document.getElementById('delegationsDropdownArrow');
+    
+    if (dropdown.style.display === 'none' || dropdown.style.display === '') {
+      dropdown.style.display = 'block';
+      arrow.classList.add('rotated');
+    } else {
+      dropdown.style.display = 'none';
+      arrow.classList.remove('rotated');
+    }
+  },
+
+  // Copy text to clipboard
+  copyToClipboard: function(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      // Use modern clipboard API
+      navigator.clipboard.writeText(text).then(() => {
+        this.showCopySuccess();
+      }).catch(err => {
+        console.error('Failed to copy: ', err);
+        this.fallbackCopyToClipboard(text);
+      });
+    } else {
+      // Fallback for older browsers
+      this.fallbackCopyToClipboard(text);
+    }
+  },
+
+  // Fallback copy method for older browsers
+  fallbackCopyToClipboard: function(text) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+      document.execCommand('copy');
+      this.showCopySuccess();
+    } catch (err) {
+      console.error('Fallback copy failed: ', err);
+      alert('Failed to copy address');
+    }
+    
+    document.body.removeChild(textArea);
+  },
+
+  // Show copy success feedback
+  showCopySuccess: function() {
+    // Create a temporary success message
+    const successMsg = document.createElement('div');
+    successMsg.textContent = 'Copied!';
+    successMsg.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #003434;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 14px;
+      z-index: 10000;
+      pointer-events: none;
+    `;
+    
+    document.body.appendChild(successMsg);
+    
+    // Remove after 2 seconds
+    setTimeout(() => {
+      if (successMsg.parentNode) {
+        successMsg.parentNode.removeChild(successMsg);
+      }
+    }, 2000);
   },
 
   // Add function to display current delegations status
@@ -4556,43 +4666,41 @@ const App = {
 
       const totalTRB = (totalDelegated / 1000000).toFixed(6);
 
-      // Display delegations
-      let html = `
-        <div class="status-item">
-          <span class="status-label">Total Delegated:</span>
-          <span class="status-amount">${totalTRB} TRB</span>
-        </div>
-        <div class="status-item">
-          <span class="status-label">Validators:</span>
-          <span class="status-value">${delegations.length}</span>
+      // Display total in distinct container with dropdown arrow
+      statusElement.innerHTML = `
+        <div class="status-total-container" onclick="App.toggleDelegationsDropdown()">
+          <div class="status-total-content">
+            <span class="status-label">Total:</span>
+            <span class="status-amount">${totalTRB} TRB</span>
+          </div>
+          <span class="dropdown-arrow" id="delegationsDropdownArrow">▼</span>
         </div>
       `;
 
-      // Show individual delegations (limit to 3 for space)
-      const displayDelegations = delegations.slice(0, 3);
-      for (const delegation of displayDelegations) {
-        const amountTRB = (parseInt(delegation.amount) / 1000000).toFixed(6);
-        // Truncate validator address for display
-        const validatorDisplay = delegation.validatorAddress.length > 20 
-          ? delegation.validatorAddress.substring(0, 17) + '...'
-          : delegation.validatorAddress;
-        
-        html += `
-          <div class="status-item">
-            <span class="status-label">Validator:</span>
-            <div style="text-align: right;">
-              <div class="status-address" style="font-size: 0.7rem;">${validatorDisplay}</div>
-              <div class="status-amount">${amountTRB} TRB</div>
+      // Populate dropdown with detailed delegations
+      const dropdownContent = document.getElementById('delegationsDropdownContent');
+      if (dropdownContent) {
+        let dropdownHtml = '';
+        for (const delegation of delegations) {
+          const amountTRB = (parseInt(delegation.amount) / 1000000).toFixed(6);
+          // Truncate validator address for display
+          const validatorDisplay = delegation.validatorAddress.length > 20 
+            ? delegation.validatorAddress.substring(0, 17) + '...'
+            : delegation.validatorAddress;
+          
+          dropdownHtml += `
+            <div class="status-item status-delegation">
+              <div class="address-with-copy">
+                <span class="status-address">${validatorDisplay}</span>
+                <button class="copy-btn" onclick="App.copyToClipboard('${delegation.validatorAddress}')" data-tooltip="Copy full address">⧉</button>
+              </div>
+              <span class="status-amount">${amountTRB} TRB</span>
             </div>
-          </div>
-        `;
+          `;
+        }
+        dropdownContent.innerHTML = dropdownHtml;
+        console.log('Dropdown HTML set:', dropdownHtml);
       }
-
-      if (delegations.length > 3) {
-        html += `<div class="status-item"><span class="status-label">...and ${delegations.length - 3} more</span></div>`;
-      }
-
-      statusElement.innerHTML = html;
     } catch (error) {
       console.error('Error displaying delegations status:', error);
       statusElement.innerHTML = '<div class="status-empty">Error loading delegations</div>';

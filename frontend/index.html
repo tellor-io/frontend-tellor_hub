@@ -267,88 +267,97 @@
 
               <!-- Action Sections (Side by Side) -->
               <div class="action-sections">
-                <!-- Delegate Tokens Section -->
-                <div class="action-section">
+                <!-- Delegate Tokens Container -->
+                <div class="action-container">
                   <div class="section-header">
                     <h3>Delegate Tokens</h3>
                     <p class="section-description">Stake your TRB tokens with validators</p>
                   </div>
-                  
-                  <div class="balance-info">
-                      <div class="input-button-container">
-                          <div class="input-with-label">
-                              <span class="input-label">TRB</span>
-                              <input class="input" type="text" id="delegateStakeAmount" placeholder="0" />
-                          </div>
+
+                  <!-- Validator Status Section -->
+                  <div class="status-section">
+                    <div class="status-header" onclick="App.toggleDelegationsDropdown()">
+                      <span>Current Delegations</span>
+                      <div class="status-header-controls">
+                        <button type="button" id="refreshDelegationsBtn" class="refresh-btn-small" title="Refresh delegations" onclick="event.stopPropagation()">↻</button>
                       </div>
-                      <div class="input-button-container">
-                          <div class="input-with-label">
-                              <select class="input-address" id="delegateValidatorDropdown">
-                                  <option value="">Select a validator...</option>
-                              </select>
-                              <button type="button" id="refreshValidatorsBtn" class="refresh-btn" title="Refresh validator list">↻</button>
-                              <input type="hidden" id="delegateValidatorAddress" />
-                              <span class="info-icon" data-tooltip="Select a validator from the list to delegate your tokens to">ⓘ</span>
-                          </div>
+                    </div>
+                    <div class="status-content" id="currentDelegationsStatus">
+                      <div class="status-loading">Loading...</div>
+                    </div>
+                    <div class="status-dropdown" id="delegationsDropdown" style="display: none;">
+                      <div class="status-dropdown-content" id="delegationsDropdownContent">
+                        <!-- Detailed delegations will be populated here -->
                       </div>
-                      <div class="bridge-direction">
-                          <button id="delegateButton" class="button-style-3" onclick="App.delegateTokens()">Delegate Tokens</button>
-                      </div>
+                    </div>
+                  </div>
+
+                  <div class="action-section">
+                    
+                    <div class="balance-info">
+                        <div class="input-button-container">
+                            <div class="input-with-label">
+                                <span class="input-label">TRB</span>
+                                <input class="input" type="text" id="delegateStakeAmount" placeholder="0" />
+                            </div>
+                        </div>
+                        <div class="input-button-container">
+                            <div class="input-with-label">
+                                <select class="input-address" id="delegateValidatorDropdown">
+                                    <option value="">Select a validator...</option>
+                                </select>
+                                <button type="button" id="refreshValidatorsBtn" class="refresh-btn" title="Refresh validator list">↻</button>
+                                <input type="hidden" id="delegateValidatorAddress" />
+                                <span class="info-icon" data-tooltip="Select a validator from the list to delegate your tokens to">ⓘ</span>
+                            </div>
+                        </div>
+                        <div class="bridge-direction">
+                            <button id="delegateButton" class="button-style-3" onclick="App.delegateTokens()">Delegate Tokens</button>
+                        </div>
+                    </div>
                   </div>
                 </div>
 
-                <!-- Reporter Selection Section -->
-                <div class="action-section">
+                <!-- Reporter Selection Container -->
+                <div class="action-container">
                   <div class="section-header">
                     <h3>Select Reporter</h3>
                     <p class="section-description">Choose a reporter for data submissions</p>
                   </div>
-                  
-                  <div class="balance-info">
-                      <div class="input-button-container">
-                          <div class="input-with-label">
-                              <select class="input-address" id="reporterDropdown">
-                                  <option value="">Select a reporter...</option>
-                              </select>
-                              <button type="button" id="refreshReportersBtn" class="refresh-btn" title="Refresh reporter list">↻</button>
-                              <input type="hidden" id="selectedReporterAddress" />
-                              <span class="info-icon" data-tooltip="Select a reporter from the list to handle data submissions">ⓘ</span>
-                          </div>
-                      </div>
-                      <div class="bridge-direction">
-                          <button id="selectReporterButton" class="button-style-3" onclick="App.selectReporter()">Select Reporter</button>
-                      </div>
-                  </div>
-                </div>
-              </div>
 
-              <!-- Current Status Section -->
-              <div class="current-status-section">
-                <div class="section-header">
-                  <h3>Current Status</h3>
-                  <p class="section-description">Your current staking and reporter selection</p>
-                </div>
-                
-                <div class="status-table">
-                  <div class="status-table-row">
-                    <div class="status-table-cell">
-                      <div class="status-table-header">
-                        <span>Selected Reporter</span>
-                        <button type="button" id="refreshReporterStatusBtn" class="refresh-btn-small" title="Refresh reporter status">↻</button>
-                      </div>
-                      <div class="status-table-content" id="currentReporterStatus">
-                        <div class="status-loading">Loading...</div>
-                      </div>
+                  <!-- Reporter Status Section -->
+                  <div class="status-section">
+                    <div class="status-header">
+                      <span>Selected Reporter</span>
+                      <button type="button" id="refreshReporterStatusBtn" class="refresh-btn-small" title="Refresh reporter status">↻</button>
                     </div>
+                    <div class="status-content" id="currentReporterStatus">
+                      <div class="status-loading">Loading...</div>
+                    </div>
+                  </div>
+
+                  <div class="action-section">
                     
-                    <div class="status-table-cell">
-                      <div class="status-table-header">
-                        <span>Validator Delegations</span>
-                        <button type="button" id="refreshDelegationsBtn" class="refresh-btn-small" title="Refresh delegations">↻</button>
-                      </div>
-                      <div class="status-table-content" id="currentDelegationsStatus">
-                        <div class="status-loading">Loading...</div>
-                      </div>
+                    <div class="balance-info">
+                        <div class="input-button-container">
+                            <div class="input-with-label">
+                                <span class="input-label">TRB *</span>
+                                <input class="input" type="text" id="reporterStakeAmount" placeholder="Enter TRB amount" required />
+                            </div>
+                        </div>
+                        <div class="input-button-container">
+                            <div class="input-with-label">
+                                <select class="input-address" id="reporterDropdown">
+                                    <option value="">Select a reporter...</option>
+                                </select>
+                                <button type="button" id="refreshReportersBtn" class="refresh-btn" title="Refresh reporter list">↻</button>
+                                <input type="hidden" id="selectedReporterAddress" />
+                                <span class="info-icon" data-tooltip="Select a reporter from the list to handle data submissions.">ⓘ</span>
+                            </div>
+                        </div>
+                        <div class="bridge-direction">
+                            <button id="selectReporterButton" class="button-style-3" onclick="App.selectReporter()">Select Reporter</button>
+                        </div>
                     </div>
                   </div>
                 </div>
@@ -775,7 +784,15 @@
               document.querySelectorAll('.function-section').forEach(s => s.classList.remove('active'));
               document.getElementById(sectionId).classList.add('active');
               
+              // Update bridge direction for proper button state management
+              if (window.App && window.App.switchBridgeDirection) {
+                window.App.switchBridgeDirection(functionType);
+              }
+              
               // Hide TRB price tooltip immediately when switching sections
+              if (window.hideTrbPriceTooltip) {
+                window.hideTrbPriceTooltip();
+              }
               if (window.hideTrbPriceTooltip) {
                 window.hideTrbPriceTooltip();
               }
@@ -863,7 +880,15 @@
               document.querySelectorAll('.function-section').forEach(s => s.classList.remove('active'));
               document.getElementById(sectionId).classList.add('active');
               
+              // Update bridge direction for proper button state management
+              if (window.App && window.App.switchBridgeDirection) {
+                window.App.switchBridgeDirection(functionType);
+              }
+              
               // Hide TRB price tooltip immediately when switching sections
+              if (window.hideTrbPriceTooltip) {
+                window.hideTrbPriceTooltip();
+              }
               if (window.hideTrbPriceTooltip) {
                 window.hideTrbPriceTooltip();
               }
@@ -925,15 +950,32 @@
                     
                     // Calculate position
                     const iconRect = icon.getBoundingClientRect();
+                    
+                    // Check if this is the reporter tooltip and position to the left by default
+                    const isReporterTooltip = icon.closest('#delegateSection') && 
+                                             icon.getAttribute('data-tooltip').includes('reporter');
+                    
+                    // Show tooltip first to get proper dimensions
+                    tooltip.style.display = 'block';
                     const tooltipRect = tooltip.getBoundingClientRect();
                     
-                    // Position tooltip to the right of the icon
-                    let left = iconRect.right + 10;
+                    // Position tooltip - left for reporter, right for others
+                    let left = isReporterTooltip ? 
+                        iconRect.left - tooltipRect.width - 10 : 
+                        iconRect.right + 10;
                     let top = iconRect.top + (iconRect.height / 2) - (tooltipRect.height / 2);
                     
                     // Ensure tooltip stays within viewport
-                    if (left + tooltipRect.width > window.innerWidth) {
-                        left = iconRect.left - tooltipRect.width - 10;
+                    if (isReporterTooltip) {
+                        // For reporter tooltip, check if it goes off the left edge
+                        if (left < 10) {
+                            left = iconRect.right + 10; // Fallback to right
+                        }
+                    } else {
+                        // For other tooltips, check if it goes off the right edge
+                        if (left + tooltipRect.width > window.innerWidth) {
+                            left = iconRect.left - tooltipRect.width - 10;
+                        }
                     }
                     if (top + tooltipRect.height > window.innerHeight) {
                         top = window.innerHeight - tooltipRect.height - 10;
@@ -1021,13 +1063,31 @@
                     if (icon && (document.getElementById('bridgeSection').classList.contains('active') || 
                                 document.getElementById('delegateSection').classList.contains('active'))) {
                         const iconRect = icon.getBoundingClientRect();
+                        
+                        // Check if this is the reporter tooltip and position to the left by default
+                        const isReporterTooltip = icon.closest('#delegateSection') && 
+                                                 icon.getAttribute('data-tooltip').includes('reporter');
+                        
+                        // Get tooltip dimensions (it should already be visible)
                         const tooltipRect = tooltip.getBoundingClientRect();
                         
-                        let left = iconRect.right + 10;
+                        // Position tooltip - left for reporter, right for others
+                        let left = isReporterTooltip ? 
+                            iconRect.left - tooltipRect.width - 10 : 
+                            iconRect.right + 10;
                         let top = iconRect.top + (iconRect.height / 2) - (tooltipRect.height / 2);
                         
-                        if (left + tooltipRect.width > window.innerWidth) {
-                            left = iconRect.left - tooltipRect.width - 10;
+                        // Ensure tooltip stays within viewport
+                        if (isReporterTooltip) {
+                            // For reporter tooltip, check if it goes off the left edge
+                            if (left < 10) {
+                                left = iconRect.right + 10; // Fallback to right
+                            }
+                        } else {
+                            // For other tooltips, check if it goes off the right edge
+                            if (left + tooltipRect.width > window.innerWidth) {
+                                left = iconRect.left - tooltipRect.width - 10;
+                            }
                         }
                         if (top + tooltipRect.height > window.innerHeight) {
                             top = window.innerHeight - tooltipRect.height - 10;

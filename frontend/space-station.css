@@ -1478,7 +1478,7 @@
   height: 48px !important; /* Match input and label height */
   padding: 12px !important;
   margin: 0 !important;
-  border: 1px solid #e2e8f0 !important;
+  border: 1px solid #7FAFB1 !important;
   border-left: none !important; /* Connect with input */
   border-radius: 0 8px 8px 0 !important; /* Rounded right corners only */
   background-color: #ffffff !important;
@@ -1502,7 +1502,7 @@
 .input-with-label .refresh-btn:hover {
   background-color: #f1f5f9 !important;
   color: #3b82f6 !important;
-  border-color: #3b82f6 !important;
+  border-color: #7FAFB1 !important;
 }
 
 /* Focus states for connected inputs */
@@ -1510,7 +1510,7 @@
 .dispute-input-container input:focus,
 .dispute-input-container select:focus {
   outline: none !important;
-  border-color: #3b82f6 !important;
+  border-color: #11321d !important;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
 }
 
@@ -1518,7 +1518,7 @@
 .dispute-input-container input:focus + .input-label,
 .dispute-input-container select:focus + .input-label,
 .dispute-input-container:focus-within .input-label {
-  border-color: #3b82f6 !important;
+  border-color: #11321d !important;
   background: #004d47 !important; /* Slightly lighter solid green on focus */
 }
 
@@ -1529,7 +1529,7 @@
 /* Default refresh button styling for standalone buttons (like in query disputes header) */
 .refresh-btn {
   padding: 8px !important;
-  border: 1px solid #e2e8f0 !important;
+  border: 1px solid #7FAFB1 !important;
   border-radius: 6px !important;
   background-color: #ffffff !important;
   color: #64748b !important;
@@ -1545,7 +1545,7 @@
 .refresh-btn:hover {
   background-color: #f1f5f9 !important;
   color: #3b82f6 !important;
-  border-color: #3b82f6 !important;
+  border-color: #7FAFB1 !important;
 }
 
 .refresh-btn svg {
