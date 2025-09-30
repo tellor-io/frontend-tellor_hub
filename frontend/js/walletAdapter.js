@@ -9,48 +9,94 @@ class CosmosWalletAdapter {
         this.rpcUrl = 'https://node-palmito.tellorlayer.com/rpc';
         this.restUrl = 'https://node-palmito.tellorlayer.com/rpc';
         
-        // Chain configuration
-        this.chainConfig = {
-            chainId: "layertest-4",
-            chainName: "Layer",
-            rpc: "https://node-palmito.tellorlayer.com/rpc",
-            rest: "https://node-palmito.tellorlayer.com/rpc",
-            bip44: {
-                coinType: 118
-            },
-            bech32Config: {
-                bech32PrefixAccAddr: "tellor",
-                bech32PrefixAccPub: "tellorpub",
-                bech32PrefixValAddr: "tellorvaloper",
-                bech32PrefixValPub: "tellorvaloperpub",
-                bech32PrefixConsAddr: "tellorvalcons",
-                bech32PrefixConsPub: "tellorvalconspub",
-            },
-            currencies: [
-                {
+        // Chain configurations for both networks
+        this.chainConfigs = {
+            'layertest-4': {
+                chainId: "layertest-4",
+                chainName: "Layer Testnet",
+                rpc: "https://node-palmito.tellorlayer.com/rpc",
+                rest: "https://node-palmito.tellorlayer.com/rpc",
+                bip44: {
+                    coinType: 118
+                },
+                bech32Config: {
+                    bech32PrefixAccAddr: "tellor",
+                    bech32PrefixAccPub: "tellorpub",
+                    bech32PrefixValAddr: "tellorvaloper",
+                    bech32PrefixValPub: "tellorvaloperpub",
+                    bech32PrefixConsAddr: "tellorvalcons",
+                    bech32PrefixConsPub: "tellorvalconspub",
+                },
+                currencies: [
+                    {
+                        coinDenom: "TRB",
+                        coinMinimalDenom: "loya",
+                        coinDecimals: 6,
+                    },
+                ],
+                feeCurrencies: [
+                    {
+                        coinDenom: "TRB",
+                        coinMinimalDenom: "loya",
+                        coinDecimals: 6,
+                        gasPriceStep: {
+                            low: 0.01,
+                            average: 0.025,
+                            high: 0.04,
+                        }
+                    },
+                ],
+                stakeCurrency: {
                     coinDenom: "TRB",
                     coinMinimalDenom: "loya",
                     coinDecimals: 6,
                 },
-            ],
-            feeCurrencies: [
-                {
+            },
+            'tellor-1': {
+                chainId: "tellor-1",
+                chainName: "Tellor Layer Mainnet",
+                rpc: "https://mainnet.tellorlayer.com/rpc",
+                rest: "https://mainnet.tellorlayer.com/rpc",
+                bip44: {
+                    coinType: 118
+                },
+                bech32Config: {
+                    bech32PrefixAccAddr: "tellor",
+                    bech32PrefixAccPub: "tellorpub",
+                    bech32PrefixValAddr: "tellorvaloper",
+                    bech32PrefixValPub: "tellorvaloperpub",
+                    bech32PrefixConsAddr: "tellorvalcons",
+                    bech32PrefixConsPub: "tellorvalconspub",
+                },
+                currencies: [
+                    {
+                        coinDenom: "TRB",
+                        coinMinimalDenom: "loya",
+                        coinDecimals: 6,
+                    },
+                ],
+                feeCurrencies: [
+                    {
+                        coinDenom: "TRB",
+                        coinMinimalDenom: "loya",
+                        coinDecimals: 6,
+                        gasPriceStep: {
+                            low: 0.01,
+                            average: 0.025,
+                            high: 0.04,
+                        }
+                    },
+                ],
+                stakeCurrency: {
                     coinDenom: "TRB",
                     coinMinimalDenom: "loya",
                     coinDecimals: 6,
-                    gasPriceStep: {
-                        low: 0.01,
-                        average: 0.025,
-                        high: 0.04,
-                    }
                 },
-            ],
-            stakeCurrency: {
-                coinDenom: "TRB",
-                coinMinimalDenom: "loya",
-                coinDecimals: 6,
-            },
+            }
         };
+        
+        // Default to testnet configuration
+        this.chainConfig = this.chainConfigs['layertest-4'];
     }
 
     // Detect available wallets
@@ -172,11 +218,32 @@ class CosmosWalletAdapter {
         };
     }
 
+    // Update chain configuration based on current network
+    updateChainConfig() {
+        const currentChainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+        
+        if (this.chainConfigs[currentChainId]) {
+            this.chainConfig = this.chainConfigs[currentChainId];
+            this.chainId = currentChainId;
+            this.rpcUrl = this.chainConfig.rpc;
+            this.restUrl = this.chainConfig.rest;
+            
+            console.log('Updated chain configuration for:', currentChainId);
+            console.log('RPC URL:', this.rpcUrl);
+            console.log('REST URL:', this.restUrl);
+        } else {
+            console.warn('Unknown chain ID:', currentChainId, 'using default testnet configuration');
+        }
+    }
+
     // Configure chain for the wallet
     async configureChain() {
         if (!this.currentWallet) {
             throw new Error('No wallet connected');
         }
+        
+        // Update chain configuration based on current network
+        this.updateChainConfig();
         
         // Different wallets have different chain suggestion methods
         switch (this.walletType) {
@@ -254,21 +321,25 @@ class CosmosWalletAdapter {
             throw new Error('No wallet connected');
         }
         
+        // Use the current chain ID from the app instead of hardcoded value
+        const currentChainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : this.chainId;
+        
         console.log('Getting offline signer for wallet type:', this.walletType);
         console.log('Current wallet provider:', this.currentWallet);
+        console.log('Using chain ID:', currentChainId);
         
         switch (this.walletType) {
             case 'keplr':
                 if (!this.currentWallet.getOfflineSigner) {
                     throw new Error('Keplr wallet does not have getOfflineSigner method');
                 }
-                return this.currentWallet.getOfflineSigner(this.chainId);
+                return this.currentWallet.getOfflineSigner(currentChainId);
                 
             case 'cosmostation':
                 if (this.currentWallet.providers && this.currentWallet.providers.keplr) {
-                    return this.currentWallet.providers.keplr.getOfflineSigner(this.chainId);
+                    return this.currentWallet.providers.keplr.getOfflineSigner(currentChainId);
                 } else if (this.currentWallet.getOfflineSigner) {
-                    return this.currentWallet.getOfflineSigner(this.chainId);
+                    return this.currentWallet.getOfflineSigner(currentChainId);
                 } else {
                     throw new Error('Cosmostation wallet does not have getOfflineSigner method');
                 }
@@ -278,18 +349,18 @@ class CosmosWalletAdapter {
                     console.error('Leap wallet methods:', Object.getOwnPropertyNames(this.currentWallet));
                     throw new Error('Leap wallet does not have getOfflineSigner method');
                 }
-                return this.currentWallet.getOfflineSigner(this.chainId);
+                return this.currentWallet.getOfflineSigner(currentChainId);
                 
             case 'station':
                 if (!this.currentWallet.getOfflineSigner) {
                     throw new Error('Station wallet does not have getOfflineSigner method');
                 }
-                return this.currentWallet.getOfflineSigner(this.chainId);
+                return this.currentWallet.getOfflineSigner(currentChainId);
                 
             default:
                 // Try standard method
                 if (this.currentWallet.getOfflineSigner) {
-                    return this.currentWallet.getOfflineSigner(this.chainId);
+                    return this.currentWallet.getOfflineSigner(currentChainId);
                 }
                 console.error('Available methods on wallet:', Object.getOwnPropertyNames(this.currentWallet));
                 throw new Error(`Unsupported wallet type: ${this.walletType}`);
