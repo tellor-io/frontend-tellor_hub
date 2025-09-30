@@ -52,7 +52,6 @@ class EthereumWalletAdapter {
     detectWallets() {
         const availableWallets = [];
         
-        console.log('Detecting available Ethereum wallets...');
         
         for (const [type, wallet] of Object.entries(this.supportedWallets)) {
             try {
@@ -63,7 +62,6 @@ class EthereumWalletAdapter {
                         priority: wallet.priority,
                         provider: this.getProviderForType(type)
                     });
-                    console.log(`${wallet.name} detected`);
                 }
             } catch (error) {
                 console.warn(`Error detecting ${wallet.name}:`, error);
@@ -78,10 +76,8 @@ class EthereumWalletAdapter {
                 priority: 10,
                 provider: window.ethereum
             });
-            console.log('Generic Ethereum provider detected');
         }
         
-        console.log('Available wallets:', availableWallets.map(w => w.name));
         return availableWallets.sort((a, b) => a.priority - b.priority);
     }
 

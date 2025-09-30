@@ -1802,17 +1802,44 @@ const App = {
     const amount = document.getElementById('stakeAmount').value;
     const amountToSend = App.web3.utils.toWei(amount, 'ether');
 
+    // Disable both buttons during approval
+    const approveButton = document.getElementById('approveButton');
+    const depositButton = document.getElementById('depositButton');
+    approveButton.disabled = true;
+    depositButton.disabled = true;
+
     App.showPendingPopup("Approval transaction pending...");
     App.contracts.Token.methods.approve(App.contracts.Bridge.options.address, amountToSend)
       .send({ from: App.account })
       .then(function(approvalResult) {
         App.hidePendingPopup();
-        document.getElementById('depositButton').disabled = false;
+        App.showSuccessPopup("Approval successful! You can now bridge your tokens.", approvalResult.transactionHash, 'ethereum');
+        
+        // Update button states after successful approval
+        approveButton.disabled = true; // Keep approve disabled since we have sufficient allowance
+        depositButton.disabled = false; // Enable deposit button
+        
+        // Update allowance display
+        if (window.checkAllowance) {
+          setTimeout(() => checkAllowance(), 1000);
+        }
       })
       .catch(function(error) {
         App.hidePendingPopup();
-        // console.error(...);
-        alert("Error in approval. Please try again.");
+        console.error('Approval error:', error);
+        
+        // Re-enable approve button on error, keep deposit disabled
+        approveButton.disabled = false;
+        depositButton.disabled = true;
+        
+        // Show user-friendly error message
+        let errorMessage = "Error in approval. Please try again.";
+        if (error.message && error.message.includes('insufficient funds')) {
+          errorMessage = "Insufficient ETH for gas fees. Please add more ETH to your wallet.";
+        } else if (error.message && error.message.includes('user rejected')) {
+          errorMessage = "Transaction was cancelled. Please try again.";
+        }
+        alert(errorMessage);
       });
   },
 
@@ -1937,6 +1964,12 @@ const App = {
         // Use fixed gas limit instead of estimation to avoid simulation failures
         const gasLimit = 500000; // 500k gas should be sufficient for bridge deposits
         
+        // Disable both buttons during deposit
+        const approveButton = document.getElementById('approveButton');
+        const depositButton = document.getElementById('depositButton');
+        approveButton.disabled = true;
+        depositButton.disabled = true;
+
         const tx = await App.contracts.Bridge.methods.depositToLayer(amountToSend, tipToSend, recipient)
             .send({ 
                 from: App.account,
@@ -1947,10 +1980,46 @@ const App = {
         await App.updateBalance();
         const txHash = tx.transactionHash;
         App.showSuccessPopup("Deposit to layer successful! You will need to wait 12 hours before you can claim your tokens on Tellor Layer.", txHash, 'ethereum');
+        
+        // Reset button states after successful deposit
+        if (window.checkAllowance) {
+          setTimeout(() => checkAllowance(), 1000);
+        }
     } catch (error) {
         App.hidePendingPopup();
-        // console.error(...);
-        alert(error.message || "Error in depositing to layer. Please try again.");
+        console.error('Deposit error:', error);
+        
+        // Re-enable buttons on error
+        const approveButton = document.getElementById('approveButton');
+        const depositButton = document.getElementById('depositButton');
+        
+        // Show user-friendly error message
+        let errorMessage = "Error in depositing to layer. Please try again.";
+        if (error.message && error.message.includes('insufficient allowance')) {
+          errorMessage = "Insufficient token allowance. Please approve more TRB tokens first.";
+          // Re-enable approve button, keep deposit disabled
+          approveButton.disabled = false;
+          depositButton.disabled = true;
+        } else if (error.message && error.message.includes('insufficient funds')) {
+          errorMessage = "Insufficient ETH for gas fees. Please add more ETH to your wallet.";
+          // Re-enable both buttons
+          if (window.checkAllowance) {
+            setTimeout(() => checkAllowance(), 1000);
+          }
+        } else if (error.message && error.message.includes('user rejected')) {
+          errorMessage = "Transaction was cancelled. Please try again.";
+          // Re-enable both buttons
+          if (window.checkAllowance) {
+            setTimeout(() => checkAllowance(), 1000);
+          }
+        } else {
+          // For other errors, re-enable both buttons
+          if (window.checkAllowance) {
+            setTimeout(() => checkAllowance(), 1000);
+          }
+        }
+        
+        alert(errorMessage);
     }
   },
 
@@ -2293,11 +2362,7 @@ const App = {
         const result = (bridgeSection && bridgeSection.classList.contains('active')) ||
                (delegateSection && delegateSection.classList.contains('active'));
         
-        console.log('shouldTooltipBeVisible:', { 
-            bridge: bridgeSection?.classList.contains('active'),
-            delegate: delegateSection?.classList.contains('active'),
-            result: result
-        });
+
         
         return result;
     }
@@ -4962,7 +5027,6 @@ const App = {
       // Initialize the no-stake reporter
       if (window.noStakeReporter) {
         await window.noStakeReporter.init();
-        console.log('No-stake reporting initialized successfully');
       } else {
         console.error('NoStakeReporter not found');
       }
@@ -4977,7 +5041,6 @@ const App = {
       // Initialize the dispute proposer
       if (window.disputeProposer) {
         await window.disputeProposer.init();
-        console.log('Dispute proposer initialized successfully');
       } else {
         console.error('DisputeProposer not found');
       }
@@ -5792,10 +5855,8 @@ $(function () {
 
 // Fallback initialization for wallet manager dropdown
 $(document).ready(function() {
-    console.log('jQuery document ready - checking wallet manager dropdown...');
     setTimeout(() => {
         if (window.App && window.App.initWalletManagerDropdown) {
-            console.log('Running fallback wallet manager dropdown initialization...');
             window.App.initWalletManagerDropdown();
         }
     }, 3000);

@@ -20,7 +20,6 @@ class DisputeProposer {
                 throw new Error('Layer protobuf definitions not loaded. Please ensure the application is properly initialized.');
             }
 
-            console.log('DisputeProposer initialized successfully');
             return true;
         } catch (error) {
             console.error('Failed to initialize DisputeProposer:', error);
@@ -1075,4 +1074,3 @@ window.DisputeProposer = DisputeProposer;
 // Create a global instance
 window.disputeProposer = new DisputeProposer();
 
-console.log('DisputeProposer module loaded successfully');

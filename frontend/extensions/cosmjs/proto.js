@@ -481,15 +481,6 @@ window.layerProto = {
     }
 };
 
-// Log initialization for debugging
-console.log('Proto types initialized:', {
-    MsgWithdrawTokens: !!window.layerProto.bridge.MsgWithdrawTokens,
-    MsgRequestAttestations: !!window.layerProto.bridge.MsgRequestAttestations,
-    MsgNoStakeReport: !!window.layerProto.bridge.MsgNoStakeReport,
-    MsgProposeDispute: !!window.layerProto.bridge.MsgProposeDispute,
-    MsgVote: !!window.layerProto.bridge.MsgVote,
-    Coin: !!window.layerProto.bridge.Coin
-});
 
 // Remove the test code below
 // const { MsgWithdrawTokens } = window.layer_proto.layer.bridge;
