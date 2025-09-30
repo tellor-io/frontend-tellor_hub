@@ -1147,17 +1147,17 @@ const App = {
         App.contracts.Bridge = new App.web3.eth.Contract(abi);
         
         const contractAddresses = {
-            11155111: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2", // Sepolia
+            11155111: "0x62733e63499a25E35844c91275d4c3bdb159D29d", // Sepolia
             1: "0x5589e306b1920F009979a50B88caE32aecD471E4",        // Mainnet
             421613: "0xb2CB696fE5244fB9004877e58dcB680cB86Ba444",   // Arbitrum Goerli
-            137: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",      // Polygon
-            80001: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",    // Mumbai
-            100: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",      // Gnosis
-            10200: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",    // Chiado
-            10: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",       // Optimism
-            420: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",      // Optimism Goerli
-            42161: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2",    // Arbitrum
-            3141: "0x5acb5977f35b1A91C4fE0F4386eB669E046776F2"      // Filecoin
+            137: "0x62733e63499a25E35844c91275d4c3bdb159D29d",      // Polygon
+            80001: "0x62733e63499a25E35844c91275d4c3bdb159D29d",    // Mumbai
+            100: "0x62733e63499a25E35844c91275d4c3bdb159D29d",      // Gnosis
+            10200: "0x62733e63499a25E35844c91275d4c3bdb159D29d",    // Chiado
+            10: "0x62733e63499a25E35844c91275d4c3bdb159D29d",       // Optimism
+            420: "0x62733e63499a25E35844c91275d4c3bdb159D29d",      // Optimism Goerli
+            42161: "0x62733e63499a25E35844c91275d4c3bdb159D29d",    // Arbitrum
+            3141: "0x62733e63499a25E35844c91275d4c3bdb159D29d"      // Filecoin
         };
 
         const address = contractAddresses[App.chainId];

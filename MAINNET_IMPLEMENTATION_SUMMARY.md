@@ -8,7 +8,7 @@ Successfully added Ethereum Mainnet support to the Layer Bridge frontend while m
 ### 1. Contract Address Configuration
 **File: `frontend/app.js`**
 - Updated bridge contract addresses to include mainnet:
-  - Sepolia: `0x5acb5977f35b1A91C4fE0F4386eB669E046776F2`
+  - Sepolia: `0x62733e63499a25E35844c91275d4c3bdb159D29d`
   - **Mainnet: `0x5589e306b1920F009979a50B88caE32aecD471E4`** (NEW)
 - Token addresses already supported mainnet:
   - Sepolia: `0x80fc34a2f9FfE86F41580F47368289C402DEc660`
@@ -125,7 +125,7 @@ Successfully added Ethereum Mainnet support to the Layer Bridge frontend while m
 - **Mainnet (Chain ID 1)**: `https://mainnet.tellorlayer.com`
 
 ### Contract Address Selection
-- **Sepolia Bridge**: `0x5acb5977f35b1A91C4fE0F4386eB669E046776F2`
+- **Sepolia Bridge**: `0x62733e63499a25E35844c91275d4c3bdb159D29d`
 - **Mainnet Bridge**: `0x5589e306b1920F009979a50B88caE32aecD471E4`
 - **Sepolia Token**: `0x80fc34a2f9FfE86F41580F47368289C402DEc660`
 - **Mainnet Token**: `0x88dF592F8eb5D7Bd38bFeF7dEb0fBc02cf3778a0`
