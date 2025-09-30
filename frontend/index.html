@@ -715,11 +715,8 @@
     <script>
       // Simple test to see if the button exists
       document.addEventListener('DOMContentLoaded', function() {
-        console.log('DOM Content Loaded - testing wallet manager button...');
         const testButton = document.getElementById('walletManagerToggle');
-        console.log('Wallet manager button found:', !!testButton);
         if (testButton) {
-          console.log('Button text:', testButton.textContent);
           testButton.addEventListener('click', function() {
             console.log('Button clicked via DOMContentLoaded handler');
           });

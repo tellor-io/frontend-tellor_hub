@@ -20,7 +20,6 @@ class NoStakeReporter {
                 throw new Error('Layer protobuf definitions not loaded.');
             }
 
-            console.log('NoStakeReporter initialized successfully');
             return true;
         } catch (error) {
             console.error('Failed to initialize NoStakeReporter:', error);
@@ -264,4 +263,3 @@ window.NoStakeReporter = NoStakeReporter;
 // Create a global instance
 window.noStakeReporter = new NoStakeReporter();
 
-console.log('NoStakeReporter module loaded successfully');
