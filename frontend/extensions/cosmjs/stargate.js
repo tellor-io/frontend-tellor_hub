@@ -135,9 +135,11 @@
                     offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
                 } else if (window.getOfflineSignerAuto) {
                     // Fallback to legacy methods
-                    offlineSigner = await window.getOfflineSignerAuto('layertest-4');
+                    const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                    offlineSigner = await window.getOfflineSignerAuto(chainId);
                 } else if (window.getOfflineSignerDirect) {
-                    offlineSigner = window.getOfflineSignerDirect('layertest-4');
+                    const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                    offlineSigner = window.getOfflineSignerDirect(chainId);
                 } else if (window.getOfflineSigner) {
                     // Use the current chain ID from the app
                 const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
@@ -452,7 +454,7 @@
                 const signDoc = {
                     bodyBytes: encodedTxBody,
                     authInfoBytes: encodedAuthInfo,
-                    chainId: 'layertest-4',
+                    chainId: window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4',
                     accountNumber: parseInt(accountInfo.account_number)
                 };
 
