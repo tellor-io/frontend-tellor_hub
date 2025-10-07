@@ -3077,11 +3077,19 @@ const App = {
                         ${!tx.claimed ? 
                             `<button class="${attestButtonClass}" onclick="App.requestAttestation(${tx.id})" 
                                 style="${attestButtonStyle}" ${attestButtonDisabled ? 'disabled' : ''}>
-                                <span>2. Request</span><span>Attestation</span>
+                                <span class="tooltip-container">
+                                    <span>2. Request</span><span>Attestation</span>
+                                    <span class="tooltip-icon tooltip-icon-white">?</span>
+                                    <span class="tooltip-text tooltip-text-right">Uses Cosmos Wallet. Must wait 12 hours after withdrawal request (step 1) is made before you can request Attestation(step 2)</span>
+                                </span>
                             </button>
                             <button class="claim-button" onclick="App.claimWithdrawal(${tx.id})" 
                                 style="background-color: #38a169; color: #eefffb; border: none;">
-                                <span>3. Claim</span><span>Withdrawal</span>
+                                <span class="tooltip-container">
+                                    <span>3. Claim</span><span>Withdrawal</span>
+                                    <span class="tooltip-icon tooltip-icon-white">?</span>
+                                    <span class="tooltip-text tooltip-text-right">Uses Ethereum Wallet. Must claim withdrawal(step 3) within 12 hours after Attestation request(step 2) is made. Otherwise you must re-request attestation</span>
+                                </span>
                             </button>` 
                             : ''}
                     </td>

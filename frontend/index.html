@@ -225,7 +225,13 @@
                     <div class="input-with-label">
                       <input class="input-address" type="text" id="ethQueryId" placeholder="To address (e.g. 0x...)" />
                     </div>
-                    <button id="withdrawButton" class="button-style-3" onclick="App.withdrawFromLayer()">Request Withdrawal</button>
+                    <button id="withdrawButton" class="button-style-3" onclick="App.withdrawFromLayer()">
+                        <span class="tooltip-container">
+                            1. Request Withdrawal
+                            <span class="tooltip-icon tooltip-icon-white">?</span>
+                            <span class="tooltip-text tooltip-text-right">Uses Cosmos Wallet. Must wait 12 hours after withdrawal request is made before you can continue to step 2, request Attestation</span>
+                        </span>
+                    </button>
                   </div>
                 </div>
                 
