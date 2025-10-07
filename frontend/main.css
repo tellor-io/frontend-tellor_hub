@@ -3031,3 +3031,99 @@ header {
         padding: 0.5rem;
     }
 }
+
+/* Tooltip styles */
+.tooltip-container {
+    position: relative;
+    display: inline-block;
+}
+
+.tooltip-icon {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-left: 8px;
+    cursor: help;
+    color: #666;
+    font-size: 14px;
+    font-weight: bold;
+    border: 1px solid #666;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 14px;
+    vertical-align: middle;
+    transition: all 0.2s ease;
+}
+
+.tooltip-icon:hover {
+    color: #333;
+    border-color: #333;
+    background-color: #f0f0f0;
+}
+
+.tooltip-icon-white {
+    color: white;
+    border-color: white;
+}
+
+.tooltip-icon-white:hover {
+    color: #f0f0f0;
+    border-color: #f0f0f0;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.tooltip-text {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    z-index: 1000;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #333;
+    color: white;
+    text-align: center;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: nowrap;
+    max-width: 400px;
+    min-width: 250px;
+    white-space: normal;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: opacity 0.3s, visibility 0.3s;
+}
+
+.tooltip-text::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #333 transparent transparent transparent;
+}
+
+.tooltip-container:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Right-positioned tooltip for buttons in containers */
+.tooltip-text-right {
+    bottom: 50%;
+    left: 100%;
+    top: auto;
+    transform: translateY(50%);
+    margin-left: 10px;
+}
+
+.tooltip-text-right::after {
+    top: 50%;
+    left: -5px;
+    margin-left: 0;
+    margin-top: -5px;
+    border-color: transparent #333 transparent transparent;
+}
