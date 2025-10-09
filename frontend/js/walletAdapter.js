@@ -5,9 +5,9 @@ class CosmosWalletAdapter {
     constructor() {
         this.currentWallet = null;
         this.walletType = null;
-        this.chainId = 'layertest-4';
-        this.rpcUrl = 'https://node-palmito.tellorlayer.com/rpc';
-        this.restUrl = 'https://node-palmito.tellorlayer.com/rpc';
+        this.chainId = 'tellor-1';
+        this.rpcUrl = 'https://mainnet.tellorlayer.com/rpc';
+        this.restUrl = 'https://mainnet.tellorlayer.com/rpc';
         
         // Chain configurations for both networks
         this.chainConfigs = {
@@ -95,8 +95,8 @@ class CosmosWalletAdapter {
             }
         };
         
-        // Default to testnet configuration
-        this.chainConfig = this.chainConfigs['layertest-4'];
+        // Default to mainnet configuration
+        this.chainConfig = this.chainConfigs['tellor-1'];
     }
 
     // Detect available wallets
@@ -220,7 +220,7 @@ class CosmosWalletAdapter {
 
     // Update chain configuration based on current network
     updateChainConfig() {
-        const currentChainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+        const currentChainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
         
         if (this.chainConfigs[currentChainId]) {
             this.chainConfig = this.chainConfigs[currentChainId];
@@ -232,7 +232,7 @@ class CosmosWalletAdapter {
             console.log('RPC URL:', this.rpcUrl);
             console.log('REST URL:', this.restUrl);
         } else {
-            console.warn('Unknown chain ID:', currentChainId, 'using default testnet configuration');
+            console.warn('Unknown chain ID:', currentChainId, 'using default mainnet configuration');
         }
     }
 

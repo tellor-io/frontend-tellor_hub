@@ -1110,6 +1110,7 @@
 
         // Add event listeners for input fields
         const stakeAmountInput = document.getElementById('stakeAmount');
+        const ethStakeAmountInput = document.getElementById('ethStakeAmount');
 
         stakeAmountInput.addEventListener('input', async function() {
           const amount = parseFloat(this.value) || 0;
@@ -1132,6 +1133,13 @@
           
           checkAllowance();
         });
+
+        // Add event listener for Ethereum stake amount input
+        if (ethStakeAmountInput) {
+          ethStakeAmountInput.addEventListener('input', async function() {
+            checkAllowance();
+          });
+        }
 
         async function checkBalance(amount) {
           // Check if App is available and has the function
@@ -1158,20 +1166,38 @@
           const approveButton = document.getElementById('approveButton');
           const depositButton = document.getElementById('depositButton');
           const withdrawButton = document.getElementById('withdrawButton');
-          const stakeAmount = parseFloat(stakeAmountInput.value) || 0;
-
-          if (isNaN(stakeAmount) || stakeAmount <= 0) {
-            approveButton.disabled = true;
-            depositButton.disabled = true;
-            withdrawButton.disabled = true;
+          
+          // Skip validation during network switching to prevent button state conflicts
+          if (App.isNetworkSwitching) {
             return;
           }
+          
+          // Get the appropriate stake amount based on current bridge direction
+          let stakeAmount = 0;
+          if (App.currentBridgeDirection === 'ethereum') {
+            const ethStakeAmountInput = document.getElementById('ethStakeAmount');
+            stakeAmount = parseFloat(ethStakeAmountInput ? ethStakeAmountInput.value : 0) || 0;
+          } else {
+            stakeAmount = parseFloat(stakeAmountInput.value) || 0;
+          }
 
-          // Handle Keplr wallet
+          // Handle Keplr wallet first - enable withdrawal button regardless of input
           if (App.isKeplrConnected) {
             approveButton.style.display = 'none';
             depositButton.style.display = 'none';
             withdrawButton.disabled = false;
+            return;
+          }
+
+          // For MetaMask wallet, check input validation
+          if (isNaN(stakeAmount) || stakeAmount <= 0) {
+            approveButton.disabled = true;
+            depositButton.disabled = true;
+            // Keep withdrawal button enabled but update title to prompt user
+            if (withdrawButton) {
+              withdrawButton.disabled = false;
+              withdrawButton.title = 'Please enter a valid amount to withdraw';
+            }
             return;
           }
 

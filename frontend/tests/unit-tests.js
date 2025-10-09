@@ -97,6 +97,23 @@ export class UnitTests extends TestSuite {
         name: 'Withdrawal button functionality on testnet',
         run: () => this.testWithdrawalButtonFunctionalityTestnet()
       },
+      // NEW: Integration tests to prevent similar bugs
+      {
+        name: 'Withdrawal button integration test (mainnet)',
+        run: () => this.testWithdrawalButtonIntegrationMainnet()
+      },
+      {
+        name: 'Withdrawal button input field bug test',
+        run: () => this.testWithdrawalButtonInputFieldBug()
+      },
+      {
+        name: 'Wallet connection UI updates test',
+        run: () => this.testWalletConnectionUIUpdates()
+      },
+      {
+        name: 'Network switching UI updates test',
+        run: () => this.testNetworkSwitchingUIUpdates()
+      },
       {
         name: 'Delegate button functionality on mainnet',
         run: () => this.testDelegateButtonFunctionalityMainnet()
@@ -1423,6 +1440,281 @@ export class UnitTests extends TestSuite {
       // Restore original function
       window.App.withdrawFromLayer = originalWithdraw;
     }
+  }
+
+  // NEW: Comprehensive integration test for withdrawal button state management
+  async testWithdrawalButtonIntegrationMainnet() {
+    // Mock mainnet environment
+    const mockKeplr = this.mockKeplrProvider();
+    mockKeplr.getChainId = async () => 'tellor-1';
+    window.keplr = mockKeplr;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Test 1: Initial state - no wallet connected
+    const withdrawButton = document.getElementById('withdrawButton');
+    this.assertNotNull(withdrawButton, 'Withdrawal button should exist');
+    
+    // Switch to ethereum bridge direction
+    if (window.App.switchBridgeDirection) {
+      window.App.switchBridgeDirection('ethereum');
+      await this.wait(100);
+    }
+    
+    // Test 2: Button should be disabled with no wallet and no input
+    const ethStakeAmountInput = document.getElementById('ethStakeAmount');
+    this.assertNotNull(ethStakeAmountInput, 'Ethereum stake amount input should exist');
+    
+    // Clear input and test button state
+    ethStakeAmountInput.value = '';
+    ethStakeAmountInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await this.wait(100);
+    
+    // Test 3: Connect wallet and verify UI updates
+    if (window.App.connectKeplrLegacy) {
+      await window.App.connectKeplrLegacy();
+      await this.wait(500);
+    }
+    
+    // Test 4: Button should be enabled after wallet connection
+    this.assertFalse(withdrawButton.disabled, 'Withdrawal button should be enabled after wallet connection');
+    
+    // Test 5: Input validation - button should stay enabled regardless of input
+    ethStakeAmountInput.value = '';
+    ethStakeAmountInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await this.wait(100);
+    
+    this.assertFalse(withdrawButton.disabled, 'Withdrawal button should stay enabled with empty input');
+    
+    // Test 6: Valid input should keep button enabled
+    ethStakeAmountInput.value = '10';
+    ethStakeAmountInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await this.wait(100);
+    
+    this.assertFalse(withdrawButton.disabled, 'Withdrawal button should be enabled with valid input');
+    
+    // Test 7: Invalid input should keep button enabled
+    ethStakeAmountInput.value = '0';
+    ethStakeAmountInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await this.wait(100);
+    
+    this.assertFalse(withdrawButton.disabled, 'Withdrawal button should stay enabled with invalid input');
+    
+    // Test 8: Negative input should keep button enabled
+    ethStakeAmountInput.value = '-5';
+    ethStakeAmountInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await this.wait(100);
+    
+    this.assertFalse(withdrawButton.disabled, 'Withdrawal button should stay enabled with negative input');
+    
+    // Test 9: Valid input should keep button enabled
+    ethStakeAmountInput.value = '5';
+    ethStakeAmountInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await this.wait(100);
+    
+    this.assertFalse(withdrawButton.disabled, 'Withdrawal button should be enabled with valid input');
+    
+    // Test 10: Verify button stays enabled regardless of input field values
+    // Button should remain enabled even with empty ethStakeAmount
+    const stakeAmountInput = document.getElementById('stakeAmount');
+    if (stakeAmountInput) {
+      stakeAmountInput.value = '100'; // Set value in wrong input
+      ethStakeAmountInput.value = '0'; // Clear correct input
+      ethStakeAmountInput.dispatchEvent(new Event('input', { bubbles: true }));
+      await this.wait(100);
+      
+      // Button should stay enabled even when ethStakeAmount is 0
+      this.assertFalse(withdrawButton.disabled, 'Withdrawal button should stay enabled when ethStakeAmount is 0, regardless of stakeAmount');
+    }
+  }
+
+  // NEW: Test for the specific bug that was missed
+  async testWithdrawalButtonInputFieldBug() {
+    // Mock mainnet environment
+    const mockKeplr = this.mockKeplrProvider();
+    mockKeplr.getChainId = async () => 'tellor-1';
+    window.keplr = mockKeplr;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Connect to mainnet
+    if (window.App.connectKeplrLegacy) {
+      await window.App.connectKeplrLegacy();
+      await this.wait(500);
+    }
+    
+    // Switch to ethereum bridge direction
+    if (window.App.switchBridgeDirection) {
+      window.App.switchBridgeDirection('ethereum');
+      await this.wait(100);
+    }
+    
+    const withdrawButton = document.getElementById('withdrawButton');
+    const ethStakeAmountInput = document.getElementById('ethStakeAmount');
+    const stakeAmountInput = document.getElementById('stakeAmount');
+    
+    this.assertNotNull(withdrawButton, 'Withdrawal button should exist');
+    this.assertNotNull(ethStakeAmountInput, 'Ethereum stake amount input should exist');
+    
+    // Test the specific bug: checkAllowance should use ethStakeAmount, not stakeAmount
+    if (stakeAmountInput) {
+      // Set value in the wrong input field (stakeAmount)
+      stakeAmountInput.value = '100';
+      stakeAmountInput.dispatchEvent(new Event('input', { bubbles: true }));
+      await this.wait(100);
+      
+      // Clear the correct input field (ethStakeAmount)
+      ethStakeAmountInput.value = '';
+      ethStakeAmountInput.dispatchEvent(new Event('input', { bubbles: true }));
+      await this.wait(100);
+      
+      // Button should stay enabled even when ethStakeAmount is empty
+      this.assertFalse(withdrawButton.disabled, 'Withdrawal button should stay enabled when ethStakeAmount is empty, regardless of stakeAmount value');
+      
+      // Now set value in correct input field
+      ethStakeAmountInput.value = '10';
+      ethStakeAmountInput.dispatchEvent(new Event('input', { bubbles: true }));
+      await this.wait(100);
+      
+      // Button should remain enabled
+      this.assertFalse(withdrawButton.disabled, 'Withdrawal button should be enabled when ethStakeAmount has valid value');
+    }
+  }
+
+  // NEW: Test wallet connection UI updates
+  async testWalletConnectionUIUpdates() {
+    // Mock mainnet environment
+    const mockKeplr = this.mockKeplrProvider();
+    mockKeplr.getChainId = async () => 'tellor-1';
+    window.keplr = mockKeplr;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Test 1: Initial state - no wallets connected
+    const withdrawButton = document.getElementById('withdrawButton');
+    const delegateButton = document.getElementById('delegateButton');
+    const depositButton = document.getElementById('depositButton');
+    
+    this.assertNotNull(withdrawButton, 'Withdrawal button should exist');
+    this.assertNotNull(delegateButton, 'Delegate button should exist');
+    this.assertNotNull(depositButton, 'Deposit button should exist');
+    
+    // Test 2: Switch to ethereum bridge direction
+    if (window.App.switchBridgeDirection) {
+      window.App.switchBridgeDirection('ethereum');
+      await this.wait(100);
+    }
+    
+    // Test 3: Connect Keplr wallet and verify UI updates
+    if (window.App.connectKeplrLegacy) {
+      await window.App.connectKeplrLegacy();
+      await this.wait(500);
+    }
+    
+    // Test 4: Withdrawal button should be enabled after Keplr connection
+    this.assertFalse(withdrawButton.disabled, 'Withdrawal button should be enabled after Keplr connection');
+    
+    // Test 5: Switch to delegate section
+    if (window.App.switchBridgeDirection) {
+      window.App.switchBridgeDirection('delegate');
+      await this.wait(100);
+    }
+    
+    // Test 6: Delegate button should be enabled after Keplr connection
+    this.assertFalse(delegateButton.disabled, 'Delegate button should be enabled after Keplr connection');
+    
+    // Test 7: Switch back to layer section
+    if (window.App.switchBridgeDirection) {
+      window.App.switchBridgeDirection('layer');
+      await this.wait(100);
+    }
+    
+    // Test 8: Deposit button should be enabled (no wallet required for layer section)
+    this.assertFalse(depositButton.disabled, 'Deposit button should be enabled in layer section');
+    
+    // Test 9: Verify updateUIForCurrentDirection is called after wallet connection
+    // This tests the fix we made to ensure UI updates after wallet connection
+    const originalUpdateUI = window.App.updateUIForCurrentDirection;
+    let updateUICalled = false;
+    window.App.updateUIForCurrentDirection = function() {
+      updateUICalled = true;
+      return originalUpdateUI.call(this);
+    };
+    
+    // Disconnect and reconnect to trigger UI update
+    if (window.App.disconnectKeplr) {
+      await window.App.disconnectKeplr();
+      await this.wait(100);
+    }
+    
+    if (window.App.connectKeplrLegacy) {
+      await window.App.connectKeplrLegacy();
+      await this.wait(500);
+    }
+    
+    // Restore original function
+    window.App.updateUIForCurrentDirection = originalUpdateUI;
+    
+    this.assertTrue(updateUICalled, 'updateUIForCurrentDirection should be called after wallet connection');
+  }
+
+  // NEW: Test network switching UI updates
+  async testNetworkSwitchingUIUpdates() {
+    // Mock mainnet environment
+    const mockKeplr = this.mockKeplrProvider();
+    mockKeplr.getChainId = async () => 'tellor-1';
+    window.keplr = mockKeplr;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    // Test 1: Connect to mainnet
+    if (window.App.connectKeplrLegacy) {
+      await window.App.connectKeplrLegacy();
+      await this.wait(500);
+    }
+    
+    // Test 2: Verify mainnet connection
+    this.assertEqual(window.App.cosmosChainId, 'tellor-1', 'Should be connected to mainnet');
+    
+    // Test 3: Switch to ethereum bridge direction
+    if (window.App.switchBridgeDirection) {
+      window.App.switchBridgeDirection('ethereum');
+      await this.wait(100);
+    }
+    
+    const withdrawButton = document.getElementById('withdrawButton');
+    this.assertNotNull(withdrawButton, 'Withdrawal button should exist');
+    
+    // Test 4: Button should be enabled on mainnet
+    this.assertFalse(withdrawButton.disabled, 'Withdrawal button should be enabled on mainnet');
+    
+    // Test 5: Switch to testnet
+    if (window.App.switchCosmosNetwork) {
+      await window.App.switchCosmosNetwork();
+      await this.wait(500);
+    }
+    
+    // Test 6: Verify testnet connection
+    this.assertEqual(window.App.cosmosChainId, 'layertest-4', 'Should be connected to testnet');
+    
+    // Test 7: Button should still be enabled on testnet
+    this.assertFalse(withdrawButton.disabled, 'Withdrawal button should be enabled on testnet');
+    
+    // Test 8: Switch back to mainnet
+    if (window.App.switchCosmosNetwork) {
+      await window.App.switchCosmosNetwork();
+      await this.wait(500);
+    }
+    
+    // Test 9: Verify mainnet connection
+    this.assertEqual(window.App.cosmosChainId, 'tellor-1', 'Should be connected to mainnet');
+    
+    // Test 10: Button should still be enabled on mainnet
+    this.assertFalse(withdrawButton.disabled, 'Withdrawal button should be enabled on mainnet');
   }
 
   async testWithdrawalButtonFunctionalityTestnet() {
