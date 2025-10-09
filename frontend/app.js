@@ -293,33 +293,33 @@ const App = {
         App.ethers = connectionResult.ethers;
         App.isConnected = true;
         
-        // Always try to switch to Sepolia first (preferred for testing)
-        if (App.chainId !== 11155111) {
+        // Default to mainnet, but allow switching to Sepolia for testing
+        if (App.chainId !== 1) {
             // console.log(...);
             try {
-                // Try to switch to Sepolia first (preferred for testing)
-                await window.ethereumWalletAdapter.switchChain(11155111);
-                App.chainId = 11155111;
+                // Try to switch to mainnet first (preferred for production)
+                await window.ethereumWalletAdapter.switchChain(1);
+                App.chainId = 1;
                 // console.log(...);
             } catch (switchError) {
-                // If switching to Sepolia fails, check if we're on mainnet
-                if (App.chainId === 1) {
-                    // User is on mainnet, ask if they want to stay or switch
-                    const userChoice = confirm('You are connected to Ethereum Mainnet. Would you like to switch to Sepolia Testnet for testing? Click OK to switch to Sepolia, or Cancel to stay on Mainnet.');
+                // If switching to mainnet fails, check if we're on Sepolia
+                if (App.chainId === 11155111) {
+                    // User is on Sepolia, ask if they want to stay or switch
+                    const userChoice = confirm('You are connected to Sepolia Testnet. Would you like to switch to Ethereum Mainnet? Click OK to switch to Mainnet, or Cancel to stay on Sepolia.');
                     if (userChoice) {
-                        // User wants to switch to Sepolia, try again
+                        // User wants to switch to mainnet, try again
                         try {
-                            await window.ethereumWalletAdapter.switchChain(11155111);
-                            App.chainId = 11155111;
+                            await window.ethereumWalletAdapter.switchChain(1);
+                            App.chainId = 1;
                         } catch (secondSwitchError) {
-                            alert('Failed to switch to Sepolia. Please manually switch to Sepolia testnet (chain ID: 11155111) in your wallet.');
-                            throw new Error('Failed to switch to Sepolia network');
+                            alert('Failed to switch to Mainnet. Please manually switch to Ethereum mainnet (chain ID: 1) in your wallet.');
+                            throw new Error('Failed to switch to Mainnet network');
                         }
                     }
-                    // If user cancels, they stay on mainnet
+                    // If user cancels, they stay on Sepolia
                 } else {
                     // User is on an unsupported network
-                    alert('Please manually switch to Sepolia testnet (chain ID: 11155111) or Ethereum Mainnet (chain ID: 1) in your wallet and try again.');
+                    alert('Please manually switch to Ethereum Mainnet (chain ID: 1) or Sepolia testnet (chain ID: 11155111) in your wallet and try again.');
                     throw new Error('Failed to switch to supported network');
                 }
             }
@@ -440,14 +440,14 @@ const App = {
         App.chainId = chainId;
         // console.log(...);
         
-        // Always try to switch to Sepolia first (preferred for testing)
-        if (chainId !== 11155111) {
+        // Default to mainnet, but allow switching to Sepolia for testing
+        if (chainId !== 1) {
             // console.log(...);
             try {
-                // Try to switch to Sepolia first (preferred for testing)
+                // Try to switch to mainnet first (preferred for production)
                 await window.ethereum.request({
                     method: 'wallet_switchEthereumChain',
-                    params: [{ chainId: '0xaa36a7' }], // 11155111 in hex
+                    params: [{ chainId: '0x1' }], // 1 in hex
                 });
                 
                 // Verify the switch worked
@@ -461,16 +461,16 @@ const App = {
             } catch (switchError) {
                 // console.log(...);
                 
-                // If switching to Sepolia fails, check if we're on mainnet
-                if (chainId === 1) {
-                    // User is on mainnet, ask if they want to stay or switch
-                    const userChoice = confirm('You are connected to Ethereum Mainnet. Would you like to switch to Sepolia Testnet for testing? Click OK to switch to Sepolia, or Cancel to stay on Mainnet.');
+                // If switching to mainnet fails, check if we're on Sepolia
+                if (chainId === 11155111) {
+                    // User is on Sepolia, ask if they want to stay or switch
+                    const userChoice = confirm('You are connected to Sepolia Testnet. Would you like to switch to Ethereum Mainnet? Click OK to switch to Mainnet, or Cancel to stay on Sepolia.');
                     if (userChoice) {
-                        // User wants to switch to Sepolia, try again
+                        // User wants to switch to mainnet, try again
                         try {
                             await window.ethereum.request({
                                 method: 'wallet_switchEthereumChain',
-                                params: [{ chainId: '0xaa36a7' }], // 11155111 in hex
+                                params: [{ chainId: '0x1' }], // 1 in hex
                             });
                             
                             // Verify the switch worked
@@ -480,11 +480,11 @@ const App = {
                             }
                             App.chainId = chainId;
                         } catch (secondSwitchError) {
-                            alert('Failed to switch to Sepolia. Please manually switch to Sepolia testnet (chain ID: 11155111) in your wallet.');
-                            throw new Error('Failed to switch to Sepolia network');
+                            alert('Failed to switch to Mainnet. Please manually switch to Ethereum mainnet (chain ID: 1) in your wallet.');
+                            throw new Error('Failed to switch to Mainnet network');
                         }
                     }
-                    // If user cancels, they stay on mainnet
+                    // If user cancels, they stay on Sepolia
                 } else {
                     // If the network doesn't exist (error code 4902), add it
                     if (switchError.code === 4902) {
@@ -615,7 +615,7 @@ const App = {
 
         // Set default chain ID if not already set
         if (!App.cosmosChainId) {
-            App.cosmosChainId = 'layertest-4'; // Default to testnet
+            App.cosmosChainId = 'tellor-1'; // Default to mainnet
         }
         
         // Try to detect the current network from the wallet adapter
@@ -686,6 +686,9 @@ const App = {
         
         App.setPageParams();
         
+        // Update UI for current direction after wallet connection
+        App.updateUIForCurrentDirection();
+        
         // Dispatch wallet connected event for dispute refresh
         document.dispatchEvent(new CustomEvent('walletConnected'));
         
@@ -709,7 +712,7 @@ const App = {
         
         // Set default chain ID if not already set
         if (!App.cosmosChainId) {
-            App.cosmosChainId = 'layertest-4'; // Default to testnet
+            App.cosmosChainId = 'tellor-1'; // Default to mainnet
         }
         
         // Get the appropriate endpoints based on current Cosmos network
@@ -843,6 +846,9 @@ const App = {
         }
         
         App.setPageParams();
+        
+        // Update UI for current direction after wallet connection
+        App.updateUIForCurrentDirection();
     } catch (error) {
         // Clear connection state on error
         App.keplrAddress = null;
@@ -962,14 +968,16 @@ const App = {
         const cosmosNetworkGroup = cosmosNetworkDisplay ? cosmosNetworkDisplay.closest('.network-group') : null;
         if (cosmosNetworkGroup) cosmosNetworkGroup.style.display = 'none';
 
-        // Disable action buttons
+        // Keep action buttons enabled but update their state
         const withdrawButton = document.getElementById('withdrawButton');
         const delegateButton = document.getElementById('delegateButton');
         if (withdrawButton) {
-            withdrawButton.disabled = true;
+            withdrawButton.disabled = false;
+            withdrawButton.title = 'Connect your Cosmos wallet to withdraw';
         }
         if (delegateButton) {
-            delegateButton.disabled = true;
+            delegateButton.disabled = false;
+            delegateButton.title = 'Connect your Cosmos wallet to delegate';
         }
         
         // Reset validator dropdown when disconnecting
@@ -1256,7 +1264,7 @@ const App = {
           toggleButton.className = 'toggle-button mainnet';
           toggleButton.disabled = false;
         }
-        if (toggleText) toggleText.textContent = 'Switch to Sepolia';
+        if (toggleText) toggleText.textContent = 'Switch to Testnet';
         if (networkGroup) networkGroup.style.display = 'flex';
       } else if (App.chainId === 11155111) {
         networkDisplay.textContent = '*Sepolia Test Network';
@@ -1448,6 +1456,9 @@ const App = {
       return;
     }
 
+    // Set flag to prevent input validation during network switch
+    App.isNetworkSwitching = true;
+
     // Show confirmation dialog
     const targetNetwork = App.cosmosChainId === 'tellor-1' ? 'testnet' : 'mainnet';
     const currentNetwork = App.cosmosChainId === 'tellor-1' ? 'mainnet' : 'testnet';
@@ -1503,6 +1514,14 @@ const App = {
         console.error('Failed to refresh dropdowns after network switch:', error);
       }
       
+      // Update UI to ensure withdrawal button state is correct after network switch
+      // This must happen after wallet reconnection is complete
+      App.updateUIForCurrentDirection();
+      
+      // Clear network switching flag
+      App.isNetworkSwitching = false;
+      
+      
       // Update balance for the new network after a small delay to ensure wallet is ready
       setTimeout(async () => {
         try {
@@ -1515,16 +1534,19 @@ const App = {
       // Re-enable the toggle button
       if (cosmosToggleButton) {
         cosmosToggleButton.disabled = false;
-        cosmosToggleButton.textContent = 'Switch to Mainnet';
+        cosmosToggleButton.textContent = App.cosmosChainId === 'tellor-1' ? 'Switch to Testnet' : 'Switch to Mainnet';
       }
       
     } catch (error) {
       // console.error('Error switching Cosmos network:', error);
       App.handleError(error);
     } finally {
+      // Clear network switching flag in case of error
+      App.isNetworkSwitching = false;
+      
       if (cosmosToggleButton) {
         cosmosToggleButton.disabled = false;
-        cosmosToggleButton.textContent = 'Switch to Palmito (test)';
+        cosmosToggleButton.textContent = App.cosmosChainId === 'tellor-1' ? 'Switch to Testnet' : 'Switch to Mainnet';
       }
     }
   });
@@ -4364,6 +4386,30 @@ const App = {
                 withdrawButton.title = 'Connect your Cosmos wallet to withdraw';
             }
         }
+        
+        // Always keep withdrawal button enabled and provide helpful prompts
+        if (withdrawButton) {
+            withdrawButton.disabled = false;
+            
+            // Check if inputs are filled and provide appropriate title
+            const ethStakeAmountInput = document.getElementById('ethStakeAmount');
+            const ethQueryIdInput = document.getElementById('ethQueryId');
+            
+            if (ethStakeAmountInput && ethQueryIdInput) {
+                const amount = parseFloat(ethStakeAmountInput.value) || 0;
+                const address = ethQueryIdInput.value.trim();
+                
+                if (amount <= 0 && !address) {
+                    withdrawButton.title = 'Please enter amount and Ethereum address';
+                } else if (amount <= 0) {
+                    withdrawButton.title = 'Please enter a valid amount to withdraw';
+                } else if (!address) {
+                    withdrawButton.title = 'Please enter Ethereum address to receive withdrawal';
+                } else {
+                    withdrawButton.title = 'Request withdrawal from Layer to Ethereum';
+                }
+            }
+        }
     } else if (this.currentBridgeDirection === 'delegate') {
         // Update Delegate section UI
         const delegateButton = document.getElementById('delegateButton');
@@ -5236,11 +5282,16 @@ const App = {
       // Check and display voting power status
     checkVotingPower: async function() {
         try {
+            if (!window.disputeProposer) {
+                return;
+            }
+            
+            const walletStatus = await window.disputeProposer.getWalletStatus();
             if (!walletStatus.isConnected) {
                 return;
             }
 
-            const votingPowerCheck = await disputeProposer.checkVotingPower();
+            const votingPowerCheck = await window.disputeProposer.checkVotingPower();
             const votingPowerIndicator = document.getElementById('votingPowerIndicator');
             
             if (votingPowerIndicator) {
@@ -5847,6 +5898,14 @@ $(function () {
                     // Force enable the withdrawal button for Bridge to Ethereum section
                     withdrawButton.disabled = false;
                 }
+                
+                // Set up periodic check to ensure withdrawal button stays enabled
+                setInterval(() => {
+                    const withdrawButton = document.getElementById('withdrawButton');
+                    if (withdrawButton && withdrawButton.disabled) {
+                        withdrawButton.disabled = false;
+                    }
+                }, 2000); // Check every 2 seconds
             }, 1000); // Wait 1 second for App.init to complete
             
         } catch (error) {

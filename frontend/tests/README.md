@@ -25,6 +25,10 @@ Comprehensive test suite for the Layer Bridge frontend application, covering bot
 ### 4. Enhanced Functional Tests (NEW!)
 - **Withdrawal button functionality on mainnet** - Tests withdrawal UI and logic on Tellor Mainnet
 - **Withdrawal button functionality on testnet** - Tests withdrawal UI and logic on Palmito Testnet
+- **Withdrawal button integration test (mainnet)** - Comprehensive integration test for withdrawal button state management
+- **Withdrawal button always enabled test** - Tests that withdrawal button stays enabled regardless of input validation
+- **Wallet connection UI updates test** - Tests UI updates after wallet connection/disconnection
+- **Network switching UI updates test** - Tests UI updates when switching between mainnet and testnet
 - **Delegate button functionality on mainnet** - Tests delegation UI and logic on Tellor Mainnet
 - **Delegate button functionality on testnet** - Tests delegation UI and logic on Palmito Testnet
 - **Validator fetching and dropdown population** - Tests validator data fetching and dropdown population
@@ -170,6 +174,13 @@ DEBUG_TESTS=true      # enable detailed logging
 
 ## Recent Updates
 
+### Bug Prevention Tests (NEW!)
+- ✅ Added comprehensive integration tests for withdrawal button state management
+- ✅ Added specific test for input field validation bug (ethStakeAmount vs stakeAmount)
+- ✅ Added wallet connection UI update tests
+- ✅ Added network switching UI update tests
+- ✅ Enhanced test coverage to prevent similar bugs in the future
+
 ### Network Detection Improvements
 - ✅ Added automatic network detection from Keplr
 - ✅ Added automatic network detection from wallet adapters
@@ -178,10 +189,11 @@ DEBUG_TESTS=true      # enable detailed logging
 - ✅ Added comprehensive network switching tests
 
 ### Test Coverage Enhancements
-- ✅ Added 12 new network-specific tests
+- ✅ Added 16 new network-specific and integration tests
 - ✅ Enhanced mocking for network detection scenarios
 - ✅ Improved test environment setup and cleanup
 - ✅ Added network state validation in all functional tests
+- ✅ Added cross-file integration testing (app.js + index.html)
 
 ## Troubleshooting
 
