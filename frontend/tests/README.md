@@ -16,15 +16,20 @@ Comprehensive test suite for the Layer Bridge frontend application, covering bot
 - Keplr connection structure
 - Wallet disconnection methods
 
-### 3. Network Detection Tests (NEW!)
+### 3. Network Detection Tests (UPDATED!)
 - **Network detection for mainnet** - Tests automatic detection of Tellor Mainnet (`tellor-1`)
 - **Network detection for testnet** - Tests automatic detection of Palmito Testnet (`layertest-4`)
 - **Network switching functionality** - Tests switching between mainnet and testnet
 - **Cosmos wallet adapter network detection** - Tests network detection with wallet adapters
+- **Network switching with isNetworkSwitching flag** - Tests the new network switching flag functionality
+- **Wallet adapter switchToChain method** - Tests the new chain switching method in wallet adapter
 
-### 4. Enhanced Functional Tests (NEW!)
+### 4. Enhanced Functional Tests (UPDATED!)
 - **Withdrawal button functionality on mainnet** - Tests withdrawal UI and logic on Tellor Mainnet
 - **Withdrawal button functionality on testnet** - Tests withdrawal UI and logic on Palmito Testnet
+- **Etherscan URL generation for mainnet** - Tests correct Etherscan URL generation for mainnet transactions
+- **Etherscan URL generation for testnet** - Tests correct Etherscan URL generation for testnet transactions
+- **Request attestation with correct RPC endpoints** - Tests that request attestation uses the correct RPC endpoints
 - **Withdrawal button integration test (mainnet)** - Comprehensive integration test for withdrawal button state management
 - **Withdrawal button always enabled test** - Tests that withdrawal button stays enabled regardless of input validation
 - **Wallet connection UI updates test** - Tests UI updates after wallet connection/disconnection

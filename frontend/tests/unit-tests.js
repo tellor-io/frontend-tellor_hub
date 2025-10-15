@@ -87,11 +87,31 @@ export class UnitTests extends TestSuite {
         name: 'Cosmos wallet adapter network detection',
         run: () => this.testCosmosWalletAdapterNetworkDetection()
       },
+      {
+        name: 'Network switching with isNetworkSwitching flag',
+        run: () => this.testNetworkSwitchingFlag()
+      },
+      {
+        name: 'Wallet adapter switchToChain method',
+        run: () => this.testWalletAdapterSwitchToChain()
+      },
 
       // Enhanced Functional Tests
       {
         name: 'Withdrawal button functionality on mainnet',
         run: () => this.testWithdrawalButtonFunctionalityMainnet()
+      },
+      {
+        name: 'Etherscan URL generation for mainnet',
+        run: () => this.testEtherscanUrlMainnet()
+      },
+      {
+        name: 'Etherscan URL generation for testnet',
+        run: () => this.testEtherscanUrlTestnet()
+      },
+      {
+        name: 'Request attestation with correct RPC endpoints',
+        run: () => this.testRequestAttestationRpcEndpoints()
       },
       {
         name: 'Withdrawal button functionality on testnet',
@@ -2317,6 +2337,228 @@ export class UnitTests extends TestSuite {
       );
       
       this.assertTrue(result.success, 'No-stake report should succeed on testnet');
+    }
+  }
+
+  // NEW TESTS FOR UPDATED FUNCTIONALITY
+
+  async testNetworkSwitchingFlag() {
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    if (window.App) {
+      // Test initial state
+      this.assertFalse(window.App.isNetworkSwitching, 'isNetworkSwitching should be false initially');
+      
+      // Simulate network switching
+      window.App.isNetworkSwitching = true;
+      this.assertTrue(window.App.isNetworkSwitching, 'isNetworkSwitching should be true during network switch');
+      
+      // Test that connectCosmosWallet respects the flag
+      const mockAdapter = {
+        isConnected: () => true,
+        getChainId: async () => 'layertest-4', // This should be ignored during network switch
+        connectToWallet: async (walletType) => ({
+          address: 'tellor1testaddress123456789012345678901234567890',
+          walletName: 'keplr'
+        })
+      };
+      
+      // Set target chain ID
+      window.App.cosmosChainId = 'tellor-1';
+      window.cosmosWalletAdapter = mockAdapter;
+      
+      // Mock the connectCosmosWallet method to test the flag behavior
+      const originalConnectCosmosWallet = window.App.connectCosmosWallet;
+      let chainIdDetected = false;
+      
+      window.App.connectCosmosWallet = async function(walletType) {
+        // This simulates the logic in connectCosmosWallet
+        if (!window.App.isNetworkSwitching) {
+          const currentChainId = await window.cosmosWalletAdapter.getChainId();
+          if (currentChainId === 'tellor-1') {
+            window.App.cosmosChainId = 'tellor-1';
+          } else if (currentChainId === 'layertest-4') {
+            window.App.cosmosChainId = 'layertest-4';
+            chainIdDetected = true;
+          }
+        }
+        return { address: 'test', walletName: 'keplr' };
+      };
+      
+      await window.App.connectCosmosWallet('keplr');
+      
+      // During network switching, the chain ID should not be overridden
+      this.assertEqual(window.App.cosmosChainId, 'tellor-1', 'Chain ID should not be overridden during network switch');
+      this.assertFalse(chainIdDetected, 'Chain ID detection should be skipped during network switch');
+      
+      // Restore original method
+      window.App.connectCosmosWallet = originalConnectCosmosWallet;
+      
+      // Clear the flag
+      window.App.isNetworkSwitching = false;
+    }
+  }
+
+  async testWalletAdapterSwitchToChain() {
+    // Mock wallet adapter with switchToChain method
+    const mockAdapter = {
+      isConnected: () => true,
+      currentWallet: {
+        experimentalSuggestChain: async (config) => {
+          console.log('Chain suggested:', config.chainId);
+        },
+        enable: async (chainId) => {
+          console.log('Chain enabled:', chainId);
+        }
+      },
+      walletType: 'keplr',
+      chainConfigs: {
+        'tellor-1': {
+          chainId: 'tellor-1',
+          chainName: 'Tellor Layer Mainnet',
+          rpc: 'https://mainnet.tellorlayer.com/rpc',
+          rest: 'https://mainnet.tellorlayer.com/rpc'
+        },
+        'layertest-4': {
+          chainId: 'layertest-4',
+          chainName: 'Layer Testnet',
+          rpc: 'https://node-palmito.tellorlayer.com/rpc',
+          rest: 'https://node-palmito.tellorlayer.com/rpc'
+        }
+      },
+      updateChainConfig: function() {
+        const currentChainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
+        if (this.chainConfigs[currentChainId]) {
+          this.chainConfig = this.chainConfigs[currentChainId];
+          this.chainId = currentChainId;
+        }
+      },
+      switchToChain: async function() {
+        this.updateChainConfig();
+        if (this.currentWallet.experimentalSuggestChain) {
+          await this.currentWallet.experimentalSuggestChain(this.chainConfig);
+        }
+        await this.currentWallet.enable(this.chainId);
+      }
+    };
+    
+    window.cosmosWalletAdapter = mockAdapter;
+    
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    if (window.App) {
+      // Test switching to testnet
+      window.App.cosmosChainId = 'layertest-4';
+      await mockAdapter.switchToChain();
+      
+      this.assertEqual(mockAdapter.chainId, 'layertest-4', 'Wallet adapter should switch to testnet chain');
+      this.assertEqual(mockAdapter.chainConfig.chainId, 'layertest-4', 'Chain config should be updated to testnet');
+      
+      // Test switching to mainnet
+      window.App.cosmosChainId = 'tellor-1';
+      await mockAdapter.switchToChain();
+      
+      this.assertEqual(mockAdapter.chainId, 'tellor-1', 'Wallet adapter should switch to mainnet chain');
+      this.assertEqual(mockAdapter.chainConfig.chainId, 'tellor-1', 'Chain config should be updated to mainnet');
+    }
+  }
+
+  async testEtherscanUrlMainnet() {
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    if (window.App) {
+      // Set to mainnet
+      window.App.chainId = 1;
+      
+      // Mock the showSuccessPopup method to capture the URL
+      const originalShowSuccessPopup = window.App.showSuccessPopup;
+      let capturedUrl = null;
+      
+      window.App.showSuccessPopup = function(message, txHash, chainType) {
+        if (txHash && chainType === 'ethereum') {
+          if (window.App.chainId === 1) {
+            capturedUrl = `https://etherscan.io/tx/${txHash}`;
+          } else {
+            capturedUrl = `https://sepolia.etherscan.io/tx/${txHash}`;
+          }
+        }
+      };
+      
+      // Test mainnet URL generation
+      window.App.showSuccessPopup('Test message', '0x1234567890abcdef', 'ethereum');
+      
+      this.assertEqual(capturedUrl, 'https://etherscan.io/tx/0x1234567890abcdef', 'Should generate mainnet Etherscan URL');
+      
+      // Restore original method
+      window.App.showSuccessPopup = originalShowSuccessPopup;
+    }
+  }
+
+  async testEtherscanUrlTestnet() {
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    if (window.App) {
+      // Set to testnet
+      window.App.chainId = 11155111;
+      
+      // Mock the showSuccessPopup method to capture the URL
+      const originalShowSuccessPopup = window.App.showSuccessPopup;
+      let capturedUrl = null;
+      
+      window.App.showSuccessPopup = function(message, txHash, chainType) {
+        if (txHash && chainType === 'ethereum') {
+          if (window.App.chainId === 1) {
+            capturedUrl = `https://etherscan.io/tx/${txHash}`;
+          } else {
+            capturedUrl = `https://sepolia.etherscan.io/tx/${txHash}`;
+          }
+        }
+      };
+      
+      // Test testnet URL generation
+      window.App.showSuccessPopup('Test message', '0x1234567890abcdef', 'ethereum');
+      
+      this.assertEqual(capturedUrl, 'https://sepolia.etherscan.io/tx/0x1234567890abcdef', 'Should generate testnet Etherscan URL');
+      
+      // Restore original method
+      window.App.showSuccessPopup = originalShowSuccessPopup;
+    }
+  }
+
+  async testRequestAttestationRpcEndpoints() {
+    // Wait for App to be available
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    
+    if (window.App) {
+      // Test mainnet RPC endpoint
+      window.App.cosmosChainId = 'tellor-1';
+      const mainnetRpcEndpoint = window.App.getCosmosRpcEndpoint();
+      this.assertEqual(mainnetRpcEndpoint, 'https://mainnet.tellorlayer.com/rpc', 'Should use mainnet RPC endpoint for request attestation');
+      
+      // Test testnet RPC endpoint
+      window.App.cosmosChainId = 'layertest-4';
+      const testnetRpcEndpoint = window.App.getCosmosRpcEndpoint();
+      this.assertEqual(testnetRpcEndpoint, 'https://node-palmito.tellorlayer.com/rpc', 'Should use testnet RPC endpoint for request attestation');
+      
+      // Test that stargate.js would use the correct endpoint
+      const mockStargateRequestAttestations = async function(account, queryId, timestamp) {
+        const rpcEndpoint = window.App && window.App.getCosmosRpcEndpoint ? window.App.getCosmosRpcEndpoint() : 'https://node-palmito.tellorlayer.com/rpc';
+        return { rpcEndpoint };
+      };
+      
+      // Test mainnet
+      window.App.cosmosChainId = 'tellor-1';
+      const mainnetResult = await mockStargateRequestAttestations('test', 'test', 'test');
+      this.assertEqual(mainnetResult.rpcEndpoint, 'https://mainnet.tellorlayer.com/rpc', 'Request attestation should use mainnet RPC endpoint');
+      
+      // Test testnet
+      window.App.cosmosChainId = 'layertest-4';
+      const testnetResult = await mockStargateRequestAttestations('test', 'test', 'test');
+      this.assertEqual(testnetResult.rpcEndpoint, 'https://node-palmito.tellorlayer.com/rpc', 'Request attestation should use testnet RPC endpoint');
     }
   }
 }

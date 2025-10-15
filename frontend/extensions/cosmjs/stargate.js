@@ -1,4 +1,4 @@
-// @cosmjs/stargate v0.28.11
+// @cosmjs/stargate v0.28.11 - Updated chain-id fallbacks to tellor-1
 (function(global, factory) {
     typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
     typeof define === 'function' && define.amd ? define(['exports'], factory) :
@@ -135,14 +135,14 @@
                     offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
                 } else if (window.getOfflineSignerAuto) {
                     // Fallback to legacy methods
-                    const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                    const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
                     offlineSigner = await window.getOfflineSignerAuto(chainId);
                 } else if (window.getOfflineSignerDirect) {
-                    const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                    const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
                     offlineSigner = window.getOfflineSignerDirect(chainId);
                 } else if (window.getOfflineSigner) {
                     // Use the current chain ID from the app
-                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
                 offlineSigner = window.getOfflineSigner(chainId);
                 } else {
                     throw new Error('No offline signer available');
@@ -454,7 +454,7 @@
                 const signDoc = {
                     bodyBytes: encodedTxBody,
                     authInfoBytes: encodedAuthInfo,
-                    chainId: window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4',
+                    chainId: window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1',
                     accountNumber: parseInt(accountInfo.account_number)
                 };
 
@@ -626,7 +626,7 @@
                 offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
             } else if (window.getOfflineSigner) {
                 // Use the current chain ID from the app
-                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
                 offlineSigner = window.getOfflineSigner(chainId);
             } else {
                 throw new Error('No offline signer available');
@@ -686,7 +686,7 @@
                 offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
             } else if (window.getOfflineSigner) {
                 // Use the current chain ID from the app
-                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
                 offlineSigner = window.getOfflineSigner(chainId);
             } else {
                 throw new Error('No offline signer available');
@@ -736,7 +736,7 @@
                 offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
             } else if (window.getOfflineSigner) {
                 // Use the current chain ID from the app
-                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
                 offlineSigner = window.getOfflineSigner(chainId);
             } else {
                 throw new Error('No offline signer available');
@@ -792,7 +792,7 @@
                 offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
             } else if (window.getOfflineSigner) {
                 // Use the current chain ID from the app
-                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
                 offlineSigner = window.getOfflineSigner(chainId);
             } else {
                 throw new Error('No offline signer available');
