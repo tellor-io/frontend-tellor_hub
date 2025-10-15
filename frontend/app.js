@@ -618,16 +618,18 @@ const App = {
             App.cosmosChainId = 'tellor-1'; // Default to mainnet
         }
         
-        // Try to detect the current network from the wallet adapter
-        try {
-            const currentChainId = await window.cosmosWalletAdapter.getChainId();
-            if (currentChainId === 'tellor-1') {
-                App.cosmosChainId = 'tellor-1';
-            } else if (currentChainId === 'layertest-4') {
-                App.cosmosChainId = 'layertest-4';
+        // Try to detect the current network from the wallet adapter (only if not switching networks)
+        if (!App.isNetworkSwitching) {
+            try {
+                const currentChainId = await window.cosmosWalletAdapter.getChainId();
+                if (currentChainId === 'tellor-1') {
+                    App.cosmosChainId = 'tellor-1';
+                } else if (currentChainId === 'layertest-4') {
+                    App.cosmosChainId = 'layertest-4';
+                }
+            } catch (error) {
+                console.log('Could not detect current network from wallet adapter, using default');
             }
-        } catch (error) {
-            console.log('Could not detect current network from wallet adapter, using default');
         }
         
         // Connect to the selected wallet
@@ -1243,6 +1245,15 @@ const App = {
       return 'https://mainnet.tellorlayer.com';
     } else {
       return 'https://node-palmito.tellorlayer.com';
+    }
+  },
+
+  // Get the appropriate Cosmos RPC endpoint based on current Cosmos network
+  getCosmosRpcEndpoint: function() {
+    if (App.cosmosChainId === 'tellor-1') {
+      return 'https://mainnet.tellorlayer.com/rpc';
+    } else {
+      return 'https://node-palmito.tellorlayer.com/rpc';
     }
   },
 
@@ -1894,7 +1905,12 @@ const App = {
       
       let explorerUrl;
       if (chainType === 'ethereum') {
-        explorerUrl = `https://sepolia.etherscan.io/tx/${txHash}`;
+        // Use correct Etherscan URL based on current Ethereum network
+        if (App.chainId === 1) {
+          explorerUrl = `https://etherscan.io/tx/${txHash}`;
+        } else {
+          explorerUrl = `https://sepolia.etherscan.io/tx/${txHash}`;
+        }
       } else if (chainType === 'cosmos') {
         explorerUrl = `https://explorer.tellor.io/txs/${txHash}`;
       }
@@ -3751,8 +3767,11 @@ const App = {
         
         let errorMessage = "Claim Withdrawal failed. Make sure you have waited the full 12 hrs have passed since you requested withdrawal & then try requesting attestation again for updated validator set.";
         if (txHash) {
-            const etherscanUrl = `https://sepolia.etherscan.io/tx/${txHash}`;
-            errorMessage += ` <a href="${etherscanUrl}" target="_blank" style="color: #DC2626; text-decoration: underline;">View on Etherscan</a>`;
+          // Use correct Etherscan URL based on current Ethereum network
+          const etherscanUrl = App.chainId === 1 
+            ? `https://etherscan.io/tx/${txHash}`
+            : `https://sepolia.etherscan.io/tx/${txHash}`;
+          errorMessage += ` <a href="${etherscanUrl}" target="_blank" style="color: #DC2626; text-decoration: underline;">View on Etherscan</a>`;
         }
         
         App.showErrorPopup(errorMessage);

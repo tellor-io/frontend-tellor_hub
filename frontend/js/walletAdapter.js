@@ -195,11 +195,19 @@ class CosmosWalletAdapter {
         this.walletType = walletToUse.type;
         this.currentWallet = walletToUse.provider;
         
-        // Configure chain based on wallet type
-        await this.configureChain();
+        // Check if we're switching networks (wallet already connected)
+        const isNetworkSwitch = this.isConnected() && window.App && window.App.isNetworkSwitching;
         
-        // Enable the chain
-        await this.enableChain();
+        if (isNetworkSwitch) {
+            // Switch to the correct chain for network switching
+            await this.switchToChain();
+        } else {
+            // Configure chain based on wallet type (new connection)
+            await this.configureChain();
+            
+            // Enable the chain
+            await this.enableChain();
+        }
         
         // Get offline signer
         const offlineSigner = this.getOfflineSigner();
@@ -312,6 +320,71 @@ class CosmosWalletAdapter {
                     await this.currentWallet.enable(this.chainId);
                 }
                 break;
+        }
+    }
+
+    // Switch to the correct chain (for network switching)
+    async switchToChain() {
+        if (!this.currentWallet) {
+            throw new Error('No wallet connected');
+        }
+        
+        // Update chain configuration first
+        this.updateChainConfig();
+        
+        try {
+            switch (this.walletType) {
+                case 'keplr':
+                    // First suggest the chain (add it if not already added)
+                    if (this.currentWallet.experimentalSuggestChain) {
+                        await this.currentWallet.experimentalSuggestChain(this.chainConfig);
+                    }
+                    // Then enable it
+                    await this.currentWallet.enable(this.chainId);
+                    break;
+                    
+                case 'cosmostation':
+                    if (this.currentWallet.providers && this.currentWallet.providers.keplr) {
+                        if (this.currentWallet.providers.keplr.experimentalSuggestChain) {
+                            await this.currentWallet.providers.keplr.experimentalSuggestChain(this.chainConfig);
+                        }
+                        await this.currentWallet.providers.keplr.enable(this.chainId);
+                    } else {
+                        if (this.currentWallet.experimentalSuggestChain) {
+                            await this.currentWallet.experimentalSuggestChain(this.chainConfig);
+                        }
+                        await this.currentWallet.enable(this.chainId);
+                    }
+                    break;
+                    
+                case 'leap':
+                    if (this.currentWallet.experimentalSuggestChain) {
+                        await this.currentWallet.experimentalSuggestChain(this.chainConfig);
+                    }
+                    await this.currentWallet.enable(this.chainId);
+                    break;
+                    
+                case 'station':
+                    if (this.currentWallet.experimentalSuggestChain) {
+                        await this.currentWallet.experimentalSuggestChain(this.chainConfig);
+                    }
+                    await this.currentWallet.enable(this.chainId);
+                    break;
+                    
+                default:
+                    // Try standard methods
+                    if (this.currentWallet.experimentalSuggestChain) {
+                        await this.currentWallet.experimentalSuggestChain(this.chainConfig);
+                    }
+                    if (this.currentWallet.enable) {
+                        await this.currentWallet.enable(this.chainId);
+                    }
+                    break;
+            }
+        } catch (error) {
+            console.warn('Could not switch to chain:', error);
+            // Fall back to just enabling the chain
+            await this.enableChain();
         }
     }
 
@@ -446,6 +519,54 @@ class CosmosWalletAdapter {
         };
         
         return descriptions[walletType] || 'Cosmos-compatible wallet';
+    }
+
+    // Get current chain ID
+    async getChainId() {
+        if (!this.currentWallet) {
+            return this.chainId; // Return default chain ID if no wallet connected
+        }
+        
+        try {
+            switch (this.walletType) {
+                case 'keplr':
+                    if (this.currentWallet.getChainId) {
+                        return await this.currentWallet.getChainId();
+                    }
+                    break;
+                    
+                case 'cosmostation':
+                    if (this.currentWallet.providers && this.currentWallet.providers.keplr && this.currentWallet.providers.keplr.getChainId) {
+                        return await this.currentWallet.providers.keplr.getChainId();
+                    } else if (this.currentWallet.getChainId) {
+                        return await this.currentWallet.getChainId();
+                    }
+                    break;
+                    
+                case 'leap':
+                    if (this.currentWallet.getChainId) {
+                        return await this.currentWallet.getChainId();
+                    }
+                    break;
+                    
+                case 'station':
+                    if (this.currentWallet.getChainId) {
+                        return await this.currentWallet.getChainId();
+                    }
+                    break;
+                    
+                default:
+                    if (this.currentWallet.getChainId) {
+                        return await this.currentWallet.getChainId();
+                    }
+                    break;
+            }
+        } catch (error) {
+            console.warn('Could not get chain ID from wallet:', error);
+        }
+        
+        // Fallback to current chain ID
+        return this.chainId;
     }
 }
 
