@@ -2787,7 +2787,7 @@ const App = {
   },
 
   // Function to fetch withdrawal history
-  getWithdrawalHistory: async function() {
+  getWithdrawalHistory: async function(showAll = false) {
     try {
         let address;
         let isEvmWallet = false;
@@ -2831,6 +2831,11 @@ const App = {
         if (!lastWithdrawalId || lastWithdrawalId <= 0) {
             return [];
         }
+        
+        if (!App.contracts.Bridge) {
+            console.error('Bridge contract not available');
+            return [];
+        }
 
         // Create arrays for withdrawal data and claim status promises
         const withdrawalPromises = [];
@@ -2843,8 +2848,11 @@ const App = {
             // Use contract's withdrawClaimed function instead of API endpoint
             claimStatusPromises.push(
                 App.contracts.Bridge.methods.withdrawClaimed(id).call()
-                    .then(claimed => ({ claimed }))
-                    .catch(() => ({ claimed: false }))
+                    .then(claimed => ({ claimed: Boolean(claimed), withdrawalId: id }))
+                    .catch(err => {
+                        console.error(`❌ Error checking claim status for withdrawal ${id}:`, err);
+                        return { claimed: false, withdrawalId: id };
+                    })
             );
         }
 
@@ -2853,7 +2861,7 @@ const App = {
             Promise.all(withdrawalPromises),
             Promise.all(claimStatusPromises)
         ]);
-
+        
         // Filter and process valid withdrawals
         const withdrawals = withdrawalResults
             .map((withdrawalData, index) => {
@@ -2873,16 +2881,22 @@ const App = {
                     ? parsedData.sender.toLowerCase().trim()
                     : '';
 
-                // For EVM wallet, match sender address. For Keplr, match recipient address
-                if ((isEvmWallet && cleanSender === cleanAddress) ||
-                    (!isEvmWallet && cleanRecipient === cleanAddress)) {
+                // If showAll is true, show all withdrawals. Otherwise filter by address
+                const matchesAddress = showAll || 
+                    (isEvmWallet && cleanSender === cleanAddress) ||
+                    (!isEvmWallet && cleanRecipient === cleanAddress);
+
+                if (matchesAddress) {
+                    const claimedStatus = claimStatuses[index]?.claimed || false;
                     return {
                         id,
                         sender: parsedData.sender,
                         recipient: parsedData.recipient,
                         amount: parsedData.amount.toString(),
                         timestamp: withdrawalData.raw.timestamp,
-                        claimed: claimStatuses[index]?.claimed || false
+                        claimed: claimedStatus,
+                        isMine: (isEvmWallet && cleanSender === cleanAddress) ||
+                                (!isEvmWallet && cleanRecipient === cleanAddress)
                     };
                 }
                 return null;
@@ -2973,7 +2987,16 @@ const App = {
   // Function to update withdrawal history UI
   updateWithdrawalHistory: async function() {
     try {
-        const transactions = await this.getWithdrawalHistory();
+        const showAllCheckbox = document.getElementById('showAllWithdrawals');
+        const showAll = showAllCheckbox ? showAllCheckbox.checked : false;
+        
+        // Show/hide legend based on checkbox state
+        const legend = document.getElementById('withdrawalLegend');
+        if (legend) {
+            legend.style.display = showAll ? 'inline-flex' : 'none';
+        }
+        
+        const transactions = await this.getWithdrawalHistory(showAll);
 
         const tableBody = document.querySelector('#withdrawal-history tbody');
         if (!tableBody) {
@@ -3006,6 +3029,9 @@ const App = {
             }
             #withdrawal-history tr:hover {
                 background-color: #f8f9fa;
+            }
+            #withdrawal-history tr[style*="background-color: #e6f7f7"]:hover {
+                background-color: #d1eeee !important;
             }
             .amount-column {
                 text-align: right;
@@ -3068,6 +3094,13 @@ const App = {
         }
 
         if (!transactions || transactions.length === 0) {
+            const message = showAll ? 
+                'No withdrawal transactions found in the system.' : 
+                'No withdrawal transactions found for your connected wallet.';
+            const hint = showAll ?
+                'There are no withdrawals in the bridge yet.' :
+                'If you\'ve made withdrawals from Tellor Layer, they will appear here once processed.';
+            
             tableBody.innerHTML = `
                 <tr>
                     <td colspan="7" style="padding: 40px 20px; text-align: center; border: none;">
@@ -3076,10 +3109,10 @@ const App = {
                                 No Withdrawal Transactions Found
                             </h4>
                             <p style="margin: 0 0 10px 0; color: #4a5568; font-size: 16px;">
-                                No withdrawal transactions found for your connected wallet.
+                                ${message}
                             </p>
                             <p style="margin: 0; color: #718096; font-size: 14px;">
-                                If you've made withdrawals from Tellor Layer, they will appear here once processed.
+                                ${hint}
                             </p>
                         </div>
                     </td>
@@ -3103,7 +3136,15 @@ const App = {
                 
                 const row = document.createElement('tr');
                 
-                // Determine button states based on connection status
+                // Determine if this is user's withdrawal for highlighting
+                const isMyWithdrawal = tx.isMine !== undefined ? tx.isMine : true;
+                
+                // Highlight user's own withdrawals when showing all
+                if (showAll && isMyWithdrawal) {
+                    row.style.backgroundColor = '#e6f7f7';
+                }
+                
+                // Button states based on connection status only (anyone can claim any withdrawal)
                 const attestButtonDisabled = !App.isKeplrConnected;
                 const attestButtonClass = attestButtonDisabled ? 'attest-button disconnected' : 'attest-button';
                 const attestButtonStyle = attestButtonDisabled ? 
@@ -3124,7 +3165,7 @@ const App = {
                             <button class="claim-button" onclick="App.claimWithdrawal(${tx.id})" 
                                 style="background-color: #38a169; color: #eefffb; border: none;">
                                 <span class="tooltip-container">
-                                    <span>3. Claim</span><span>Withdrawal</span>
+                                    <span>3. Process</span><span>Withdrawal</span>
                                     <span class="tooltip-icon tooltip-icon-white">?</span>
                                     <span class="tooltip-text tooltip-text-right">Uses Ethereum Wallet. Must claim withdrawal(step 3) within 12 hours after Attestation request(step 2) is made. Otherwise you must re-request attestation</span>
                                 </span>

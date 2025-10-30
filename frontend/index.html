@@ -205,7 +205,7 @@
                   </div>
                   <div class="bridge-direction">
                     <button id="approveButton" class="button-style-1" onclick="App.approveDeposit()">Approve Deposit</button>
-                    <button id="depositButton" class="button-style-3" onclick="App.depositToLayer()">Bridge to Layer</button>
+                    <button id="depositButton" class="button-style-3" onclick="App.depositToLayer()">Bridge to Tellor</button>
                   </div>
                 </div>
               </div>
@@ -237,7 +237,21 @@
                 
                 <div class="transactions-container active">
                   <div class="history-header">
-                    <h3>Withdrawal Transactions: View & Claim your withdrawal requests and their status</h3>
+                    <h3>Withdrawal Transactions: View & Claim withdrawal requests and their status</h3>
+                  </div>
+                    <div style="margin: 15px 0; padding: 0 20px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                    <label style="display: inline-flex; align-items: center; cursor: pointer; font-size: 14px; color: #2d3748;">
+                      <input type="checkbox" id="showAllWithdrawals" onchange="App.updateWithdrawalHistory()" style="margin-right: 8px; cursor: pointer; width: 16px; height: 16px;">
+                      <span>Show all withdrawals (not just mine)</span>
+                    </label>
+                    <button onclick="App.updateWithdrawalHistory()" style="padding: 6px 12px; background-color: #4a5568; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; display: inline-flex; align-items: center; gap: 4px;">
+                      <span>🔄</span>
+                      <span>Refresh</span>
+                    </button>
+                    <span id="withdrawalLegend" style="font-size: 12px; color: #718096; display: none;">
+                      <span style="display: inline-block; width: 12px; height: 12px; background-color: #e6f7f7; border: 1px solid #b2d8d8; margin-right: 4px;"></span>
+                      = Your withdrawals
+                    </span>
                   </div>
                   <div class="withdrawal-table-container">
                     <table id="withdrawal-history" class="withdrawal-table">
@@ -1181,8 +1195,8 @@
             stakeAmount = parseFloat(stakeAmountInput.value) || 0;
           }
 
-          // Handle Keplr wallet first - enable withdrawal button regardless of input
-          if (App.isKeplrConnected) {
+          // Handle Keplr wallet on Bridge to Ethereum - enable withdrawal button regardless of input
+          if (App.isKeplrConnected && App.currentBridgeDirection === 'ethereum') {
             approveButton.style.display = 'none';
             depositButton.style.display = 'none';
             withdrawButton.disabled = false;
