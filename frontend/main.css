@@ -2768,15 +2768,7 @@ header {
     margin-bottom: 0.0rem;
     padding-bottom: 0.0rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
-
-.status-header:hover {
-    background-color: rgb(206, 206, 206);
-    border-radius: 4px;
-    margin: -0.25rem -0.25rem 0.25rem -0.25rem;
-    padding: 0.25rem 0.5rem 0.5rem 0.5rem;
+    cursor: default;
 }
 
 .status-header span {
@@ -2869,9 +2861,10 @@ header {
 
 .status-total-content {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
     align-items: center;
     flex: 1;
+    gap: 0.35rem;
 }
 
 .status-total {
@@ -2902,6 +2895,20 @@ header {
     font-size: 0.7rem;
     color: #123f23;
     word-break: break-all;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 0.25rem;
+    padding: 0.05rem 0.4rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #004d47;
+    background: rgba(56, 168, 163, 0.12);
+    border-radius: 999px;
+    white-space: nowrap;
 }
 
 .address-with-copy {

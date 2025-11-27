@@ -380,19 +380,33 @@
                         // Encode reporter selection message
                         const MsgSelectReporter = new protobuf.Type("MsgSelectReporter")
                             .add(new protobuf.Field("selectorAddress", 1, "string"))
-                            .add(new protobuf.Field("reporterAddress", 2, "string"))
-                            .add(new protobuf.Field("stakeAmount", 3, "string"));
+                            .add(new protobuf.Field("reporterAddress", 2, "string"));
                         
                         root.add(MsgSelectReporter);
                         const MsgType = root.lookupType("MsgSelectReporter");
                         
                         const msgValue = {
                             selectorAddress: message.value.selectorAddress,
-                            reporterAddress: message.value.reporterAddress,
-                            stakeAmount: message.value.stakeAmount || '0'
+                            reporterAddress: message.value.reporterAddress
                         };
                         
                         console.log('Encoding MsgSelectReporter:', msgValue);
+                        encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
+                    } else if (message.typeUrl === '/layer.reporter.MsgSwitchReporter') {
+                        // Encode reporter switch message
+                        const MsgSwitchReporter = new protobuf.Type("MsgSwitchReporter")
+                            .add(new protobuf.Field("selectorAddress", 1, "string"))
+                            .add(new protobuf.Field("reporterAddress", 2, "string"));
+
+                        root.add(MsgSwitchReporter);
+                        const MsgType = root.lookupType("MsgSwitchReporter");
+
+                        const msgValue = {
+                            selectorAddress: message.value.selectorAddress,
+                            reporterAddress: message.value.reporterAddress
+                        };
+
+                        console.log('Encoding MsgSwitchReporter:', msgValue);
                         encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else {
                         throw new Error(`Unsupported message type: ${message.typeUrl}`);
@@ -506,24 +520,22 @@
                 while (attempts < maxAttempts) {
                     attempts++;
                     
-                    try {
-                        const statusResponse = await fetch(`${this.rpcUrl}/cosmos/tx/v1beta1/txs/${txHash}`);
-                        const statusData = await statusResponse.json();
+                    const statusResponse = await fetch(`${this.rpcUrl}/cosmos/tx/v1beta1/txs/${txHash}`);
+                    const statusData = await statusResponse.json();
+                    
+                    if (statusResponse.ok && statusData.tx_response) {
+                        const txResponse = statusData.tx_response;
                         
-                        if (statusResponse.ok && statusData.tx_response) {
-                            const txResponse = statusData.tx_response;
-                            
-                            if (txResponse.height !== "0") {
-                                // Transaction has been included in a block
-                                if (txResponse.code === 0) {
-                                    return txResponse;
-                                } else {
-                                    throw new Error(txResponse.raw_log || 'Transaction failed');
-                                }
+                        if (txResponse.height !== "0") {
+                            // Transaction has been included in a block
+                            if (txResponse.code === 0) {
+                                return txResponse;
+                            } else {
+                                // Return full tx response with error code so callers can handle it
+                                console.error('Error polling transaction status:', txResponse.raw_log || 'Transaction failed', txResponse);
+                                return txResponse;
                             }
                         }
-                    } catch (error) {
-                        console.error('Error polling transaction status:', error);
                     }
                     
                     // Wait before next attempt
@@ -810,8 +822,7 @@
                 typeUrl: '/layer.reporter.MsgSelectReporter',
                 value: {
                     selectorAddress: account,
-                    reporterAddress: reporterAddress,
-                    stakeAmount: stakeAmount || '0'
+                    reporterAddress: reporterAddress
                 }
             };
 
@@ -833,12 +844,61 @@
         }
     }
 
+    // Function to switch a reporter for an existing selector
+    async function switchReporter(account, newReporterAddress) {
+        try {
+            // Get offline signer from wallet adapter or fallback to legacy method
+            let offlineSigner;
+            if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+                offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+            } else if (window.getOfflineSigner) {
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
+                offlineSigner = window.getOfflineSigner(chainId);
+            } else {
+                throw new Error('No offline signer available');
+            }
+
+            // Use the current RPC endpoint from the app
+            const rpcEndpoint = window.App && window.App.getCosmosRpcEndpoint ? window.App.getCosmosRpcEndpoint() : 'https://node-palmito.tellorlayer.com/rpc';
+            const client = await SigningStargateClient.connectWithSigner(
+                rpcEndpoint,
+                offlineSigner
+            );
+
+            // Create the MsgSwitchReporter message
+            const msg = {
+                typeUrl: '/layer.reporter.MsgSwitchReporter',
+                value: {
+                    selectorAddress: account,
+                    reporterAddress: newReporterAddress
+                }
+            };
+
+            // Sign and broadcast using direct signing
+            const result = await client.signAndBroadcastDirect(
+                account,
+                [msg],
+                {
+                    amount: [{ denom: 'loya', amount: '5000' }],
+                    gas: '200000'
+                },
+                'Switch reporter for data submissions'
+            );
+
+            return result;
+        } catch (error) {
+            console.error('Reporter switch error:', error);
+            throw error;
+        }
+    }
+
     // Export to both module and global scope
     exports.SigningStargateClient = SigningStargateClient;
     exports.withdrawFromLayer = withdrawFromLayer;
     exports.requestAttestations = requestAttestations;
     exports.delegateTokens = delegateTokens;
     exports.selectReporter = selectReporter;
+    exports.switchReporter = switchReporter;
     exports.pollTransactionStatus = pollTransactionStatus;
 
     // Ensure cosmjs object exists
@@ -851,6 +911,7 @@
     window.cosmjs.stargate.requestAttestations = requestAttestations;
     window.cosmjs.stargate.delegateTokens = delegateTokens;
     window.cosmjs.stargate.selectReporter = selectReporter;
+    window.cosmjs.stargate.switchReporter = switchReporter;
     window.cosmjs.stargate.pollTransactionStatus = pollTransactionStatus;
     
     window.cosmjsStargate = {
@@ -859,6 +920,7 @@
         requestAttestations: requestAttestations,
         delegateTokens: delegateTokens,
         selectReporter: selectReporter,
+        switchReporter: switchReporter,
         pollTransactionStatus: pollTransactionStatus
     };
 }))); 

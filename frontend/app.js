@@ -3530,14 +3530,38 @@ const App = {
         const accounts = await offlineSigner.getAccounts();
         const layerAccount = accounts[0].address;
 
-        // Call the reporter selection function
-        const result = await window.cosmjs.stargate.selectReporter(
-            layerAccount,
-            reporterAddress,
-            stakeAmount
-        );
+        // Determine whether to select a new reporter or switch an existing one
+        let result;
+        try {
+            const current = await App.fetchCurrentReporter(layerAccount);
+            const hasExistingReporter = current && current.reporter;
 
-        if (result && result.txhash) {
+            if (hasExistingReporter) {
+                // Existing selector: switch reporter
+                result = await window.cosmjs.stargate.switchReporter(
+                    layerAccount,
+                    reporterAddress
+                );
+            } else {
+                // No existing reporter: initial selection
+                result = await window.cosmjs.stargate.selectReporter(
+                    layerAccount,
+                    reporterAddress,
+                    stakeAmount
+                );
+            }
+        } catch (fetchError) {
+            console.error('Error determining current reporter, falling back to selectReporter:', fetchError);
+            result = await window.cosmjs.stargate.selectReporter(
+                layerAccount,
+                reporterAddress,
+                stakeAmount
+            );
+        }
+
+        const success = result && (result.code === 0 || result.tx_response?.code === 0);
+
+        if (success) {
             // Get transaction hash from the result
             const txHash = result.txhash || result.tx_response?.txhash;
             App.showSuccessPopup("Reporter selection successful!", txHash, 'cosmos');
@@ -3548,7 +3572,9 @@ const App = {
             // Refresh status to show new selection
             await App.refreshCurrentStatus();
         } else {
-            throw new Error(result?.rawLog || "Reporter selection failed");
+            const rawLog = result?.rawLog || result?.tx_response?.raw_log;
+            console.error('Reporter selection failed raw log:', rawLog, result);
+            throw new Error(rawLog || "Reporter selection failed");
         }
     } catch (error) {
         console.error('Reporter selection error:', error);
@@ -4618,9 +4644,11 @@ const App = {
         throw new Error('Invalid reporters response format');
       }
       
-      // Sort reporters by address for consistent ordering
+      // Sort reporters by power (descending), similar to validator dropdown
       const sortedReporters = data.reporters.sort((a, b) => {
-        return a.address.localeCompare(b.address);
+        const powerA = parseInt(a.power || '0');
+        const powerB = parseInt(b.power || '0');
+        return powerB - powerA;
       });
       
       return sortedReporters.map(reporter => ({
@@ -4725,11 +4753,27 @@ const App = {
         return;
       }
 
-      // Display reporter address with copy tooltip
+      // Display reporter moniker + address with copy tooltip
       const reporterAddress = reporterData.reporter || 'Unknown';
+
+      // Try to resolve reporter moniker from reporters list
+      let reporterLabel = reporterAddress;
+      try {
+        const reporters = await this.fetchReporters();
+        const match = reporters.find(r => r.address === reporterAddress);
+        if (match && match.name) {
+          const shortAddr = reporterAddress.length > 20
+            ? reporterAddress.substring(0, 17) + '...'
+            : reporterAddress;
+          reporterLabel = `${match.name} (${shortAddr})`;
+        }
+      } catch (e) {
+        console.error('Error fetching reporters for reporter status:', e);
+      }
+
       statusElement.innerHTML = `
         <div class="status-item">
-          <span class="status-address">${reporterAddress}</span>
+          <span class="status-address">${reporterLabel}</span>
           <button class="copy-btn" onclick="App.copyToClipboard('${reporterAddress}')" data-tooltip="Copy address">⧉</button>
         </div>
       `;
@@ -4835,43 +4879,79 @@ const App = {
         return;
       }
 
-      // Calculate total delegation
+      // Fetch validators to map operator address -> moniker
+      let validatorMonikers = {};
+      try {
+        const validators = await this.fetchValidators();
+        validators.forEach(validator => {
+          validatorMonikers[validator.address] = validator.moniker || 'Unknown Validator';
+        });
+      } catch (e) {
+        console.error('Error fetching validators for delegations status:', e);
+      }
+
+      // Calculate total delegation and find top validator
       let totalDelegated = 0;
+      let topDelegation = null;
       delegations.forEach(delegation => {
         if (delegation.denom === 'loya') {
-          totalDelegated += parseInt(delegation.amount);
+          const amount = parseInt(delegation.amount);
+          totalDelegated += amount;
+          if (!topDelegation || amount > parseInt(topDelegation.amount)) {
+            topDelegation = delegation;
+          }
         }
       });
 
       const totalTRB = (totalDelegated / 1000000).toFixed(6);
+      const delegationCount = delegations.length;
 
-      // Display total in distinct container with dropdown arrow
+      // Derive top validator display (moniker + short address), if any
+      let topValidatorHtml = '';
+      if (topDelegation) {
+        const topAddr = topDelegation.validatorAddress;
+        const shortAddr = topAddr.length > 20 ? topAddr.substring(0, 17) + '...' : topAddr;
+        const moniker = validatorMonikers[topAddr] || 'Validator';
+        const topAmountTRB = (parseInt(topDelegation.amount) / 1000000).toFixed(6);
+        topValidatorHtml = `
+          <div class="status-top-validator">
+            <span class="status-label">Top validator:</span>
+            <span class="status-address">${moniker} (${shortAddr})</span>
+            <span class="status-amount">${topAmountTRB} TRB</span>
+          </div>
+        `;
+      }
+
+      // Display total with badge + optional top validator, and dropdown arrow
       statusElement.innerHTML = `
         <div class="status-total-container" onclick="App.toggleDelegationsDropdown()">
           <div class="status-total-content">
             <span class="status-label">Total:</span>
             <span class="status-amount">${totalTRB} TRB</span>
+            <span class="status-badge">${delegationCount} delegation${delegationCount !== 1 ? 's' : ''}</span>
           </div>
+          ${topValidatorHtml}
           <span class="dropdown-arrow" id="delegationsDropdownArrow">▼</span>
         </div>
       `;
 
-      // Populate dropdown with detailed delegations
+      // Populate dropdown with detailed delegations (moniker + address)
       const dropdownContent = document.getElementById('delegationsDropdownContent');
       if (dropdownContent) {
         let dropdownHtml = '';
         for (const delegation of delegations) {
           const amountTRB = (parseInt(delegation.amount) / 1000000).toFixed(6);
-          // Truncate validator address for display
-          const validatorDisplay = delegation.validatorAddress.length > 20 
-            ? delegation.validatorAddress.substring(0, 17) + '...'
-            : delegation.validatorAddress;
+          const fullAddr = delegation.validatorAddress;
+          const shortAddr = fullAddr.length > 20 
+            ? fullAddr.substring(0, 17) + '...'
+            : fullAddr;
+          const moniker = validatorMonikers[fullAddr] || 'Validator';
           
           dropdownHtml += `
             <div class="status-item status-delegation">
               <div class="address-with-copy">
-                <span class="status-address">${validatorDisplay}</span>
-                <button class="copy-btn" onclick="App.copyToClipboard('${delegation.validatorAddress}')" data-tooltip="Copy full address">⧉</button>
+                <span class="status-address">${moniker} (${shortAddr})</span>
+                <button class="copy-btn" onclick="App.copyToClipboard('${fullAddr}')" data-tooltip="Copy full address">⧉</button>
               </div>
               <span class="status-amount">${amountTRB} TRB</span>
             </div>
