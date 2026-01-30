@@ -1833,11 +1833,38 @@
   background: #15803d !important;
 }
 
+.btn-claim-rewards {
+  background: #8b5cf6 !important;
+}
+
+.btn-claim-rewards:hover {
+  background: #7c3aed !important;
+}
+
+.btn-withdraw-fee {
+  background: #f59e0b !important;
+}
+
+.btn-withdraw-fee:hover {
+  background: #d97706 !important;
+}
+
 .status-text {
   font-size: 11px !important;
   color: #64748b !important;
   font-weight: 500 !important;
   text-transform: capitalize !important;
+}
+
+.dispute-actions {
+  min-width: 120px !important;
+}
+
+.dispute-actions > div {
+  display: flex !important;
+  gap: 4px !important;
+  flex-wrap: wrap !important;
+  margin-top: 4px !important;
 }
 
 /* Dispute Tabs Styling */

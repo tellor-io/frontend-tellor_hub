@@ -376,6 +376,38 @@
                         
                         console.log('Encoding MsgAddFeeToDispute:', msgValue);
                         encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
+                    } else if (message.typeUrl === '/layer.dispute.MsgClaimDisputeRewards') {
+                        // Encode claim dispute rewards message
+                        const MsgClaimDisputeRewards = new protobuf.Type("MsgClaimDisputeRewards")
+                            .add(new protobuf.Field("creator", 1, "string"))
+                            .add(new protobuf.Field("disputeId", 2, "uint64"));
+                        
+                        root.add(MsgClaimDisputeRewards);
+                        const MsgType = root.lookupType("MsgClaimDisputeRewards");
+                        
+                        const msgValue = {
+                            creator: message.value.creator,
+                            disputeId: message.value.disputeId
+                        };
+                        
+                        console.log('Encoding MsgClaimDisputeRewards:', msgValue);
+                        encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
+                    } else if (message.typeUrl === '/layer.dispute.MsgWithdrawFeeRefund') {
+                        // Encode withdraw fee refund message
+                        const MsgWithdrawFeeRefund = new protobuf.Type("MsgWithdrawFeeRefund")
+                            .add(new protobuf.Field("creator", 1, "string"))
+                            .add(new protobuf.Field("disputeId", 2, "uint64"));
+                        
+                        root.add(MsgWithdrawFeeRefund);
+                        const MsgType = root.lookupType("MsgWithdrawFeeRefund");
+                        
+                        const msgValue = {
+                            creator: message.value.creator,
+                            disputeId: message.value.disputeId
+                        };
+                        
+                        console.log('Encoding MsgWithdrawFeeRefund:', msgValue);
+                        encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else if (message.typeUrl === '/layer.reporter.MsgSelectReporter') {
                         // Encode reporter selection message
                         const MsgSelectReporter = new protobuf.Type("MsgSelectReporter")
