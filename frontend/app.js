@@ -5507,7 +5507,7 @@ const App = {
             }
 
             if (result.disputes && result.disputes.length > 0) {
-                App.displayDisputesTable(result.disputes, result.pagination, walletStatus.network);
+                await App.displayDisputesTable(result.disputes, result.pagination, walletStatus.network);
                 if (disputesTable) {
                     disputesTable.style.display = 'block';
                 }
@@ -5538,8 +5538,54 @@ const App = {
         }
     },
 
+    // Fetch claimable dispute rewards for an address and dispute
+    fetchClaimableDisputeRewards: async function(address, disputeId) {
+        try {
+            // Determine RPC endpoint based on wallet manager's network
+            let rpcEndpoint;
+            if (window.App && window.App.cosmosChainId === 'tellor-1') {
+                rpcEndpoint = 'https://tellorlayer.com';
+            } else {
+                rpcEndpoint = 'https://tellorlayer.com';
+            }
+
+            const url = `${rpcEndpoint}/tellor-io/layer/dispute/claimabledisputerewards/${address}/${disputeId}`;
+            console.log('Fetching claimable rewards from:', url);
+
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                // If endpoint is not active yet, return default values
+                if (response.status === 404 || response.status === 500) {
+                    console.log('Claimable rewards endpoint not active yet, returning defaults');
+                    return {
+                        'claim-rewards': 0,
+                        'withdraw-fee-refund': 0
+                    };
+                }
+                throw new Error(`Failed to fetch claimable rewards: ${response.status} ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            console.log('Claimable rewards data:', data);
+
+            // Return the data, ensuring we have numeric values
+            return {
+                'claim-rewards': parseFloat(data['claim-rewards'] || 0),
+                'withdraw-fee-refund': parseFloat(data['withdraw-fee-refund'] || 0)
+            };
+        } catch (error) {
+            console.error('Error fetching claimable dispute rewards:', error);
+            // Return defaults if endpoint is not available
+            return {
+                'claim-rewards': 0,
+                'withdraw-fee-refund': 0
+            };
+        }
+    },
+
     // Display disputes in a table format
-    displayDisputesTable: function(disputes, pagination, network) {
+    displayDisputesTable: async function(disputes, pagination, network) {
         const tableBody = document.getElementById('disputesTableBody');
         const totalCount = document.getElementById('disputesTotalCount');
         
@@ -5557,8 +5603,12 @@ const App = {
             totalCount.textContent = `Total Disputes: ${pagination.total}${networkDisplay}`;
         }
 
+        // Get connected address
+        const walletStatus = await window.disputeProposer.getWalletStatus();
+        const connectedAddress = walletStatus.isConnected ? walletStatus.address : null;
+
         // Add rows for each dispute
-        disputes.forEach(dispute => {
+        for (const dispute of disputes) {
             const row = document.createElement('tr');
             const data = dispute.displayData;
             
@@ -5569,6 +5619,41 @@ const App = {
             // Format dates
             const startDate = data.startTime ? new Date(data.startTime).toLocaleDateString() : 'N/A';
             const endDate = data.endTime ? new Date(data.endTime).toLocaleDateString() : 'N/A';
+            
+            // Fetch claimable rewards if address is connected
+            let claimableRewards = { 'claim-rewards': 0, 'withdraw-fee-refund': 0 };
+            if (connectedAddress) {
+                claimableRewards = await App.fetchClaimableDisputeRewards(connectedAddress, data.disputeId);
+            }
+
+            // Build actions column
+            let actionsHtml = '';
+            
+            // Existing status-based actions
+            if (data.disputeStatus === 'DISPUTE_STATUS_VOTING') {
+                actionsHtml = `<button class="btn-small btn-vote" onclick="App.navigateToVoting('${data.disputeId}')">Vote</button>`;
+            } else if (data.disputeStatus === 'DISPUTE_STATUS_PREVOTE') {
+                actionsHtml = `<button class="btn-small btn-add-fee" onclick="App.navigateToAddFee('${data.disputeId}')">Add Fee</button>`;
+            } else {
+                actionsHtml = `<span class="status-text">${App.formatStatus(data.disputeStatus)}</span>`;
+            }
+
+            // Add claim buttons if rewards are available
+            const claimButtons = [];
+            if (claimableRewards['claim-rewards'] > 0) {
+                claimButtons.push(`<button class="btn-small btn-claim-rewards" onclick="App.claimDisputeRewards('${data.disputeId}')">Claim Rewards</button>`);
+            }
+            if (claimableRewards['withdraw-fee-refund'] > 0) {
+                claimButtons.push(`<button class="btn-small btn-withdraw-fee" onclick="App.withdrawFeeRefund('${data.disputeId}')">Withdraw Fee Refund</button>`);
+            }
+
+            if (claimButtons.length > 0) {
+                // If there are existing actions, add a separator
+                if (actionsHtml && !actionsHtml.includes('status-text')) {
+                    actionsHtml += '<br style="margin-top: 4px;">';
+                }
+                actionsHtml += '<div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px;">' + claimButtons.join('') + '</div>';
+            }
             
             row.innerHTML = `
                 <td class="dispute-id">#${data.disputeId}</td>
@@ -5592,17 +5677,12 @@ const App = {
                 </td>
                 <td class="dispute-block">${data.blockNumber}</td>
                 <td class="dispute-actions">
-                    ${data.disputeStatus === 'DISPUTE_STATUS_VOTING' ? 
-                        `<button class="btn-small btn-vote" onclick="App.navigateToVoting('${data.disputeId}')">Vote</button>` : 
-                        data.disputeStatus === 'DISPUTE_STATUS_PREVOTE' ?
-                        `<button class="btn-small btn-add-fee" onclick="App.navigateToAddFee('${data.disputeId}')">Add Fee</button>` :
-                        `<span class="status-text">${App.formatStatus(data.disputeStatus)}</span>`
-                    }
+                    ${actionsHtml}
                 </td>
             `;
             
             tableBody.appendChild(row);
-        });
+        }
     },
 
     // Helper functions for formatting
@@ -5709,6 +5789,196 @@ const App = {
         } catch (error) {
             console.error('Failed to navigate to voting tab:', error);
             App.showErrorPopup('Failed to navigate to voting tab');
+        }
+    },
+
+    // Claim dispute rewards
+    claimDisputeRewards: async function(disputeId) {
+        try {
+            if (!window.disputeProposer) {
+                throw new Error('DisputeProposer not initialized');
+            }
+
+            // Check wallet connection
+            const walletStatus = await window.disputeProposer.getWalletStatus();
+            if (!walletStatus.isConnected || !walletStatus.address) {
+                throw new Error('Wallet not connected. Please connect your Cosmos wallet.');
+            }
+
+            // Show pending popup
+            App.showPendingPopup("Claiming dispute rewards...");
+
+            // Determine RPC endpoint
+            let rpcEndpoint;
+            if (window.App && window.App.cosmosChainId === 'tellor-1') {
+                rpcEndpoint = 'https://mainnet.tellorlayer.com';
+            } else {
+                rpcEndpoint = 'https://node-palmito.tellorlayer.com';
+            }
+
+            // Get offline signer
+            let offlineSigner;
+            if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+                offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+            } else if (window.keplr) {
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                offlineSigner = window.keplr.getOfflineSigner(chainId);
+            } else {
+                throw new Error('No wallet connected.');
+            }
+
+            // Create Stargate client
+            const client = await window.cosmjs.stargate.SigningStargateClient.connectWithSigner(
+                rpcEndpoint,
+                offlineSigner
+            );
+
+            // Parse disputeId to number
+            const numericDisputeId = parseInt(disputeId);
+            if (isNaN(numericDisputeId) || numericDisputeId <= 0) {
+                throw new Error('Invalid dispute ID');
+            }
+
+            // Create the claim rewards message
+            const msg = {
+                typeUrl: '/layer.dispute.MsgClaimDisputeRewards',
+                value: {
+                    creator: walletStatus.address,
+                    disputeId: numericDisputeId
+                }
+            };
+
+            console.log('Claiming dispute rewards:', {
+                creator: msg.value.creator,
+                disputeId: msg.value.disputeId
+            });
+
+            // Sign and broadcast the transaction
+            const result = await client.signAndBroadcastDirect(
+                walletStatus.address,
+                [msg],
+                {
+                    amount: [{ denom: 'loya', amount: '15000' }],
+                    gas: '200000'
+                },
+                'Claim Dispute Rewards'
+            );
+
+            // Hide pending popup
+            App.hidePendingPopup();
+
+            if (result && result.code === 0) {
+                const txHash = result.txhash || result.tx_response?.txhash;
+                App.showSuccessPopup(`Successfully claimed dispute rewards! Transaction: ${txHash}`);
+                
+                // Reload disputes to update the UI
+                setTimeout(() => {
+                    if (App.loadAllDisputes) {
+                        App.loadAllDisputes();
+                    }
+                }, 2000);
+            } else {
+                throw new Error(result.rawLog || 'Transaction failed');
+            }
+        } catch (error) {
+            console.error('Failed to claim dispute rewards:', error);
+            App.hidePendingPopup();
+            App.showErrorPopup(error.message || 'Failed to claim dispute rewards');
+        }
+    },
+
+    // Withdraw fee refund
+    withdrawFeeRefund: async function(disputeId) {
+        try {
+            if (!window.disputeProposer) {
+                throw new Error('DisputeProposer not initialized');
+            }
+
+            // Check wallet connection
+            const walletStatus = await window.disputeProposer.getWalletStatus();
+            if (!walletStatus.isConnected || !walletStatus.address) {
+                throw new Error('Wallet not connected. Please connect your Cosmos wallet.');
+            }
+
+            // Show pending popup
+            App.showPendingPopup("Withdrawing fee refund...");
+
+            // Determine RPC endpoint
+            let rpcEndpoint;
+            if (window.App && window.App.cosmosChainId === 'tellor-1') {
+                rpcEndpoint = 'https://mainnet.tellorlayer.com';
+            } else {
+                rpcEndpoint = 'https://node-palmito.tellorlayer.com';
+            }
+
+            // Get offline signer
+            let offlineSigner;
+            if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+                offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+            } else if (window.keplr) {
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                offlineSigner = window.keplr.getOfflineSigner(chainId);
+            } else {
+                throw new Error('No wallet connected.');
+            }
+
+            // Create Stargate client
+            const client = await window.cosmjs.stargate.SigningStargateClient.connectWithSigner(
+                rpcEndpoint,
+                offlineSigner
+            );
+
+            // Parse disputeId to number
+            const numericDisputeId = parseInt(disputeId);
+            if (isNaN(numericDisputeId) || numericDisputeId <= 0) {
+                throw new Error('Invalid dispute ID');
+            }
+
+            // Create the withdraw fee refund message
+            const msg = {
+                typeUrl: '/layer.dispute.MsgWithdrawFeeRefund',
+                value: {
+                    creator: walletStatus.address,
+                    disputeId: numericDisputeId
+                }
+            };
+
+            console.log('Withdrawing fee refund:', {
+                creator: msg.value.creator,
+                disputeId: msg.value.disputeId
+            });
+
+            // Sign and broadcast the transaction
+            const result = await client.signAndBroadcastDirect(
+                walletStatus.address,
+                [msg],
+                {
+                    amount: [{ denom: 'loya', amount: '15000' }],
+                    gas: '200000'
+                },
+                'Withdraw Fee Refund'
+            );
+
+            // Hide pending popup
+            App.hidePendingPopup();
+
+            if (result && result.code === 0) {
+                const txHash = result.txhash || result.tx_response?.txhash;
+                App.showSuccessPopup(`Successfully withdrew fee refund! Transaction: ${txHash}`);
+                
+                // Reload disputes to update the UI
+                setTimeout(() => {
+                    if (App.loadAllDisputes) {
+                        App.loadAllDisputes();
+                    }
+                }, 2000);
+            } else {
+                throw new Error(result.rawLog || 'Transaction failed');
+            }
+        } catch (error) {
+            console.error('Failed to withdraw fee refund:', error);
+            App.hidePendingPopup();
+            App.showErrorPopup(error.message || 'Failed to withdraw fee refund');
         }
     },
 
