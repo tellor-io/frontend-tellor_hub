@@ -123,8 +123,7 @@ p {
 /* Update direction classes to maintain centering */
 .box-wrapper.layer-direction,
 .box-wrapper.ethereum-direction,
-.box-wrapper.delegate-direction,
-.box-wrapper.noStakeReport-direction {
+.box-wrapper.delegate-direction {
     justify-content: center;
 }
 
@@ -1353,77 +1352,6 @@ input {
         min-height: 520px;
         max-height: 520px;
     }
-}
-
-/* No-Stake Reporting Input Styling */
-/* No-Stake Reporting Input Styling */
-.no-stake-input {
-    width: 100% !important; /* Full width */
-    font-family: 'PPNeueMontreal-Book', Arial, sans-serif !important; /* Keep same font */
-    font-size: 12px !important; /* Smaller font size */
-    padding: 12px !important; /* Consistent padding */
-    box-sizing: border-box !important; /* Include padding in width calculation */
-    margin: 0 !important; /* Remove any default margins */
-    border: 1px solid #ccc !important; /* Custom border */
-    border-radius: 8px !important; /* Custom border radius for no-stake inputs */
-    background-color: #fff !important; /* White background */
-}
-
-#noStakeQueryData {
-    height: auto !important; /* Auto height based on rows */
-    min-height: 200px !important; /* Minimum height for 10 rows */
-    line-height: 1.4 !important; /* Better line height for readability */
-    resize: vertical !important; /* Allow vertical resizing */
-    white-space: pre-wrap !important; /* Preserve line breaks and spaces */
-    word-wrap: break-word !important; /* Break long lines */
-    overflow-wrap: break-word !important; /* Modern word wrapping */
-}
-
-/* Align the label container with the textarea */
-.no-stake-query-container .input-label,
-.no-stake-value-container .input-label {
-    width: 100% !important; /* Full width to match textarea */
-    text-align: left !important; /* Left align the text */
-    display: block !important; /* Block display for full width */
-    margin-bottom: 0 !important; /* No space - label and input as one container */
-    font-weight: bold !important; /* Make label more prominent */
-    order: -1 !important; /* Ensure label appears first (above) */
-    border-radius: 0 !important; /* Remove the 12px 0px 0px 12px border radius */
-    background: none !important; /* Remove background */
-    border: none !important; /* Remove border */
-    margin: 0 !important; /* Remove all margins */
-    padding: 0 !important; /* Remove padding */
-    height: auto !important; /* Auto height */
-    color: #131e20 !important; /* Keep text color */
-}
-
-/* Make the query data container full width and vertical layout */
-.no-stake-query-container,
-.no-stake-value-container {
-    width: 100% !important; /* Full width */
-    max-width: none !important; /* Override any max-width constraints */
-    display: flex !important; /* Use flexbox */
-    flex-direction: column !important; /* Stack elements vertically */
-    align-items: flex-start !important; /* Align items to the left */
-}
-
-/* Ensure the textarea takes full width */
-.no-stake-query-container textarea {
-    width: 100% !important; /* Full width */
-    max-width: none !important; /* Override max-width */
-    box-sizing: border-box !important; /* Include padding in width */
-}
-
-/* Full-width container styling */
-.input-button-container.full-width {
-    width: 100% !important; /* Full width */
-    max-width: none !important; /* Override max-width constraints */
-    margin: 0 !important; /* Remove margins */
-}
-
-#noStakeValue {
-    font-size: 12px !important; /* Smaller font for value field too */
-    font-family: 'PPNeueMontreal-Book', Arial, sans-serif !important; /* Keep same font */
 }
 
 /* Bridge Direction Selector Styles */

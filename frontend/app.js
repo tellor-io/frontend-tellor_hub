@@ -50,7 +50,6 @@ const App = {
             App.initInputValidation();
             App.initBridgeDirectionUI(); // Initialize bridge direction UI
             App.initWalletManagerDropdown(); // Initialize wallet manager dropdown
-            App.initNoStakeReporting(); // Initialize no-stake reporting
         App.initDisputeProposer(); // Initialize dispute proposer
         
         // Add wallet connection listener for dispute refresh
@@ -2206,7 +2205,7 @@ const App = {
     setInterval(() => {
         if (tooltip && tooltip.style.display === 'block') {
             const activeSection = document.querySelector('.function-section.active');
-            if (activeSection && activeSection.id === 'noStakeReportSection') {
+            if (activeSection && activeSection.id === 'disputeSection') {
                 enhancedHideTooltip();
             }
         }
@@ -2364,17 +2363,11 @@ const App = {
                 
                 // Also hide tooltip when any section becomes active
                 setTimeout(() => {
-                    if (functionType !== 'noStakeReport') {
-                        // Double-check that tooltip is hidden
-                        enhancedHideTooltip();
-                    }
+                    enhancedHideTooltip();
                 }, 50);
                 
-                // Only hide tooltip when going to No-Stake Report (which has no TRB inputs)
-                if (functionType === 'noStakeReport') {
-                    // Tooltip is already hidden, no need to do anything else
-                } else {
-                    // For other sections, check if there's a value in the current input and show tooltip if appropriate
+                // For sections with TRB inputs, check if there's a value and show tooltip if appropriate
+                if (functionType !== 'dispute') {
                     setTimeout(() => {
                         const activeInput = App.currentBridgeDirection === 'layer' ? stakeAmountInput : ethStakeAmountInput;
                         if (activeInput && activeInput.value && parseFloat(activeInput.value) > 0) {
@@ -4232,11 +4225,6 @@ const App = {
         }
     });
 
-    noStakeReportBtn.addEventListener('click', () => {
-        if (this.currentBridgeDirection !== 'noStakeReport') {
-            this.switchBridgeDirection('noStakeReport');
-        }
-    });
   },
 
   initWalletManagerDropdown: function() {
@@ -4337,7 +4325,7 @@ const App = {
   },
 
   switchBridgeDirection: function(direction) {
-    if (direction !== 'layer' && direction !== 'ethereum' && direction !== 'delegate' && direction !== 'noStakeReport') {
+    if (direction !== 'layer' && direction !== 'ethereum' && direction !== 'delegate') {
         // console.error(...);
         return;
     }
@@ -4347,13 +4335,11 @@ const App = {
     const bridgeToTellorContent = document.getElementById('bridgeToTellorContent');
     const bridgeToEthereumContent = document.getElementById('bridgeToEthereumContent');
     const delegateBtn = document.getElementById('delegateBtn');
-    const noStakeReportBtn = document.getElementById('noStakeReportBtn');
     const delegateSection = document.getElementById('delegateSection');
-    const noStakeReportSection = document.getElementById('noStakeReportSection');
     const transactionsContainer = document.getElementById('bridgeTransactionsContainer');
     const boxWrapper = document.querySelector('.box-wrapper');
 
-    if (!bridgeSection || !bridgeToTellorContent || !bridgeToEthereumContent || !delegateBtn || !delegateSection) {
+    if (!bridgeSection || !bridgeToTellorContent || !bridgeToEthereumContent || !delegateSection) {
         // console.error(...);
         return;
     }
@@ -4369,26 +4355,22 @@ const App = {
         bridgeToEthereumContent.style.display = direction === 'ethereum' ? 'block' : 'none';
         bridgeSection.classList.add('active');
         delegateSection.classList.remove('active');
-        noStakeReportSection.classList.remove('active');
     } else {
         bridgeToTellorContent.style.display = 'none';
         bridgeToEthereumContent.style.display = 'none';
         bridgeSection.classList.remove('active');
         delegateSection.classList.toggle('active', direction === 'delegate');
-        noStakeReportSection.classList.toggle('active', direction === 'noStakeReport');
     }
     
     // Update box wrapper classes for animation
     if (boxWrapper) {
-        boxWrapper.classList.remove('layer-direction', 'ethereum-direction', 'delegate-direction', 'noStakeReport-direction');
+        boxWrapper.classList.remove('layer-direction', 'ethereum-direction', 'delegate-direction');
         if (direction === 'layer') {
             boxWrapper.classList.add('layer-direction');
         } else if (direction === 'ethereum') {
             boxWrapper.classList.add('ethereum-direction');
         } else if (direction === 'delegate') {
             boxWrapper.classList.add('delegate-direction');
-        } else if (direction === 'noStakeReport') {
-            boxWrapper.classList.add('noStakeReport-direction');
         }
     }
     
@@ -5215,20 +5197,6 @@ const App = {
     }
   },
 
-  // No-Stake Reporting Functions
-  initNoStakeReporting: async function() {
-    try {
-      // Initialize the no-stake reporter
-      if (window.noStakeReporter) {
-        await window.noStakeReporter.init();
-      } else {
-        console.error('NoStakeReporter not found');
-      }
-    } catch (error) {
-      console.error('Failed to initialize no-stake reporting:', error);
-    }
-  },
-
   // Dispute Functions
   initDisputeProposer: async function() {
     try {
@@ -5240,78 +5208,6 @@ const App = {
       }
     } catch (error) {
       console.error('Failed to initialize dispute proposer:', error);
-    }
-  },
-
-  // Check wallet connection status for no-stake reporting
-  checkNoStakeWalletStatus: async function() {
-    try {
-      if (!window.noStakeReporter) {
-        throw new Error('NoStakeReporter not initialized');
-      }
-
-      const walletStatus = await window.noStakeReporter.getWalletStatus();
-      return walletStatus;
-    } catch (error) {
-      console.error('Failed to check no-stake wallet status:', error);
-      return { isConnected: false, address: null, walletType: null };
-    }
-  },
-
-  // Update wallet info display
-  updateNoStakeWalletInfo: function(address) {
-    // You can add wallet info display here if needed
-    console.log('No-stake wallet connected:', address);
-  },
-
-  // Submit a no-stake report
-  submitNoStakeReport: async function() {
-    try {
-      if (!window.noStakeReporter) {
-        throw new Error('NoStakeReporter not initialized');
-      }
-
-      // Get form values
-      const queryData = document.getElementById('noStakeQueryData').value.trim();
-      const value = document.getElementById('noStakeValue').value.trim();
-
-      // Validate inputs
-      if (!queryData) {
-        throw new Error('Please enter query data');
-      }
-      if (!value) {
-        throw new Error('Please enter a value');
-      }
-      if (!window.noStakeReporter.validateQueryData(queryData)) {
-        throw new Error('Invalid query data format. Must be a valid hex string.');
-      }
-      if (!window.noStakeReporter.validateValue(value)) {
-        throw new Error('Invalid value format. Must be a valid hex string.');
-      }
-
-      // Show pending popup
-      App.showPendingPopup("Submitting no-stake report...");
-
-      // Submit the report (network is automatically detected from wallet manager)
-      const result = await window.noStakeReporter.submitNoStakeReport(queryData, value);
-      
-      // Hide pending popup
-      App.hidePendingPopup();
-      
-      if (result.success) {
-        // Show success popup with transaction hash and block explorer link
-        App.showSuccessPopup("No-stake report submitted successfully!", result.transactionHash, 'cosmos');
-        
-        // Clear form
-        document.getElementById('noStakeQueryData').value = '';
-        document.getElementById('noStakeValue').value = '';
-      } else {
-        throw new Error('Failed to submit report');
-      }
-    } catch (error) {
-      console.error('Failed to submit no-stake report:', error);
-      App.hidePendingPopup();
-      App.showErrorPopup(error.message || 'Failed to submit no-stake report');
     }
   },
 
@@ -6229,8 +6125,6 @@ const App = {
 window.App = App;
 window.App.claimWithdrawal = App.claimWithdrawal;  // Explicitly expose claimWithdrawal
 window.App.requestAttestation = App.requestAttestation;  // Also explicitly expose requestAttestation
-window.App.submitNoStakeReport = App.submitNoStakeReport;  // Expose no-stake report function
-window.App.checkNoStakeWalletStatus = App.checkNoStakeWalletStatus;  // Expose wallet status check
 window.App.proposeDispute = App.proposeDispute;  // Expose dispute function
   window.App.voteOnDispute = App.voteOnDispute;  // Expose dispute voting function
   window.App.loadOpenDisputes = App.loadOpenDisputes;  // Expose load open disputes function
