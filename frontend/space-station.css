@@ -56,8 +56,8 @@
   background: transparent;
   border: none;
   border-radius: 0;
-  width: 140px;
-  height: 140px;
+  width: var(--hub-size);
+  height: var(--hub-size);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -75,7 +75,7 @@
 }
 
 .hub-logo {
-  max-width: 140px;
+  max-width: var(--hub-size);
   width: 100%;
   height: auto;
   filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
@@ -85,11 +85,28 @@
 
 /* Hub pulse animation removed for swoosh design */
 
+/* Fluid sizing via custom properties -- all hub layout scales from vmin */
+:root {
+  --pod-size: clamp(220px, 38vmin, 500px);
+  --pod-icon-size: clamp(180px, 32vmin, 420px);
+  --hub-size: clamp(40px, 6vmin, 70px);
+  --orbit-size: clamp(550px, 95vmin, 1200px);
+  --offset-x: clamp(150px, 26vmin, 320px);
+  --offset-y-top: clamp(150px, 26vmin, 320px);
+  --offset-y-bot: clamp(110px, 20vmin, 250px);
+}
+
+@media (max-width: 768px) {
+  :root {
+    --offset-x: clamp(110px, 21vmin, 200px);
+  }
+}
+
 /* Floating Pods Container */
 .orbit-container {
   position: absolute;
-  width: 800px;
-  height: 800px;
+  width: var(--orbit-size);
+  height: var(--orbit-size);
   top: 60%;
   left: 50%;
   transform: translate(-50%, -50%);
@@ -98,92 +115,32 @@
   justify-content: center;
 }
 
-/* Mobile orbit container sizing */
-@media (max-width: 768px) {
-  .orbit-container {
-    width: 600px;
-    height: 600px;
-  }
-}
-
-@media (max-width: 480px) {
-  .orbit-container {
-    width: 500px;
-    height: 500px;
-  }
-}
-
-/* Floating pods don't need pause functionality */
-
 /* Orbiting Pods */
 .orbiting-pod {
   position: absolute;
-  width: 280px;
-  height: 280px;
+  width: var(--pod-size);
+  height: var(--pod-size);
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
-/* Position pods in a 2x2 grid formation around the hub */
+/* Position pods: 1 on top, 2 on bottom triangle */
 .orbiting-pod[data-function="bridge"] {
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%) translate(-150px, -150px);
+  transform: translate(-50%, -50%) translate(0px, calc(var(--offset-y-top) * -1));
 }
 
 .orbiting-pod[data-function="delegate"] {
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%) translate(150px, -150px);
-}
-
-.orbiting-pod[data-function="noStakeReport"] {
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) translate(-150px, 150px);
+  transform: translate(-50%, -50%) translate(calc(var(--offset-x) * -1), var(--offset-y-bot));
 }
 
 .orbiting-pod[data-function="dispute"] {
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%) translate(150px, 150px);
-}
-
-/* Mobile pod positioning - bring them closer to center */
-@media (max-width: 768px) {
-  .orbiting-pod[data-function="bridge"] {
-    transform: translate(-50%, -50%) translate(-120px, -120px);
-  }
-
-  .orbiting-pod[data-function="delegate"] {
-    transform: translate(-50%, -50%) translate(120px, -120px);
-  }
-
-  .orbiting-pod[data-function="noStakeReport"] {
-    transform: translate(-50%, -50%) translate(-120px, 120px);
-  }
-
-  .orbiting-pod[data-function="dispute"] {
-    transform: translate(-50%, -50%) translate(120px, 120px);
-  }
-}
-
-@media (max-width: 480px) {
-  .orbiting-pod[data-function="bridge"] {
-    transform: translate(-50%, -50%) translate(-100px, -100px);
-  }
-
-  .orbiting-pod[data-function="delegate"] {
-    transform: translate(-50%, -50%) translate(100px, -100px);
-  }
-
-  .orbiting-pod[data-function="noStakeReport"] {
-    transform: translate(-50%, -50%) translate(-100px, 100px);
-  }
-
-  .orbiting-pod[data-function="dispute"] {
-    transform: translate(-50%, -50%) translate(100px, 100px);
-  }
+  transform: translate(-50%, -50%) translate(var(--offset-x), var(--offset-y-bot));
 }
 
 /* Staggered floating animations for natural movement */
@@ -195,70 +152,39 @@
   animation-delay: -1.2s;
 }
 
-.orbiting-pod[data-function="noStakeReport"] .pod-content {
+.orbiting-pod[data-function="dispute"] .pod-content {
   animation-delay: -2.4s;
 }
 
-.orbiting-pod[data-function="dispute"] .pod-content {
-  animation-delay: -3.6s;
-}
+/* Stagger aura layers per pod so they all pulse out of phase */
+.orbiting-pod[data-function="bridge"] .aura-1  { animation-delay: 0s; }
+.orbiting-pod[data-function="bridge"] .aura-2  { animation-delay: -1.8s; }
+.orbiting-pod[data-function="bridge"] .aura-3  { animation-delay: -0.5s; }
+.orbiting-pod[data-function="bridge"] .aura-4  { animation-delay: -3.2s; }
+.orbiting-pod[data-function="delegate"] .aura-1 { animation-delay: -1.2s; }
+.orbiting-pod[data-function="delegate"] .aura-2 { animation-delay: -3.5s; }
+.orbiting-pod[data-function="delegate"] .aura-3 { animation-delay: -2.0s; }
+.orbiting-pod[data-function="delegate"] .aura-4 { animation-delay: -0.8s; }
+.orbiting-pod[data-function="dispute"] .aura-1  { animation-delay: -2.5s; }
+.orbiting-pod[data-function="dispute"] .aura-2  { animation-delay: -0.6s; }
+.orbiting-pod[data-function="dispute"] .aura-3  { animation-delay: -3.8s; }
+.orbiting-pod[data-function="dispute"] .aura-4  { animation-delay: -1.5s; }
 
 .orbiting-pod:hover {
   z-index: 20;
 }
 
-/* Hover effects for each pod that maintain their 2x2 grid position */
+/* Hover effects - use same CSS vars so they scale automatically */
 .orbiting-pod[data-function="bridge"]:hover {
-  transform: translate(-50%, -50%) translate(-150px, -150px) scale(1.1);
+  transform: translate(-50%, -50%) translate(0px, calc(var(--offset-y-top) * -1)) scale(1.08);
 }
 
 .orbiting-pod[data-function="delegate"]:hover {
-  transform: translate(-50%, -50%) translate(150px, -150px) scale(1.1);
-}
-
-.orbiting-pod[data-function="noStakeReport"]:hover {
-  transform: translate(-50%, -50%) translate(-150px, 150px) scale(1.1);
+  transform: translate(-50%, -50%) translate(calc(var(--offset-x) * -1), var(--offset-y-bot)) scale(1.08);
 }
 
 .orbiting-pod[data-function="dispute"]:hover {
-  transform: translate(-50%, -50%) translate(150px, 150px) scale(1.1);
-}
-
-/* Mobile hover effects - maintain proper positioning */
-@media (max-width: 768px) {
-  .orbiting-pod[data-function="bridge"]:hover {
-    transform: translate(-50%, -50%) translate(-120px, -120px) scale(1.1);
-  }
-
-  .orbiting-pod[data-function="delegate"]:hover {
-    transform: translate(-50%, -50%) translate(120px, -120px) scale(1.1);
-  }
-
-  .orbiting-pod[data-function="noStakeReport"]:hover {
-    transform: translate(-50%, -50%) translate(-120px, 120px) scale(1.1);
-  }
-
-  .orbiting-pod[data-function="dispute"]:hover {
-    transform: translate(-50%, -50%) translate(120px, 120px) scale(1.1);
-  }
-}
-
-@media (max-width: 480px) {
-  .orbiting-pod[data-function="bridge"]:hover {
-    transform: translate(-50%, -50%) translate(-100px, -100px) scale(1.1);
-  }
-
-  .orbiting-pod[data-function="delegate"]:hover {
-    transform: translate(-50%, -50%) translate(100px, -100px) scale(1.1);
-  }
-
-  .orbiting-pod[data-function="noStakeReport"]:hover {
-    transform: translate(-50%, -50%) translate(-100px, 100px) scale(1.1);
-  }
-
-  .orbiting-pod[data-function="dispute"]:hover {
-    transform: translate(-50%, -50%) translate(100px, 100px) scale(1.1);
-  }
+  transform: translate(-50%, -50%) translate(var(--offset-x), var(--offset-y-bot)) scale(1.08);
 }
 
 /* Hover effects removed for cleaner look */
@@ -277,6 +203,86 @@
   transition: all 0.3s ease;
   animation: floatGently 6s ease-in-out infinite;
   transform-origin: center center;
+  position: relative;
+}
+
+/* Multi-layer amoeba aura system */
+.aura {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(var(--pod-icon-size) * 1.075);
+  height: calc(var(--pod-icon-size) * 1.075);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.aura-1 {
+  background: transparent;
+  border: 2px solid rgba(8, 175, 172, 0.5);
+  box-shadow: 0 0 12px rgba(8, 175, 172, 0.35), 0 0 25px rgba(8, 175, 172, 0.15);
+  border-radius: 60% 40% 35% 65% / 65% 35% 60% 40%;
+  animation: blob1 5s linear infinite;
+}
+
+.aura-2 {
+  background: transparent;
+  border: 2px solid rgba(8, 175, 172, 0.45);
+  box-shadow: 0 0 14px rgba(8, 175, 172, 0.3), 0 0 30px rgba(8, 175, 172, 0.12);
+  border-radius: 40% 60% 65% 35% / 35% 65% 40% 60%;
+  animation: blob2 7s linear infinite reverse;
+}
+
+.aura-3 {
+  background: transparent;
+  border: 2px solid rgba(8, 175, 172, 0.55);
+  box-shadow: 0 0 16px rgba(8, 175, 172, 0.4), 0 0 35px rgba(8, 175, 172, 0.18);
+  border-radius: 65% 35% 60% 40% / 40% 60% 35% 65%;
+  animation: blob3 4s linear infinite;
+}
+
+.aura-4 {
+  background: transparent;
+  border: 2px solid rgba(8, 175, 172, 0.45);
+  box-shadow: 0 0 12px rgba(8, 175, 172, 0.3), 0 0 28px rgba(8, 175, 172, 0.12);
+  border-radius: 35% 65% 40% 60% / 60% 40% 65% 35%;
+  animation: blob4 6s linear infinite reverse;
+}
+
+@keyframes blob1 {
+  0%   { border-radius: 60% 40% 35% 65% / 65% 35% 60% 40%; }
+  20%  { border-radius: 35% 65% 60% 40% / 40% 60% 35% 65%; }
+  40%  { border-radius: 65% 35% 40% 60% / 60% 40% 65% 35%; }
+  60%  { border-radius: 40% 60% 65% 35% / 35% 65% 40% 60%; }
+  80%  { border-radius: 60% 35% 65% 40% / 40% 60% 35% 65%; }
+  100% { border-radius: 60% 40% 35% 65% / 65% 35% 60% 40%; }
+}
+
+@keyframes blob2 {
+  0%   { border-radius: 40% 60% 65% 35% / 35% 65% 40% 60%; }
+  33%  { border-radius: 65% 35% 40% 60% / 60% 40% 65% 35%; }
+  66%  { border-radius: 35% 65% 60% 40% / 40% 60% 35% 65%; }
+  100% { border-radius: 40% 60% 65% 35% / 35% 65% 40% 60%; }
+}
+
+@keyframes blob3 {
+  0%   { border-radius: 65% 35% 60% 40% / 40% 60% 35% 65%; }
+  25%  { border-radius: 35% 60% 40% 65% / 65% 35% 60% 40%; }
+  50%  { border-radius: 60% 40% 65% 35% / 35% 65% 40% 60%; }
+  75%  { border-radius: 40% 65% 35% 60% / 60% 40% 65% 35%; }
+  100% { border-radius: 65% 35% 60% 40% / 40% 60% 35% 65%; }
+}
+
+@keyframes blob4 {
+  0%   { border-radius: 35% 65% 40% 60% / 60% 40% 65% 35%; }
+  14%  { border-radius: 55% 45% 60% 40% / 40% 55% 45% 60%; }
+  28%  { border-radius: 40% 60% 35% 65% / 65% 35% 60% 40%; }
+  42%  { border-radius: 60% 35% 65% 40% / 40% 65% 35% 60%; }
+  57%  { border-radius: 45% 55% 40% 60% / 60% 40% 55% 45%; }
+  71%  { border-radius: 65% 40% 55% 35% / 35% 60% 40% 65%; }
+  85%  { border-radius: 40% 60% 45% 55% / 55% 45% 60% 40%; }
+  100% { border-radius: 35% 65% 40% 60% / 60% 40% 65% 35%; }
 }
 
 /* Ensure floating animation works properly */
@@ -308,12 +314,6 @@
   }
 }
 
-@keyframes staticNoStakeReport {
-  0%, 100% {
-    transform: rotate(0deg);
-  }
-}
-
 @keyframes staticDispute {
   0%, 100% {
     transform: rotate(0deg);
@@ -329,107 +329,39 @@
   animation: staticDelegate 1s ease-in-out infinite;
 }
 
-.orbiting-pod[data-function="noStakeReport"] .pod-content {
-  animation: staticNoStakeReport 1s ease-in-out infinite;
-}
-
 .orbiting-pod[data-function="dispute"] .pod-content {
   animation: staticDispute 1s ease-in-out infinite;
 }
 
-/* Hose Graphics - Connect each pod to the hub using absolute positioning */
-.orbiting-pod::after {
-  content: '';
+/* SVG Spoke Lines - always connect hub center to pod centers */
+.spoke-svg {
   position: absolute;
-  width: 200px;
-  height: 8px;
-  background: linear-gradient(90deg, 
-    rgba(56, 168, 163, 0.8) 0%, 
-    rgb(9, 121, 106) 30%, 
-    rgba(56, 168, 163, 0.8) 70%, 
-    rgb(9, 255, 104) 100%);
-  border-radius: 4px;
-  transform-origin: left center;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   z-index: -1;
-  box-shadow: 
-    0 0 10px rgba(56, 168, 163, 0.4),
-    inset 0 1px 2px rgba(255, 255, 255, 0.3);
-  animation: hoseGlow 3s ease-in-out infinite;
+  pointer-events: none;
+  overflow: visible;
 }
 
-/* Position hoses for each pod to connect to hub center in 2x2 grid formation */
-.orbiting-pod[data-function="bridge"]::after {
-  top: 140px;
-  left: 140px;
-  transform: rotate(45deg);
+.spoke-line {
+  stroke: rgb(9, 121, 106);
+  stroke-width: 5;
+  stroke-linecap: round;
+  animation: spokeGlow 3s ease-in-out infinite;
 }
 
-.orbiting-pod[data-function="delegate"]::after {
-  top: 140px;
-  left: 140px;
-  transform: rotate(135deg);
-}
-
-.orbiting-pod[data-function="noStakeReport"]::after {
-  top: 140px;
-  left: 140px;
-  transform: rotate(315deg);
-}
-
-.orbiting-pod[data-function="dispute"]::after {
-  top: 140px;
-  left: 140px;
-  transform: rotate(225deg);
-}
-
-/* Mobile hose positioning - adjust for closer pods */
-@media (max-width: 768px) {
-  .orbiting-pod::after {
-    width: 150px;
-    height: 6px;
-  }
-  
-  .orbiting-pod[data-function="bridge"]::after,
-  .orbiting-pod[data-function="delegate"]::after,
-  .orbiting-pod[data-function="noStakeReport"]::after,
-  .orbiting-pod[data-function="dispute"]::after {
-    top: 120px;
-    left: 120px;
-  }
-}
-
-@media (max-width: 480px) {
-  .orbiting-pod::after {
-    width: 120px;
-    height: 5px;
-  }
-  
-  .orbiting-pod[data-function="bridge"]::after,
-  .orbiting-pod[data-function="delegate"]::after,
-  .orbiting-pod[data-function="noStakeReport"]::after,
-  .orbiting-pod[data-function="dispute"]::after {
-    top: 100px;
-    left: 100px;
-  }
-}
-
-/* Connection circle removed for cleaner look */
-
-/* Main spoke lines are now handled by individual pod ::after pseudo-elements */
-
-/* Hose glow animation */
-@keyframes hoseGlow {
+@keyframes spokeGlow {
   0%, 100% {
-    box-shadow: 
-      0 0 15px rgba(56, 168, 163, 0.6),
-      0 0 25px rgba(9, 121, 106, 0.4),
-      inset 0 1px 3px rgb(4, 239, 94);
+    filter: drop-shadow(0 0 8px rgba(56, 168, 163, 0.6))
+           drop-shadow(0 0 16px rgba(9, 121, 106, 0.4));
+    stroke: rgb(9, 121, 106);
   }
   50% {
-    box-shadow: 
-      0 0 30px rgba(136, 255, 236, 0.8),
-      0 0 45px rgba(9, 255, 104, 0.6),
-      inset 0 1px 4px rgba(255, 255, 255, 0.6);
+    filter: drop-shadow(0 0 15px rgba(136, 255, 236, 0.8))
+           drop-shadow(0 0 25px rgba(9, 255, 104, 0.5));
+    stroke: rgba(56, 168, 163, 0.9);
   }
 }
 
@@ -443,9 +375,13 @@
   font-size: 32px;
   margin-bottom: 0;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
-  width: 200px;
-  height: 200px;
+  width: var(--pod-icon-size);
+  height: var(--pod-icon-size);
   object-fit: contain;
+  border-radius: 50%;
+  mix-blend-mode: screen;
+  position: relative;
+  z-index: 2;
 }
 
 .pod-title {
@@ -748,31 +684,11 @@
 @media (max-width: 768px) {
   .space-station-container {
     padding: 10px;
-    margin-top: 20px; /* Reduced top margin for mobile */
-  }
-  
-  .hub-core {
-    width: 120px;
-    height: 120px;
-  }
-  
-  .hub-logo {
-    max-width: 100px;
+    margin-top: 20px;
   }
   
   .hub-subtitle {
     font-size: 14px;
-  }
-  
-  .orbiting-pod {
-    width: 200px;
-    height: 200px;
-  }
-  
-  .pod-icon {
-    font-size: 20px;
-    width: 150px;
-    height: 150px;
   }
   
   .pod-title {
@@ -817,31 +733,11 @@
 @media (max-width: 480px) {
   .space-station-container {
     padding: 5px;
-    margin-top: 15px; /* Further reduced top margin for small mobile */
-  }
-  
-  .hub-core {
-    width: 100px;
-    height: 100px;
-  }
-  
-  .hub-logo {
-    max-width: 80px;
+    margin-top: 15px;
   }
   
   .hub-subtitle {
     font-size: 12px;
-  }
-  
-  .orbiting-pod {
-    width: 160px;
-    height: 160px;
-  }
-  
-  .pod-icon {
-    font-size: 18px;
-    width: 120px;
-    height: 120px;
   }
   
   .pod-title {
@@ -1160,75 +1056,6 @@
   max-width: 100% !important; /* Ensure no width constraints */
   border: 1px solid #e2e8f0 !important; /* Visual boundary for scrollable area */
   border-radius: 8px !important;
-}
-
-/* No-Stake Stacked Layout */
-.no-stake-horizontal-layout {
-  width: 100% !important;
-  max-width: none !important;
-}
-
-.no-stake-row {
-  display: flex !important;
-  flex-direction: row !important;
-  gap: 20px !important;
-  align-items: flex-start !important;
-  width: 100% !important;
-}
-
-/* Left side: Stacked Value and Query Data */
-.no-stake-left-column {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 1px !important;
-  flex: 1 !important; /* Take remaining space */
-  min-width: 0 !important; /* Allow shrinking */
-}
-
-.no-stake-value-container {
-  width: 100% !important; /* Full width of left column */
-  min-width: 0 !important; /* Allow shrinking */
-}
-
-.no-stake-query-container {
-  width: 100% !important; /* Full width of left column */
-  min-width: 0 !important; /* Allow shrinking */
-}
-
-.no-stake-submit-container {
-  flex: 0 0 auto !important; /* Don't grow or shrink, stay at natural size */
-  display: flex !important;
-  align-items: flex-start !important; /* Align to top */
-  padding-top: 45px !important; /* Move button down by 20px */
-}
-
-/* Adjust textarea height for horizontal layout */
-.no-stake-horizontal-layout .no-stake-input {
-  width: 100% !important;
-  box-sizing: border-box !important;
-}
-
-/* Ensure submit button fits properly */
-.no-stake-submit-container .button-style-3 {
-  white-space: nowrap !important;
-  min-width: fit-content !important;
-}
-
-/* Specific styling for no-stake reporting input labels */
-#noStakeReportSection .input-label {
-  height: 40px !important; /* Match input height */
-  padding: 8px 12px !important; /* Match input padding */
-  margin: 0 !important; /* Remove all margins */
-  display: flex !important;
-  align-items: center !important; /* Vertically center text */
-  font-size: 14px !important;
-  font-weight: 600 !important;
-  color: #374151 !important;
-  background: none !important;
-  border-radius: 0 !important;
-  text-align: left !important;
-  min-width: auto !important;
-  line-height: 1.2 !important;
 }
 
 /* Hide empty wallet connection containers that cause spacing issues */
@@ -2401,6 +2228,104 @@ body:has(.function-focus-state) .frontend-code-link {
   opacity: 0 !important;
   pointer-events: none !important;
   transform: scale(0.95) !important;
+}
+
+/* ── Under Construction Mode ── */
+.function-section.under-construction .bridge-real-content {
+  display: none !important;
+}
+
+.under-construction-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 60px 24px;
+  gap: 12px;
+}
+
+.under-construction-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+  animation: gearSpin 4s linear infinite;
+}
+
+@keyframes gearSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.under-construction-title {
+  font-family: 'PPNeueMontreal-Bold', monospace;
+  font-size: 22px;
+  color: #003734;
+  margin: 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.under-construction-text {
+  font-family: 'PPNeueMontreal-Book', monospace;
+  font-size: 14px;
+  color: #38A8A3;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.construction-workers {
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  margin-top: 16px;
+}
+
+.construction-worker {
+  width: 70px;
+  height: 105px;
+}
+
+.worker-left {
+  animation: dig-right 1.2s ease-in-out infinite;
+  transform-origin: 27px 58px;
+}
+
+.worker-right {
+  animation: dig-left 1.2s ease-in-out infinite;
+  animation-delay: 0.6s;
+  transform-origin: 53px 58px;
+}
+
+@keyframes dig-right {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(12deg); }
+}
+
+@keyframes dig-left {
+  0%, 100% { transform: rotate(0deg); }
+  50%      { transform: rotate(-12deg); }
+}
+
+.dirt {
+  opacity: 0;
+}
+
+.worker-left .dirt-1 { animation: fly-dirt-right 1.2s ease-out infinite 0.4s; }
+.worker-left .dirt-2 { animation: fly-dirt-right 1.2s ease-out infinite 0.5s; }
+.worker-left .dirt-3 { animation: fly-dirt-right 1.2s ease-out infinite 0.45s; }
+.worker-right .dirt-1 { animation: fly-dirt-left 1.2s ease-out infinite 1.0s; }
+.worker-right .dirt-2 { animation: fly-dirt-left 1.2s ease-out infinite 1.1s; }
+.worker-right .dirt-3 { animation: fly-dirt-left 1.2s ease-out infinite 1.05s; }
+
+@keyframes fly-dirt-right {
+  0%   { opacity: 0; transform: translate(0, 0); }
+  20%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(14px, -20px); }
+}
+
+@keyframes fly-dirt-left {
+  0%   { opacity: 0; transform: translate(0, 0); }
+  20%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-14px, -20px); }
 }
 
 

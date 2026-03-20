@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tellor Hub</title>
     <link rel="stylesheet" href="main.css" />
-    <link rel="stylesheet" href="space-station.css" />
+    <link rel="stylesheet" href="space-station.css?v=22" />
     <link rel="icon" type="image/x-icon" href="/drkgrnswsh.png">
 
     <!-- Load protobuf.js first -->
@@ -94,13 +94,20 @@
 
         <!-- Orbiting Pods -->
         <div class="orbit-container">
-          <!-- Two Continuous Diagonal Lines -->
-          <div class="spoke-line spoke-diagonal-1"></div>
-          <div class="spoke-line spoke-diagonal-2"></div>
-          
+          <!-- SVG spoke lines: always connect hub center to each pod center -->
+          <svg class="spoke-svg" xmlns="http://www.w3.org/2000/svg">
+            <line class="spoke-line" id="spoke-bridge" />
+            <line class="spoke-line" id="spoke-delegate" />
+            <line class="spoke-line" id="spoke-dispute" />
+          </svg>
+
           <!-- Bridge Pod (Consolidated) -->
           <div class="orbiting-pod" data-function="bridge">
             <div class="pod-content">
+              <div class="aura aura-1"></div>
+              <div class="aura aura-2"></div>
+              <div class="aura aura-3"></div>
+              <div class="aura aura-4"></div>
               <img src="Orb_Bridge_Tellor.png" alt="Bridge" class="pod-icon">
             </div>
           </div>
@@ -108,20 +115,21 @@
           <!-- Delegate Pod -->
           <div class="orbiting-pod" data-function="delegate">
             <div class="pod-content">
+              <div class="aura aura-1"></div>
+              <div class="aura aura-2"></div>
+              <div class="aura aura-3"></div>
+              <div class="aura aura-4"></div>
               <img src="Orb_Delegate.png" alt="Delegate" class="pod-icon">
-            </div>
-          </div>
-
-          <!-- No-Stake Report Pod -->
-          <div class="orbiting-pod" data-function="noStakeReport">
-            <div class="pod-content">
-              <img src="Orb_Report.png" alt="Report" class="pod-icon">
             </div>
           </div>
 
           <!-- Dispute Pod -->
           <div class="orbiting-pod" data-function="dispute">
             <div class="pod-content">
+              <div class="aura aura-1"></div>
+              <div class="aura aura-2"></div>
+              <div class="aura aura-3"></div>
+              <div class="aura aura-4"></div>
               <img src="Orb_Dispute.png" alt="Dispute" class="pod-icon">
             </div>
           </div>
@@ -150,11 +158,6 @@
               <div class="nav-option-title">Delegate Tokens</div>
             </div>
             
-            <div class="nav-option" data-function="noStakeReport">
-              <img class="nav-option-icon"src="./symbol_report.png" alt="Bridge to Ethereum"/>
-              <div class="nav-option-title">No-Stake Report</div>
-            </div>
-            
             <div class="nav-option" data-function="dispute">
               <img class="nav-option-icon"src="./symbol_dispute.png" alt="Dispute"/>
               <div class="nav-option-title">Propose Dispute</div>
@@ -166,7 +169,74 @@
         <div class="function-display-area">
           <div class="function-container">
             <!-- Bridge Section (Consolidated) -->
-            <div id="bridgeSection" class="function-section">
+            <div id="bridgeSection" class="function-section under-construction">
+              <!-- Under Construction Overlay -->
+              <div class="under-construction-overlay">
+                <div class="under-construction-icon">⚙️</div>
+                <h2 class="under-construction-title">Bridge Under Construction</h2>
+                <p class="under-construction-text">The Bridge module is currently being upgraded.<br>Check back soon!</p>
+                <div class="construction-workers">
+                  <!-- Left worker digging right -->
+                  <svg class="construction-worker worker-left" viewBox="0 0 80 120" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Hard hat -->
+                    <rect x="16" y="4" width="22" height="6" rx="2" fill="#FFD600"/>
+                    <rect x="12" y="9" width="30" height="4" rx="1" fill="#FFD600"/>
+                    <!-- Head -->
+                    <circle cx="27" cy="20" r="8" fill="#38A8A3"/>
+                    <!-- Body -->
+                    <line x1="27" y1="28" x2="27" y2="58" stroke="#38A8A3" stroke-width="3" stroke-linecap="round"/>
+                    <!-- Left arm (holding shovel handle) -->
+                    <line x1="27" y1="36" x2="14" y2="50" stroke="#38A8A3" stroke-width="3" stroke-linecap="round"/>
+                    <!-- Right arm (holding shovel lower) -->
+                    <line x1="27" y1="40" x2="42" y2="56" stroke="#38A8A3" stroke-width="3" stroke-linecap="round"/>
+                    <!-- Left leg -->
+                    <line x1="27" y1="58" x2="18" y2="78" stroke="#38A8A3" stroke-width="3" stroke-linecap="round"/>
+                    <!-- Right leg (stepping on shovel) -->
+                    <line x1="27" y1="58" x2="38" y2="76" stroke="#38A8A3" stroke-width="3" stroke-linecap="round"/>
+                    <!-- Feet -->
+                    <line x1="18" y1="78" x2="12" y2="78" stroke="#38A8A3" stroke-width="3" stroke-linecap="round"/>
+                    <line x1="38" y1="76" x2="44" y2="76" stroke="#38A8A3" stroke-width="3" stroke-linecap="round"/>
+                    <!-- Shovel handle -->
+                    <line x1="14" y1="50" x2="48" y2="74" stroke="#5C4033" stroke-width="2.5" stroke-linecap="round"/>
+                    <!-- Shovel blade -->
+                    <path d="M46 72 L56 80 L50 84 L42 76 Z" fill="#888"/>
+                    <!-- Dirt particles -->
+                    <circle class="dirt dirt-1" cx="54" cy="68" r="2" fill="#5C4033"/>
+                    <circle class="dirt dirt-2" cx="60" cy="62" r="1.5" fill="#5C4033"/>
+                    <circle class="dirt dirt-3" cx="50" cy="60" r="1.8" fill="#5C4033"/>
+                  </svg>
+                  <!-- Right worker digging left (mirrored) -->
+                  <svg class="construction-worker worker-right" viewBox="0 0 80 120" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Hard hat -->
+                    <rect x="42" y="4" width="22" height="6" rx="2" fill="#FFD600"/>
+                    <rect x="38" y="9" width="30" height="4" rx="1" fill="#FFD600"/>
+                    <!-- Head -->
+                    <circle cx="53" cy="20" r="8" fill="#38A8A3"/>
+                    <!-- Body -->
+                    <line x1="53" y1="28" x2="53" y2="58" stroke="#38A8A3" stroke-width="3" stroke-linecap="round"/>
+                    <!-- Right arm (holding shovel handle) -->
+                    <line x1="53" y1="36" x2="66" y2="50" stroke="#38A8A3" stroke-width="3" stroke-linecap="round"/>
+                    <!-- Left arm (holding shovel lower) -->
+                    <line x1="53" y1="40" x2="38" y2="56" stroke="#38A8A3" stroke-width="3" stroke-linecap="round"/>
+                    <!-- Right leg -->
+                    <line x1="53" y1="58" x2="62" y2="78" stroke="#38A8A3" stroke-width="3" stroke-linecap="round"/>
+                    <!-- Left leg (stepping on shovel) -->
+                    <line x1="53" y1="58" x2="42" y2="76" stroke="#38A8A3" stroke-width="3" stroke-linecap="round"/>
+                    <!-- Feet -->
+                    <line x1="62" y1="78" x2="68" y2="78" stroke="#38A8A3" stroke-width="3" stroke-linecap="round"/>
+                    <line x1="42" y1="76" x2="36" y2="76" stroke="#38A8A3" stroke-width="3" stroke-linecap="round"/>
+                    <!-- Shovel handle -->
+                    <line x1="66" y1="50" x2="32" y2="74" stroke="#5C4033" stroke-width="2.5" stroke-linecap="round"/>
+                    <!-- Shovel blade -->
+                    <path d="M34 72 L24 80 L30 84 L38 76 Z" fill="#888"/>
+                    <!-- Dirt particles -->
+                    <circle class="dirt dirt-1" cx="26" cy="68" r="2" fill="#5C4033"/>
+                    <circle class="dirt dirt-2" cx="20" cy="62" r="1.5" fill="#5C4033"/>
+                    <circle class="dirt dirt-3" cx="30" cy="60" r="1.8" fill="#5C4033"/>
+                  </svg>
+                </div>
+              </div>
+              <div class="bridge-real-content">
               <div class="section-header">
                 <div class="bridge-header-container">
                   <h2 id="bridgeTitle">Bridge TRB To Tellor</h2>
@@ -275,6 +345,7 @@
                   </div>
                 </div>
               </div>
+              </div><!-- /.bridge-real-content -->
             </div>
 
             <!-- Delegate Section -->
@@ -382,32 +453,6 @@
                   </div>
                 </div>
               </div>
-            </div>
-
-            <!-- No-Stake Report Section -->
-            <div id="noStakeReportSection" class="function-section">
-              <div class="section-header">
-                <h2>No-Stake Report</h2>
-                <p class="section-description">Submit data reports without requiring staked tokens</p>
-              </div>
-              <div class="wallet-disclaimer">*Please connect your Cosmos wallet*</div>
-                              <div class="balance-info no-stake-horizontal-layout">
-                    <div class="no-stake-row">
-                        <div class="no-stake-left-column">
-                            <div class="input-with-label no-stake-value-container">
-                                <span class="input-label">Value (Hex)</span>
-                                <input class="no-stake-input" type="text" id="noStakeValue" placeholder="0x..." />
-                            </div>
-                            <div class="input-with-label no-stake-query-container">
-                                <span class="input-label">Query Data (Hex)</span>
-                                <textarea class="no-stake-input" id="noStakeQueryData" placeholder="0x..." rows="6"></textarea>
-                            </div>
-                        </div>
-                        <div class="no-stake-submit-container">
-                            <button id="submitNoStakeReportBtn" class="button-style-3" onclick="App.submitNoStakeReport()">Submit Report</button>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <!-- Dispute Section -->
@@ -759,6 +804,38 @@
             }
         }
         
+        // Position SVG spoke lines from hub center to each pod center
+        function updateSpokes() {
+          const container = document.querySelector('.orbit-container');
+          if (!container) return;
+          const rect = container.getBoundingClientRect();
+          const cx = rect.width / 2;
+          const cy = rect.height / 2;
+          const pods = [
+            { id: 'spoke-bridge',   fn: 'bridge' },
+            { id: 'spoke-delegate', fn: 'delegate' },
+            { id: 'spoke-dispute',  fn: 'dispute' }
+          ];
+          pods.forEach(({ id, fn }) => {
+            const pod = container.querySelector(`.orbiting-pod[data-function="${fn}"]`);
+            const line = document.getElementById(id);
+            if (!pod || !line) return;
+            const pr = pod.getBoundingClientRect();
+            const px = pr.left + pr.width / 2 - rect.left;
+            const py = pr.top + pr.height / 2 - rect.top;
+            line.setAttribute('x1', cx);
+            line.setAttribute('y1', cy);
+            line.setAttribute('x2', px);
+            line.setAttribute('y2', py);
+          });
+          const svg = container.querySelector('.spoke-svg');
+          if (svg) {
+            svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+          }
+        }
+        updateSpokes();
+        window.addEventListener('resize', updateSpokes);
+
         // Add pod navigation handlers
         const orbitingPods = document.querySelectorAll('.orbiting-pod');
         const orbitContainer = document.querySelector('.orbit-container');
@@ -789,9 +866,6 @@
               case 'delegate':
                 sectionId = 'delegateSection';
                 break;
-              case 'noStakeReport':
-                sectionId = 'noStakeReportSection';
-                break;
               case 'dispute':
                 sectionId = 'disputeSection';
                 break;
@@ -815,14 +889,13 @@
               }
               
               // For relevant sections, check if there's a value and show tooltip if appropriate
-              if (functionType !== 'noStakeReport' && functionType !== 'dispute') {
+              if (functionType !== 'dispute') {
                 setTimeout(() => {
                   if (window.App && window.App.currentBridgeDirection) {
                     const activeInput = window.App.currentBridgeDirection === 'layer' ? 
                       document.getElementById('stakeAmount') : 
                       document.getElementById('ethStakeAmount');
                     if (activeInput && activeInput.value && parseFloat(activeInput.value) > 0) {
-                      // Trigger tooltip update if there's a value
                       if (window.App.updateTooltip) {
                         window.App.updateTooltip();
                       }
@@ -833,7 +906,6 @@
               
               // Update withdrawal history when bridge to ethereum section is shown
               if (functionType === 'bridgeToEth') {
-                // Update the withdrawal history in the integrated table
                 if (window.App && window.App.updateWithdrawalHistory) {
                   setTimeout(() => {
                     window.App.updateWithdrawalHistory();
@@ -885,9 +957,6 @@
               case 'delegate':
                 sectionId = 'delegateSection';
                 break;
-              case 'noStakeReport':
-                sectionId = 'noStakeReportSection';
-                break;
               case 'dispute':
                 sectionId = 'disputeSection';
                 break;
@@ -911,14 +980,13 @@
               }
               
               // For relevant sections, check if there's a value and show tooltip if appropriate
-              if (functionType !== 'noStakeReport' && functionType !== 'dispute') {
+              if (functionType !== 'dispute') {
                 setTimeout(() => {
                   if (window.App && window.App.currentBridgeDirection) {
                     const activeInput = window.App.currentBridgeDirection === 'layer' ? 
                       document.getElementById('stakeAmount') : 
                       document.getElementById('ethStakeAmount');
                     if (activeInput && activeInput.value && parseFloat(activeInput.value) > 0) {
-                      // Trigger tooltip update if there's a value
                       if (window.App.updateTooltip) {
                         window.App.updateTooltip();
                       }
@@ -929,7 +997,6 @@
               
               // Update withdrawal history when bridge to ethereum section is shown
               if (functionType === 'bridgeToEth') {
-                // Update the withdrawal history in the integrated table
                 if (window.App && window.App.updateWithdrawalHistory) {
                   setTimeout(() => {
                     window.App.updateWithdrawalHistory();
@@ -1243,8 +1310,6 @@
           });
         }
 
-        // No-stake reporting is now integrated with the existing wallet manager
-        
         // Wait for App to be initialized before checking allowance
         function waitForAppAndInitialize() {
             if (window.App && typeof window.App.getAllowance === 'function') {
@@ -1410,7 +1475,6 @@
         }
       };
     </script>
-    <script src="./js/noStake.js"></script>
     <script src="./js/dispute.js"></script>
   </body>
 </html>
