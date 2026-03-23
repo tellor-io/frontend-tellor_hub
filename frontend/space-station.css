@@ -2258,7 +2258,7 @@ body:has(.function-focus-state) .frontend-code-link {
 
 .under-construction-title {
   font-family: 'PPNeueMontreal-Bold', monospace;
-  font-size: 22px;
+  font-size: 28px;
   color: #003734;
   margin: 0;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
@@ -2266,7 +2266,7 @@ body:has(.function-focus-state) .frontend-code-link {
 
 .under-construction-text {
   font-family: 'PPNeueMontreal-Book', monospace;
-  font-size: 14px;
+  font-size: 28px;
   color: #38A8A3;
   margin: 0;
   line-height: 1.6;
