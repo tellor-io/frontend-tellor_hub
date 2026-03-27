@@ -1141,7 +1141,7 @@ const App = {
             throw new Error('Web3 not properly initialized');
         }
 
-        const response = await fetch("./abis/TokenBridge.json");
+        const response = await fetch("./abis/TokenBridgeV2.json");
         if (!response.ok) {
             throw new Error(`Failed to load ABI: ${response.statusText}`);
         }
@@ -1155,8 +1155,16 @@ const App = {
 
         App.contracts.Bridge = new App.web3.eth.Contract(abi);
         
+        // V2 contracts were initialized with a starting withdrawId via init().
+        // Withdrawals below this ID belong to V1 and can't be claimed on V2.
+        const v2StartingWithdrawId = {
+            11155111: 68,  // Sepolia: V2 deployed Mar 23 2026, IDs 1-67 belong to V1
+            1: 0,          // Mainnet: still on V1, no cutoff yet
+        };
+        App.v2StartingWithdrawId = v2StartingWithdrawId[App.chainId] || 0;
+
         const contractAddresses = {
-            11155111: "0x62733e63499a25E35844c91275d4c3bdb159D29d", // Sepolia
+            11155111: "0x55355157703A44f7516FBB831333317E98944e32", // Sepolia (TokenBridgeV2)
             1: "0x5589e306b1920F009979a50B88caE32aecD471E4",        // Mainnet
             421613: "0xb2CB696fE5244fB9004877e58dcB680cB86Ba444",   // Arbitrum Goerli
             137: "0x62733e63499a25E35844c91275d4c3bdb159D29d",      // Polygon
@@ -2830,29 +2838,49 @@ const App = {
             return [];
         }
 
-        // Create arrays for withdrawal data and claim status promises
+        // Create arrays for withdrawal data, claim status, and on-chain details promises
         const withdrawalPromises = [];
         const claimStatusPromises = [];
+        const withdrawDetailPromises = [];
 
-        // Create promises for all withdrawals
+        const v2Start = App.v2StartingWithdrawId || 0;
+
         for (let id = 1; id <= lastWithdrawalId; id++) {
             const queryId = generateWithdrawalQueryId(id);
             withdrawalPromises.push(this.fetchWithdrawalData(queryId));
-            // Use contract's withdrawClaimed function instead of API endpoint
-            claimStatusPromises.push(
-                App.contracts.Bridge.methods.withdrawClaimed(id).call()
-                    .then(claimed => ({ claimed: Boolean(claimed), withdrawalId: id }))
-                    .catch(err => {
-                        console.error(`❌ Error checking claim status for withdrawal ${id}:`, err);
-                        return { claimed: false, withdrawalId: id };
-                    })
-            );
+
+            if (id >= v2Start) {
+                claimStatusPromises.push(
+                    App.contracts.Bridge.methods.withdrawClaimed(id).call()
+                        .then(claimed => ({ claimed: Boolean(claimed), withdrawalId: id }))
+                        .catch(err => {
+                            console.error(`❌ Error checking claim status for withdrawal ${id}:`, err);
+                            return { claimed: false, withdrawalId: id };
+                        })
+                );
+                withdrawDetailPromises.push(
+                    App.contracts.Bridge.methods.withdrawDetails(id).call()
+                        .then(details => ({
+                            withdrawalId: id,
+                            pendingAmount: details.pendingAmount || '0',
+                            lastVerifiedTime: details.lastVerifiedTime || '0'
+                        }))
+                        .catch(() => ({ withdrawalId: id, pendingAmount: '0', lastVerifiedTime: '0' }))
+                );
+            } else {
+                claimStatusPromises.push(
+                    Promise.resolve({ claimed: false, withdrawalId: id, isV1: true })
+                );
+                withdrawDetailPromises.push(
+                    Promise.resolve({ withdrawalId: id, pendingAmount: '0', lastVerifiedTime: '0' })
+                );
+            }
         }
 
-        // Process all withdrawals in parallel
-        const [withdrawalResults, claimStatuses] = await Promise.all([
+        const [withdrawalResults, claimStatuses, withdrawDetails] = await Promise.all([
             Promise.all(withdrawalPromises),
-            Promise.all(claimStatusPromises)
+            Promise.all(claimStatusPromises),
+            Promise.all(withdrawDetailPromises)
         ]);
         
         // Filter and process valid withdrawals
@@ -2881,11 +2909,14 @@ const App = {
 
                 if (matchesAddress) {
                     const claimedStatus = claimStatuses[index]?.claimed || false;
+                    const details = withdrawDetails[index] || {};
+                    const pendingAmount = details.pendingAmount || '0';
                     return {
                         id,
                         sender: parsedData.sender,
                         recipient: parsedData.recipient,
                         amount: parsedData.amount.toString(),
+                        pendingAmount,
                         timestamp: withdrawalData.raw.timestamp,
                         claimed: claimedStatus,
                         isMine: (isEvmWallet && cleanSender === cleanAddress) ||
@@ -3137,6 +3168,8 @@ const App = {
                     row.style.backgroundColor = '#e6f7f7';
                 }
                 
+                const isV2Withdrawal = tx.id >= (App.v2StartingWithdrawId || 0);
+
                 // Button states based on connection status only (anyone can claim any withdrawal)
                 const attestButtonDisabled = !App.isKeplrConnected;
                 const attestButtonClass = attestButtonDisabled ? 'attest-button disconnected' : 'attest-button';
@@ -3144,9 +3177,14 @@ const App = {
                     'background-color: #cbd5e0; color: #718096; border: none;' : 
                     'background-color: #003734; color: #eefffb; border: none;';
                 
+                const pendingTrb = Number(tx.pendingAmount) / 1e6;
+                const hasPending = isV2Withdrawal && pendingTrb > 0;
+
                 row.innerHTML = `
                     <td style="white-space: normal;">
-                        ${!tx.claimed ? 
+                        ${!isV2Withdrawal ?
+                            `<span style="color: #718096; font-size: 12px;">V1 Bridge</span>`
+                            : !tx.claimed ? 
                             `<button class="${attestButtonClass}" onclick="App.requestAttestation(${tx.id})" 
                                 style="${attestButtonStyle}" ${attestButtonDisabled ? 'disabled' : ''}>
                                 <span class="tooltip-container">
@@ -3164,13 +3202,31 @@ const App = {
                                 </span>
                             </button>` 
                             : ''}
+                        ${hasPending ?
+                            `<button class="claim-button" onclick="App.claimExtraWithdraw(${tx.id})"
+                                style="background-color: #d69e2e; color: #fff; border: none; margin-top: 4px;"
+                                ${!App.isConnected ? 'disabled' : ''}>
+                                <span class="tooltip-container">
+                                    <span>Claim Extra</span>
+                                    <span class="tooltip-icon tooltip-icon-white">?</span>
+                                    <span class="tooltip-text tooltip-text-right">This withdrawal hit the bridge limit. ${pendingTrb.toFixed(2)} TRB is pending and can be claimed once the limit resets.</span>
+                                </span>
+                            </button>`
+                            : ''}
                     </td>
                     <td style="font-weight: 500;">${tx.id}</td>
                     <td class="address-cell" title="${tx.sender}">${this.formatAddress(tx.sender)}</td>
                     <td class="address-cell" title="${tx.recipient}">${this.formatAddress(tx.recipient)}</td>
-                    <td class="amount-column">${amount.toFixed(2)} TRB</td>
+                    <td class="amount-column">
+                        ${amount.toFixed(2)} TRB
+                        ${hasPending ? `<br><span style="color: #d69e2e; font-size: 12px;">(${pendingTrb.toFixed(2)} pending)</span>` : ''}
+                    </td>
                     <td>${date}</td>
-                    <td class="status-${tx.claimed}">${tx.claimed ? 'Claimed' : 'Pending'}</td>
+                    <td class="status-${tx.claimed}">
+                        ${!isV2Withdrawal ? '<span style="color: #718096;">V1</span>'
+                            : tx.claimed ? 'Claimed' : 'Pending'}
+                        ${hasPending ? '<br><span style="color: #d69e2e; font-size: 12px;">Extra Pending</span>' : ''}
+                    </td>
                 `;
                 tableBody.appendChild(row);
             } catch (error) {
@@ -3834,6 +3890,52 @@ const App = {
           errorMessage += ` <a href="${etherscanUrl}" target="_blank" style="color: #DC2626; text-decoration: underline;">View on Etherscan</a>`;
         }
         
+        App.showErrorPopup(errorMessage);
+    } finally {
+        App.hidePendingPopup();
+    }
+  },
+
+  claimExtraWithdraw: async function(withdrawalId) {
+    let txHash = null;
+    try {
+        if (!App.isConnected) {
+            alert('Please connect your MetaMask wallet first');
+            return;
+        }
+
+        const details = await App.contracts.Bridge.methods.withdrawDetails(withdrawalId).call();
+        const pendingAmount = Number(details.pendingAmount || 0);
+        if (pendingAmount <= 0) {
+            alert('No extra amount pending for this withdrawal.');
+            return;
+        }
+
+        App.showPendingPopup("Claiming extra withdrawal amount...");
+
+        const tx = await App.contracts.Bridge.methods.claimExtraWithdrawByWithdrawId(withdrawalId)
+            .send({ from: App.account });
+
+        txHash = tx.transactionHash;
+        App.showSuccessPopup("Extra withdrawal claimed successfully!", txHash, 'ethereum');
+        await this.updateWithdrawalHistory();
+        return tx;
+
+    } catch (error) {
+        if (error.transactionHash) {
+            txHash = error.transactionHash;
+        } else if (error.receipt && error.receipt.transactionHash) {
+            txHash = error.receipt.transactionHash;
+        }
+
+        let errorMessage = "Claim extra withdrawal failed. The bridge withdraw limit may not have reset yet. Please try again later.";
+        if (txHash) {
+            const etherscanUrl = App.chainId === 1
+                ? `https://etherscan.io/tx/${txHash}`
+                : `https://sepolia.etherscan.io/tx/${txHash}`;
+            errorMessage += ` <a href="${etherscanUrl}" target="_blank" style="color: #DC2626; text-decoration: underline;">View on Etherscan</a>`;
+        }
+
         App.showErrorPopup(errorMessage);
     } finally {
         App.hidePendingPopup();
@@ -6124,6 +6226,7 @@ const App = {
 // Export App to window object for global access
 window.App = App;
 window.App.claimWithdrawal = App.claimWithdrawal;  // Explicitly expose claimWithdrawal
+window.App.claimExtraWithdraw = App.claimExtraWithdraw;
 window.App.requestAttestation = App.requestAttestation;  // Also explicitly expose requestAttestation
 window.App.proposeDispute = App.proposeDispute;  // Expose dispute function
   window.App.voteOnDispute = App.voteOnDispute;  // Expose dispute voting function
