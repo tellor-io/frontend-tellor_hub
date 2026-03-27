@@ -2236,13 +2236,17 @@ body:has(.function-focus-state) .frontend-code-link {
 }
 
 .under-construction-overlay {
-  display: flex;
+  display: none;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   padding: 60px 24px;
   gap: 12px;
+}
+
+.function-section.under-construction .under-construction-overlay {
+  display: flex;
 }
 
 .under-construction-icon {
