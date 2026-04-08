@@ -809,15 +809,13 @@
               document.querySelectorAll('.function-section').forEach(s => s.classList.remove('active'));
               document.getElementById(sectionId).classList.add('active');
               
-              // Update bridge direction for proper button state management
               if (window.App && window.App.switchBridgeDirection) {
-                window.App.switchBridgeDirection(functionType);
+                const dir = window.App.resolveBridgeNavDirection
+                  ? window.App.resolveBridgeNavDirection(functionType)
+                  : functionType;
+                window.App.switchBridgeDirection(dir);
               }
               
-              // Hide TRB price tooltip immediately when switching sections
-              if (window.hideTrbPriceTooltip) {
-                window.hideTrbPriceTooltip();
-              }
               if (window.hideTrbPriceTooltip) {
                 window.hideTrbPriceTooltip();
               }
@@ -836,15 +834,6 @@
                     }
                   }
                 }, 200);
-              }
-              
-              // Update withdrawal history when bridge to ethereum section is shown
-              if (functionType === 'bridgeToEth') {
-                if (window.App && window.App.updateWithdrawalHistory) {
-                  setTimeout(() => {
-                    window.App.updateWithdrawalHistory();
-                  }, 100);
-                }
               }
             }
             
@@ -900,20 +889,17 @@
               document.querySelectorAll('.function-section').forEach(s => s.classList.remove('active'));
               document.getElementById(sectionId).classList.add('active');
               
-              // Update bridge direction for proper button state management
               if (window.App && window.App.switchBridgeDirection) {
-                window.App.switchBridgeDirection(functionType);
+                const dir = window.App.resolveBridgeNavDirection
+                  ? window.App.resolveBridgeNavDirection(functionType)
+                  : functionType;
+                window.App.switchBridgeDirection(dir);
               }
               
-              // Hide TRB price tooltip immediately when switching sections
               if (window.hideTrbPriceTooltip) {
                 window.hideTrbPriceTooltip();
               }
-              if (window.hideTrbPriceTooltip) {
-                window.hideTrbPriceTooltip();
-              }
               
-              // For relevant sections, check if there's a value and show tooltip if appropriate
               if (functionType !== 'dispute') {
                 setTimeout(() => {
                   if (window.App && window.App.currentBridgeDirection) {
@@ -927,15 +913,6 @@
                     }
                   }
                 }, 200);
-              }
-              
-              // Update withdrawal history when bridge to ethereum section is shown
-              if (functionType === 'bridgeToEth') {
-                if (window.App && window.App.updateWithdrawalHistory) {
-                  setTimeout(() => {
-                    window.App.updateWithdrawalHistory();
-                  }, 100);
-                }
               }
             }
             

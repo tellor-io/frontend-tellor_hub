@@ -18,7 +18,7 @@ Comprehensive test suite for the Layer Bridge frontend application, covering bot
 
 ### 3. Network Detection Tests (UPDATED!)
 - **Network detection for mainnet** - Tests automatic detection of Tellor Mainnet (`tellor-1`)
-- **Network detection for testnet** - Tests automatic detection of Palmito Testnet (`layertest-4`)
+- **Network detection for testnet** - Tests automatic detection of Palmito Testnet (`layertest-5`)
 - **Network switching functionality** - Tests switching between mainnet and testnet
 - **Cosmos wallet adapter network detection** - Tests network detection with wallet adapters
 - **Network switching with isNetworkSwitching flag** - Tests the new network switching flag functionality
@@ -79,12 +79,12 @@ Comprehensive test suite for the Layer Bridge frontend application, covering bot
 - **RPC Endpoint Selection**: Tests correct endpoint selection based on detected network
   - Mainnet: `https://mainnet.tellorlayer.com`
   - Testnet: `https://node-palmito.tellorlayer.com`
-- **Chain ID Validation**: Tests proper `cosmosChainId` setting (`tellor-1` vs `layertest-4`)
+- **Chain ID Validation**: Tests proper `cosmosChainId` setting (`tellor-1` vs `layertest-5`)
 - **Button State Management**: Tests UI button states based on network and connection status
 
 ### Network Switching
-- **Mainnet to Testnet**: Tests switching from `tellor-1` to `layertest-4`
-- **Testnet to Mainnet**: Tests switching from `layertest-4` to `tellor-1`
+- **Mainnet to Testnet**: Tests switching from `tellor-1` to `layertest-5`
+- **Testnet to Mainnet**: Tests switching from `layertest-5` to `tellor-1`
 - **State Persistence**: Tests that network state persists across operations
 
 ## Mock Objects
@@ -93,7 +93,7 @@ Comprehensive test suite for the Layer Bridge frontend application, covering bot
 ```javascript
 {
   enable: async (chainId) => { /* chain configuration */ },
-  getChainId: async () => 'layertest-4', // Default, can be overridden
+  getChainId: async () => 'layertest-5', // Default, can be overridden
   getOfflineSigner: (chainId) => { /* signer with accounts */ },
   experimentalSuggestChain: async (chainConfig) => true
 }

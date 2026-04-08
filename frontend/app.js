@@ -35,6 +35,12 @@ const App = {
         // Initialize ethers
         App.ethers = ethers;
         
+        // Restore persisted network selections before anything else
+        const savedCosmosChain = localStorage.getItem('tellor_cosmos_chain_id');
+        if (savedCosmosChain && (savedCosmosChain === 'tellor-1' || savedCosmosChain === 'layertest-5')) {
+          App.cosmosChainId = savedCosmosChain;
+        }
+        
         // Initialize delegate section immediately (doesn't depend on Web3 or CosmJS)
         App.initDelegateSection();
         
@@ -65,6 +71,9 @@ const App = {
             
             // Initialize withdrawal history table
             App.updateWithdrawalHistory();
+            
+            // Auto-reconnect wallets from previous session
+            App.autoReconnectWallets();
             
             // Remove any existing event listeners
             const walletButton = document.getElementById('walletButton');
@@ -155,6 +164,50 @@ const App = {
     });
   },
 
+  autoReconnectWallets: async function() {
+    // Silently reconnect wallets that were connected before page refresh
+    const savedCosmosWalletType = localStorage.getItem('tellor_cosmos_wallet_type');
+    const savedCosmosChainId = localStorage.getItem('tellor_cosmos_chain_id');
+    const savedEthWalletType = localStorage.getItem('tellor_eth_wallet_type');
+    const savedEthConnected = localStorage.getItem('tellor_eth_wallet_connected');
+
+    if (savedCosmosWalletType && window.cosmosWalletAdapter) {
+      try {
+        if (savedCosmosChainId) {
+          App.cosmosChainId = savedCosmosChainId;
+        }
+        await App.connectCosmosWallet(savedCosmosWalletType);
+        console.log('Auto-reconnected Cosmos wallet:', savedCosmosWalletType);
+      } catch (err) {
+        console.warn('Auto-reconnect Cosmos wallet failed:', err.message);
+        localStorage.removeItem('tellor_cosmos_wallet_type');
+        localStorage.removeItem('tellor_cosmos_chain_id');
+      }
+    }
+
+    if (savedEthConnected === 'true' && savedEthWalletType) {
+      try {
+        App._isAutoReconnecting = true;
+        if (window.ethereumWalletAdapter) {
+          await App.connectEthereumWallet(savedEthWalletType);
+        } else if (window.ethereum) {
+          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+          if (accounts.length > 0) {
+            await App.connectMetaMask();
+          }
+        }
+        console.log('Auto-reconnected Ethereum wallet:', savedEthWalletType);
+      } catch (err) {
+        console.warn('Auto-reconnect Ethereum wallet failed:', err.message);
+        localStorage.removeItem('tellor_eth_wallet_type');
+        localStorage.removeItem('tellor_eth_wallet_connected');
+        localStorage.removeItem('tellor_eth_chain_id');
+      } finally {
+        delete App._isAutoReconnecting;
+      }
+    }
+  },
+
   initWeb3: function () {
     return new Promise((resolve, reject) => {
       try {
@@ -164,62 +217,67 @@ const App = {
         
         // Handle Ethereum wallets
         if (hasEthereumAdapter) {
-          // Use wallet adapter for Ethereum wallets
           const availableWallets = window.ethereumWalletAdapter.detectWallets();
           
           if (availableWallets.length > 0) {
-            // Enable Ethereum wallet buttons
             const walletButton = document.getElementById("walletButton");
-            
             if (walletButton) {
               walletButton.disabled = false;
               walletButton.innerHTML = 'Connect Ethereum Wallet';
             }
           }
         } else {
-          // Fallback to direct MetaMask detection
           const hasMetaMask = typeof window.ethereum !== 'undefined';
           
           if (hasMetaMask) {
             App.web3Provider = window.ethereum;
             App.web3 = new Web3(window.ethereum);
-            
-            // Set up event listeners
-            const handleDisconnect = () => {
-              App.disconnectMetaMask();
-            };
 
-                const handleChainChanged = () => {
-      // Prevent automatic page reload to avoid hosting issues
-      // window.location.reload();
-      App.handleError(new Error('Network changed. Please refresh manually if needed.'));
-      
-      // Update network display
-      if (App.updateNetworkDisplay) {
-        App.updateNetworkDisplay();
-      }
-    };
-
-            const handleAccountsChanged = (accounts) => {
-              App.handleAccountsChanged(accounts);
-            };
-
-            // Remove existing listeners if any
-            if(App.web3Provider) {
-              window.ethereum.removeListener('disconnect', handleDisconnect);
-              window.ethereum.removeListener('chainChanged', handleChainChanged);
-              window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-            }
-            
-            // Add new listeners
-            window.ethereum.on('disconnect', handleDisconnect);
-            window.ethereum.on('chainChanged', handleChainChanged);
-            window.ethereum.on('accountsChanged', handleAccountsChanged);
-
-            // Enable MetaMask buttons
             const walletButton = document.getElementById("walletButton");
             if (walletButton) walletButton.disabled = false;
           }
+        }
+
+        // Always listen for chain/account changes on window.ethereum
+        // (needed regardless of wallet adapter vs legacy path)
+        if (typeof window.ethereum !== 'undefined') {
+          const handleChainChanged = async (chainIdHex) => {
+            const newChainId = typeof chainIdHex === 'string' && chainIdHex.startsWith('0x')
+              ? parseInt(chainIdHex, 16)
+              : parseInt(chainIdHex);
+            
+            App.chainId = newChainId;
+
+            if (App.isConnected) {
+              localStorage.setItem('tellor_eth_chain_id', String(newChainId));
+            }
+
+            if (App.updateNetworkDisplay) {
+              App.updateNetworkDisplay();
+            }
+            if (App.updateWalletManagerToggleText) {
+              App.updateWalletManagerToggleText();
+            }
+            if (App.updateNetworkCompatibilityWarning) {
+              App.updateNetworkCompatibilityWarning();
+            }
+          };
+
+          const handleAccountsChanged = (accounts) => {
+            App.handleAccountsChanged(accounts);
+          };
+
+          const handleDisconnect = () => {
+            App.disconnectMetaMask();
+          };
+
+          window.ethereum.removeListener('chainChanged', handleChainChanged);
+          window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+          window.ethereum.removeListener('disconnect', handleDisconnect);
+
+          window.ethereum.on('chainChanged', handleChainChanged);
+          window.ethereum.on('accountsChanged', handleAccountsChanged);
+          window.ethereum.on('disconnect', handleDisconnect);
         }
         
         // Handle Cosmos wallets
@@ -292,21 +350,20 @@ const App = {
         App.ethers = connectionResult.ethers;
         App.isConnected = true;
         
-        // Default to mainnet, but allow switching to Sepolia for testing
-        if (App.chainId !== 1) {
-            // console.log(...);
+        // Persist connection for auto-reconnect on page refresh
+        localStorage.setItem('tellor_eth_wallet_type', walletType);
+        localStorage.setItem('tellor_eth_wallet_connected', 'true');
+        
+        // During auto-reconnect, respect whatever chain MetaMask is already on.
+        // Only prompt/force mainnet on fresh user-initiated connects.
+        if (!App._isAutoReconnecting && App.chainId !== 1) {
             try {
-                // Try to switch to mainnet first (preferred for production)
                 await window.ethereumWalletAdapter.switchChain(1);
                 App.chainId = 1;
-                // console.log(...);
             } catch (switchError) {
-                // If switching to mainnet fails, check if we're on Sepolia
                 if (App.chainId === 11155111) {
-                    // User is on Sepolia, ask if they want to stay or switch
                     const userChoice = confirm('You are connected to Sepolia Testnet. Would you like to switch to Ethereum Mainnet? Click OK to switch to Mainnet, or Cancel to stay on Sepolia.');
                     if (userChoice) {
-                        // User wants to switch to mainnet, try again
                         try {
                             await window.ethereumWalletAdapter.switchChain(1);
                             App.chainId = 1;
@@ -315,9 +372,7 @@ const App = {
                             throw new Error('Failed to switch to Mainnet network');
                         }
                     }
-                    // If user cancels, they stay on Sepolia
                 } else {
-                    // User is on an unsupported network
                     alert('Please manually switch to Ethereum Mainnet (chain ID: 1) or Sepolia testnet (chain ID: 11155111) in your wallet and try again.');
                     throw new Error('Failed to switch to supported network');
                 }
@@ -332,6 +387,9 @@ const App = {
             alert('Please connect to Sepolia (chain ID: 11155111) or Ethereum Mainnet (chain ID: 1).');
             throw error;
         }
+        
+        // Persist final chain ID for auto-reconnect
+        localStorage.setItem('tellor_eth_chain_id', String(App.chainId));
         
         // Initialize contracts
         await App.initBridgeContract();
@@ -348,9 +406,6 @@ const App = {
         
         // Update wallet manager toggle text
         App.updateWalletManagerToggleText();
-        
-        // Keep dropdown open after wallet connection
-        App.keepWalletDropdownOpen();
         
         // Update balances and limits
         await Promise.all([
@@ -437,42 +492,29 @@ const App = {
         }
         
         App.chainId = chainId;
-        // console.log(...);
         
-        // Default to mainnet, but allow switching to Sepolia for testing
-        if (chainId !== 1) {
-            // console.log(...);
+        // During auto-reconnect, respect whatever chain MetaMask is already on.
+        // Only prompt/force mainnet on fresh user-initiated connects.
+        if (!App._isAutoReconnecting && chainId !== 1) {
             try {
-                // Try to switch to mainnet first (preferred for production)
                 await window.ethereum.request({
                     method: 'wallet_switchEthereumChain',
-                    params: [{ chainId: '0x1' }], // 1 in hex
+                    params: [{ chainId: '0x1' }],
                 });
-                
-                // Verify the switch worked
                 chainId = await window.ethereum.request({ method: 'eth_chainId' });
                 if (typeof chainId === 'string' && chainId.startsWith('0x')) {
                     chainId = parseInt(chainId, 16);
                 }
                 App.chainId = chainId;
-                // console.log(...);
-                
             } catch (switchError) {
-                // console.log(...);
-                
-                // If switching to mainnet fails, check if we're on Sepolia
                 if (chainId === 11155111) {
-                    // User is on Sepolia, ask if they want to stay or switch
                     const userChoice = confirm('You are connected to Sepolia Testnet. Would you like to switch to Ethereum Mainnet? Click OK to switch to Mainnet, or Cancel to stay on Sepolia.');
                     if (userChoice) {
-                        // User wants to switch to mainnet, try again
                         try {
                             await window.ethereum.request({
                                 method: 'wallet_switchEthereumChain',
-                                params: [{ chainId: '0x1' }], // 1 in hex
+                                params: [{ chainId: '0x1' }],
                             });
-                            
-                            // Verify the switch worked
                             chainId = await window.ethereum.request({ method: 'eth_chainId' });
                             if (typeof chainId === 'string' && chainId.startsWith('0x')) {
                                 chainId = parseInt(chainId, 16);
@@ -483,45 +525,9 @@ const App = {
                             throw new Error('Failed to switch to Mainnet network');
                         }
                     }
-                    // If user cancels, they stay on Sepolia
                 } else {
-                    // If the network doesn't exist (error code 4902), add it
-                    if (switchError.code === 4902) {
-                        try {
-                            // console.log(...);
-                            await window.ethereum.request({
-                                method: 'wallet_addEthereumChain',
-                                params: [{
-                                    chainId: '0xaa36a7', // 11155111 in hex
-                                    chainName: 'Sepolia',
-                                    nativeCurrency: {
-                                        name: 'Sepolia Ether',
-                                        symbol: 'ETH',
-                                        decimals: 18
-                                    },
-                                    rpcUrls: ['https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161'],
-                                    blockExplorerUrls: ['https://sepolia.etherscan.io']
-                                }]
-                            });
-                            
-                            // Verify the add worked
-                            chainId = await window.ethereum.request({ method: 'eth_chainId' });
-                            if (typeof chainId === 'string' && chainId.startsWith('0x')) {
-                                chainId = parseInt(chainId, 16);
-                            }
-                            App.chainId = chainId;
-                            // console.log(...);
-                            
-                        } catch (addError) {
-                            // console.error(...);
-                            alert('Please manually add Sepolia testnet (chain ID: 11155111) or Ethereum Mainnet (chain ID: 1) to MetaMask and try again.');
-                            throw new Error('Failed to add supported network to MetaMask');
-                        }
-                    } else {
-                        // console.error(...);
-                        alert('Please manually switch to Sepolia testnet (chain ID: 11155111) or Ethereum Mainnet (chain ID: 1) in MetaMask and try again.');
-                        throw new Error('Failed to switch to supported network');
-                    }
+                    alert('Please manually switch to Ethereum Mainnet (chain ID: 1) or Sepolia testnet (chain ID: 11155111) in your wallet and try again.');
+                    throw new Error('Failed to switch to supported network');
                 }
             }
         }
@@ -530,9 +536,6 @@ const App = {
         try {
             validateChainId(chainId);
         } catch (error) {
-            // console.error(...);
-            // console.error(...);
-            // console.error(...);
             alert('Please connect to Sepolia (chain ID: 11155111) or Ethereum Mainnet (chain ID: 1).');
             throw error;
         }
@@ -540,6 +543,11 @@ const App = {
         // Set account and connection state
         App.account = accounts[0];
         App.isConnected = true;
+        
+        // Persist connection for auto-reconnect on page refresh
+        localStorage.setItem('tellor_eth_wallet_type', 'metamask');
+        localStorage.setItem('tellor_eth_wallet_connected', 'true');
+        localStorage.setItem('tellor_eth_chain_id', String(App.chainId));
         
         // Initialize contracts
         await App.initBridgeContract();
@@ -555,10 +563,6 @@ const App = {
         
         // Update wallet manager toggle text
         App.updateWalletManagerToggleText();
-        
-        // Keep dropdown open after wallet connection
-        App.keepWalletDropdownOpen();
-
         
         // Update balances and limits
         await Promise.all([
@@ -617,14 +621,16 @@ const App = {
             App.cosmosChainId = 'tellor-1'; // Default to mainnet
         }
         
-        // Try to detect the current network from the wallet adapter (only if not switching networks)
-        if (!App.isNetworkSwitching) {
+        // Try to detect the current network from the wallet adapter
+        // Only query if not switching networks AND the adapter already has a live connection
+        // (otherwise getChainId returns the adapter default and overwrites the restored value)
+        if (!App.isNetworkSwitching && window.cosmosWalletAdapter.isConnected()) {
             try {
                 const currentChainId = await window.cosmosWalletAdapter.getChainId();
                 if (currentChainId === 'tellor-1') {
                     App.cosmosChainId = 'tellor-1';
-                } else if (currentChainId === 'layertest-4') {
-                    App.cosmosChainId = 'layertest-4';
+                } else if (currentChainId === 'layertest-5') {
+                    App.cosmosChainId = 'layertest-5';
                 }
             } catch (error) {
                 console.log('Could not detect current network from wallet adapter, using default');
@@ -636,6 +642,10 @@ const App = {
         
         // Cache the wallet type for future reconnections
         App.cachedCosmosWalletType = walletType;
+        
+        // Persist connection for auto-reconnect on page refresh
+        localStorage.setItem('tellor_cosmos_wallet_type', walletType);
+        localStorage.setItem('tellor_cosmos_chain_id', App.cosmosChainId || 'tellor-1');
         
         // Set wallet state
         App.keplrAddress = connectionResult.address;
@@ -653,9 +663,6 @@ const App = {
         
         // Update wallet manager toggle text
         App.updateWalletManagerToggleText();
-        
-        // Keep dropdown open after wallet connection
-        App.keepWalletDropdownOpen();
         
         // Update balance immediately after connection
         await App.updateKeplrBalance();
@@ -736,8 +743,8 @@ const App = {
                 rpcUrl = "https://mainnet.tellorlayer.com/rpc";
                 restUrl = "https://mainnet.tellorlayer.com/rpc";
                 chainName = "Tellor Layer";
-            } else if (currentChainId === 'layertest-4') {
-                App.cosmosChainId = 'layertest-4';
+            } else if (currentChainId === 'layertest-5') {
+                App.cosmosChainId = 'layertest-5';
                 rpcUrl = "https://node-palmito.tellorlayer.com/rpc";
                 restUrl = "https://node-palmito.tellorlayer.com/rpc";
                 chainName = "Tellor Layer Testnet";
@@ -805,6 +812,10 @@ const App = {
         App.isKeplrConnected = true;
         App.connectedWallet = 'Keplr';
         
+        // Persist connection for auto-reconnect on page refresh
+        localStorage.setItem('tellor_cosmos_wallet_type', 'keplr');
+        localStorage.setItem('tellor_cosmos_chain_id', App.cosmosChainId || 'tellor-1');
+        
         // Update button text
         const truncatedAddress = `${App.keplrAddress.substring(0, 6)}...${App.keplrAddress.substring(App.keplrAddress.length - 4)}`;
         const keplrButton = document.getElementById('keplrButton');
@@ -814,9 +825,6 @@ const App = {
         
         // Update wallet manager toggle text
         App.updateWalletManagerToggleText();
-        
-        // Keep dropdown open after wallet connection
-        App.keepWalletDropdownOpen();
         
         // Update balance immediately after connection
         await App.updateKeplrBalance();
@@ -866,6 +874,11 @@ const App = {
         if (!App.isConnected) {
             return;
         }
+
+        // Clear auto-reconnect persistence
+        localStorage.removeItem('tellor_eth_wallet_type');
+        localStorage.removeItem('tellor_eth_wallet_connected');
+        localStorage.removeItem('tellor_eth_chain_id');
 
         // Disconnect from wallet adapter if available
         if (window.ethereumWalletAdapter && window.ethereumWalletAdapter.isWalletConnected()) {
@@ -941,6 +954,10 @@ const App = {
             // console.warn(...);
         }
         }
+
+        // Clear auto-reconnect persistence
+        localStorage.removeItem('tellor_cosmos_wallet_type');
+        localStorage.removeItem('tellor_cosmos_chain_id');
 
         // Clear wallet state
         App.keplrAddress = null;
@@ -1060,9 +1077,6 @@ const App = {
         
         // Update wallet manager toggle text
         App.updateWalletManagerToggleText();
-        
-        // Keep dropdown open after account change
-        App.keepWalletDropdownOpen();
         
         App.setPageParams();
         this.updateUIForCurrentDirection();
@@ -1329,7 +1343,7 @@ const App = {
         }
         if (cosmosToggleText) cosmosToggleText.textContent = 'Switch to Testnet';
         if (cosmosNetworkGroup) cosmosNetworkGroup.style.display = 'flex';
-      } else if (App.cosmosChainId === 'layertest-4') {
+      } else if (App.cosmosChainId === 'layertest-5') {
         cosmosNetworkDisplay.textContent = '*Palmito Testnet';
         cosmosNetworkDisplay.style.color = '#f59e0b'; // Orange for testnet
         // Show network toggle for testnet
@@ -1481,10 +1495,9 @@ const App = {
     const targetNetwork = App.cosmosChainId === 'tellor-1' ? 'testnet' : 'mainnet';
     const currentNetwork = App.cosmosChainId === 'tellor-1' ? 'mainnet' : 'testnet';
     
-    const message = `Switching from ${currentNetwork} to ${targetNetwork} requires reconnecting your wallet. Do you want to continue?`;
+    const message = `Switch from ${currentNetwork} to ${targetNetwork}?`;
     
          App.showConfirmationModal(message, async () => {
-       // User confirmed - proceed with network switch
        const cosmosToggleButton = document.getElementById('cosmos-network-toggle-btn');
        if (cosmosToggleButton) {
          cosmosToggleButton.disabled = true;
@@ -1494,72 +1507,75 @@ const App = {
     try {
       let targetChainId;
       if (App.cosmosChainId === 'tellor-1') {
-        // Currently on mainnet, switch to testnet
-        targetChainId = 'layertest-4';
-      } else if (App.cosmosChainId === 'layertest-4') {
-        // Currently on testnet, switch to mainnet
+        targetChainId = 'layertest-5';
+      } else if (App.cosmosChainId === 'layertest-5') {
         targetChainId = 'tellor-1';
       } else {
         App.showValidationErrorPopup('Cannot switch from unsupported Cosmos network');
         return;
       }
 
-      // Disconnect current Cosmos connection
-      await App.disconnectKeplr();
-      
-      // Update App state
+      // Update App state to the target chain
       App.cosmosChainId = targetChainId;
-      
-      // Update UI
-      App.updateCosmosNetworkDisplay();
-      
-      // Reconnect with new network using cached wallet type if available
-      if (App.cachedCosmosWalletType && window.cosmosWalletAdapter) {
-        // Use the wallet adapter with cached wallet type
-        await App.connectCosmosWallet(App.cachedCosmosWalletType);
-      } else {
-        // Fall back to legacy Keplr connection
+
+      // In-place chain switch via the wallet adapter (no disconnect needed)
+      if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+        await window.cosmosWalletAdapter.switchToChain();
+
+        // Re-fetch accounts from the new chain's offline signer
+        const offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+        const accounts = await offlineSigner.getAccounts();
+        if (accounts && accounts.length > 0) {
+          App.keplrAddress = accounts[0].address;
+        }
+
+        // Update persisted chain ID for auto-reconnect
+        localStorage.setItem('tellor_cosmos_chain_id', targetChainId);
+      } else if (window.keplr) {
+        // Legacy path: must disconnect and reconnect
+        await App.disconnectKeplr();
         await App.connectKeplr();
       }
       
-      // Always refresh validator dropdown when switching networks
+      // Update UI
+      App.updateCosmosNetworkDisplay();
+
+      const truncatedAddress = `${App.keplrAddress.substring(0, 6)}...${App.keplrAddress.substring(App.keplrAddress.length - 4)}`;
+      const keplrButton = document.getElementById('keplrButton');
+      if (keplrButton) {
+        keplrButton.innerHTML = `Disconnect <span class="truncated-address">(${truncatedAddress})</span>`;
+      }
+
+      // Refresh validator/reporter dropdowns for the new network
       try {
-        await App.populateValidatorDropdown(true); // true = isNetworkSwitch
-        await App.populateReporterDropdown(true); // true = isNetworkSwitch
+        await App.populateValidatorDropdown(true);
+        await App.populateReporterDropdown(true);
         await App.refreshCurrentStatus();
-        console.log('Validator and reporter dropdowns refreshed after network switch');
       } catch (error) {
         console.error('Failed to refresh dropdowns after network switch:', error);
       }
       
-      // Update UI to ensure withdrawal button state is correct after network switch
-      // This must happen after wallet reconnection is complete
       App.updateUIForCurrentDirection();
-      
-      // Clear network switching flag
+      App.updateWalletManagerToggleText();
       App.isNetworkSwitching = false;
       
-      
-      // Update balance for the new network after a small delay to ensure wallet is ready
+      // Update balance after a short delay to let the wallet settle
       setTimeout(async () => {
         try {
           await App.updateKeplrBalance();
         } catch (error) {
           console.error('Error updating balance after network switch:', error);
         }
-      }, 1000);
+      }, 500);
       
-      // Re-enable the toggle button
       if (cosmosToggleButton) {
         cosmosToggleButton.disabled = false;
         cosmosToggleButton.textContent = App.cosmosChainId === 'tellor-1' ? 'Switch to Testnet' : 'Switch to Mainnet';
       }
       
     } catch (error) {
-      // console.error('Error switching Cosmos network:', error);
       App.handleError(error);
     } finally {
-      // Clear network switching flag in case of error
       App.isNetworkSwitching = false;
       
       if (cosmosToggleButton) {
@@ -3009,12 +3025,19 @@ const App = {
   },
 
   // Function to update withdrawal history UI
+  _withdrawalStylesInjected: false,
+
   updateWithdrawalHistory: async function() {
+    const refreshBtn = document.querySelector('button[onclick="App.updateWithdrawalHistory()"]');
+    if (refreshBtn) {
+        refreshBtn.disabled = true;
+        refreshBtn.innerHTML = '<span>⏳</span><span>Loading...</span>';
+    }
+
     try {
         const showAllCheckbox = document.getElementById('showAllWithdrawals');
         const showAll = showAllCheckbox ? showAllCheckbox.checked : false;
         
-        // Show/hide legend based on checkbox state
         const legend = document.getElementById('withdrawalLegend');
         if (legend) {
             legend.style.display = showAll ? 'inline-flex' : 'none';
@@ -3024,76 +3047,77 @@ const App = {
 
         const tableBody = document.querySelector('#withdrawal-history tbody');
         if (!tableBody) {
-            // console.error(...);
             return;
         }
 
-        // Add table styles
-        const style = document.createElement('style');
-        style.textContent = `
-            #withdrawal-history {
-                border-collapse: collapse;
-                width: 100%;
-            }
-            #withdrawal-history th {
-                background-color: #f8f9fa;
-                padding: 12px;
-                text-align: left;
-                border-bottom: 2px solid #e2e8f0;
-                font-weight: 600;
-                color: #2d3748;
-            }
-            #withdrawal-history td {
-                padding: 12px;
-                border-bottom: 1px solid #e2e8f0;
-                vertical-align: middle;
-            }
-            #withdrawal-history tr:last-child td {
-                border-bottom: none;
-            }
-            #withdrawal-history tr:hover {
-                background-color: #f8f9fa;
-            }
-            #withdrawal-history tr[style*="background-color: #e6f7f7"]:hover {
-                background-color: #d1eeee !important;
-            }
-            .amount-column {
-                text-align: right;
-            }
-            .address-cell {
-                font-family: monospace;
-                color: #4a5568;
-            }
-            .status-true {
-                color: #38a169;
-                font-weight: 500;
-            }
-            .status-false {
-                color: #e53e3e;
-                font-weight: 500;
-            }
-            .attest-button, .claim-button {
-                margin: 0 4px;
-                padding: 6px 12px;
-                border-radius: 4px;
-                font-size: 14px;
-                transition: opacity 0.2s;
-            }
-            .attest-button:hover, .claim-button:hover {
-                opacity: 0.9;
-            }
-            .attest-button:disabled, .claim-button:disabled {
-                background-color: #cbd5e0 !important;
-                cursor: not-allowed;
-                opacity: 0.7;
-            }
-            .attest-button.disconnected {
-                background-color: #cbd5e0 !important;
-                cursor: not-allowed;
-                opacity: 0.7;
-            }
-        `;
-        document.head.appendChild(style);
+        if (!this._withdrawalStylesInjected) {
+            this._withdrawalStylesInjected = true;
+            const style = document.createElement('style');
+            style.textContent = `
+                #withdrawal-history {
+                    border-collapse: collapse;
+                    width: 100%;
+                }
+                #withdrawal-history th {
+                    background-color: #f8f9fa;
+                    padding: 12px;
+                    text-align: left;
+                    border-bottom: 2px solid #e2e8f0;
+                    font-weight: 600;
+                    color: #2d3748;
+                }
+                #withdrawal-history td {
+                    padding: 12px;
+                    border-bottom: 1px solid #e2e8f0;
+                    vertical-align: middle;
+                }
+                #withdrawal-history tr:last-child td {
+                    border-bottom: none;
+                }
+                #withdrawal-history tr:hover {
+                    background-color: #f8f9fa;
+                }
+                #withdrawal-history tr[style*="background-color: #e6f7f7"]:hover {
+                    background-color: #d1eeee !important;
+                }
+                .amount-column {
+                    text-align: right;
+                }
+                .address-cell {
+                    font-family: monospace;
+                    color: #4a5568;
+                }
+                .status-true {
+                    color: #38a169;
+                    font-weight: 500;
+                }
+                .status-false {
+                    color: #e53e3e;
+                    font-weight: 500;
+                }
+                .attest-button, .claim-button {
+                    margin: 0 4px;
+                    padding: 6px 12px;
+                    border-radius: 4px;
+                    font-size: 14px;
+                    transition: opacity 0.2s;
+                }
+                .attest-button:hover, .claim-button:hover {
+                    opacity: 0.9;
+                }
+                .attest-button:disabled, .claim-button:disabled {
+                    background-color: #cbd5e0 !important;
+                    cursor: not-allowed;
+                    opacity: 0.7;
+                }
+                .attest-button.disconnected {
+                    background-color: #cbd5e0 !important;
+                    cursor: not-allowed;
+                    opacity: 0.7;
+                }
+            `;
+            document.head.appendChild(style);
+        }
 
         // Clear existing content
         tableBody.innerHTML = '';
@@ -3234,7 +3258,6 @@ const App = {
             }
         }
     } catch (error) {
-        // console.error(...);
         const tableBody = document.querySelector('#withdrawal-history tbody');
         if (tableBody) {
             tableBody.innerHTML = `
@@ -3245,6 +3268,11 @@ const App = {
                     </td>
                 </tr>
             `;
+        }
+    } finally {
+        if (refreshBtn) {
+            refreshBtn.disabled = false;
+            refreshBtn.innerHTML = '<span>🔄</span><span>Refresh</span>';
         }
     }
   },
@@ -4397,33 +4425,36 @@ const App = {
     
     const isEthereumConnected = App.isConnected && App.account !== '0x0';
     const isCosmosConnected = App.isKeplrConnected && App.keplrAddress;
-    
+
+    const ethIsMainnet = App.chainId === 1;
+    const cosmosIsMainnet = App.cosmosChainId === 'tellor-1';
+    const dot = (isMainnet) => `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${isMainnet ? '#10b981' : '#f59e0b'};margin-right:4px;vertical-align:middle;"></span>`;
+
     if (isEthereumConnected && isCosmosConnected) {
-      const ethTruncatedAddress = `${App.account.substring(0, 6)}...${App.account.substring(App.account.length - 4)}`;
-      const cosmosTruncatedAddress = `${App.keplrAddress.substring(0, 6)}...${App.keplrAddress.substring(App.keplrAddress.length - 4)}`;
-      walletManagerText.textContent = `Ethereum: ${ethTruncatedAddress} | Cosmos: ${cosmosTruncatedAddress}`;
+      const ethAddr = `${App.account.substring(0, 6)}...${App.account.substring(App.account.length - 4)}`;
+      const cosmosAddr = `${App.keplrAddress.substring(0, 6)}...${App.keplrAddress.substring(App.keplrAddress.length - 4)}`;
+      walletManagerText.innerHTML = `${dot(ethIsMainnet)}Eth: ${ethAddr} | ${dot(cosmosIsMainnet)}Cosmos: ${cosmosAddr}`;
     } else if (isEthereumConnected) {
-      const truncatedAddress = `${App.account.substring(0, 6)}...${App.account.substring(App.account.length - 4)}`;
-      walletManagerText.textContent = `Ethereum: ${truncatedAddress} | Cosmos: Not Connected`;
+      const ethAddr = `${App.account.substring(0, 6)}...${App.account.substring(App.account.length - 4)}`;
+      walletManagerText.innerHTML = `${dot(ethIsMainnet)}Eth: ${ethAddr} | Cosmos: --`;
     } else if (isCosmosConnected) {
-      const truncatedAddress = `${App.keplrAddress.substring(0, 6)}...${App.keplrAddress.substring(App.keplrAddress.length - 4)}`;
-      walletManagerText.textContent = `Ethereum: Not Connected | Cosmos: ${truncatedAddress}`;
+      const cosmosAddr = `${App.keplrAddress.substring(0, 6)}...${App.keplrAddress.substring(App.keplrAddress.length - 4)}`;
+      walletManagerText.innerHTML = `Eth: -- | ${dot(cosmosIsMainnet)}Cosmos: ${cosmosAddr}`;
     } else {
       walletManagerText.textContent = 'Connect Wallets';
     }
   },
 
-  keepWalletDropdownOpen: function() {
-    const walletManagerDropdown = document.querySelector('.wallet-manager-dropdown');
-    if (walletManagerDropdown) {
-      // Ensure dropdown stays open after wallet operations
-      // Use a small delay to ensure it works after any UI updates
-      setTimeout(() => {
-        if (!walletManagerDropdown.classList.contains('open')) {
-          walletManagerDropdown.classList.add('open');
-        }
-      }, 100);
+  /**
+   * Maps hub / side-nav `data-function` values to a direction accepted by switchBridgeDirection.
+   * Raw 'bridge' is invalid there (early return) — callers must use this so layer vs ethereum sub-tabs restore.
+   */
+  resolveBridgeNavDirection: function(functionType) {
+    if (functionType === 'bridge') {
+      const last = this.currentBridgeDirection;
+      return (last === 'layer' || last === 'ethereum') ? last : 'layer';
     }
+    return functionType;
   },
 
   switchBridgeDirection: function(direction) {
@@ -5819,7 +5850,7 @@ const App = {
             if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
                 offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
             } else if (window.keplr) {
-                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-5';
                 offlineSigner = window.keplr.getOfflineSigner(chainId);
             } else {
                 throw new Error('No wallet connected.');
@@ -5914,7 +5945,7 @@ const App = {
             if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
                 offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
             } else if (window.keplr) {
-                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-5';
                 offlineSigner = window.keplr.getOfflineSigner(chainId);
             } else {
                 throw new Error('No wallet connected.');

@@ -124,6 +124,20 @@ export class IntegrationTests extends TestSuite {
       {
         name: 'UI responsiveness',
         run: () => this.testUIResponsiveness()
+      },
+
+      // Session Persistence Integration
+      {
+        name: 'Wallet reconnect persists through full cycle',
+        run: () => this.testWalletReconnectCycle()
+      },
+      {
+        name: 'Bridge nav remembers last sub-direction',
+        run: () => this.testBridgeNavMemory()
+      },
+      {
+        name: 'Network dots update on wallet state changes',
+        run: () => this.testNetworkDotsReactivity()
       }
     ];
   }
@@ -1075,5 +1089,90 @@ export class IntegrationTests extends TestSuite {
     this.assertObject(hasVotedResult, 'Has voted result should be an object');
     this.assertDefined(hasVotedResult.hasVoted, 'Should have hasVoted property');
     this.assertFalse(hasVotedResult.hasVoted, 'Mock should not have voted');
+  }
+
+  // ─── Session Persistence Integration ──────────────────────────────
+
+  async testWalletReconnectCycle() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+
+    const keys = [
+      'tellor_cosmos_wallet_type', 'tellor_cosmos_chain_id',
+      'tellor_eth_wallet_type', 'tellor_eth_wallet_connected', 'tellor_eth_chain_id'
+    ];
+    keys.forEach(k => localStorage.removeItem(k));
+
+    localStorage.setItem('tellor_cosmos_wallet_type', 'keplr');
+    localStorage.setItem('tellor_cosmos_chain_id', 'layertest-5');
+    localStorage.setItem('tellor_eth_wallet_type', 'metamask');
+    localStorage.setItem('tellor_eth_wallet_connected', 'true');
+    localStorage.setItem('tellor_eth_chain_id', '11155111');
+
+    this.assertEqual(localStorage.getItem('tellor_cosmos_wallet_type'), 'keplr', 'Cosmos wallet type should survive storage round-trip');
+    this.assertEqual(localStorage.getItem('tellor_cosmos_chain_id'), 'layertest-5', 'Cosmos chain ID should survive storage round-trip');
+    this.assertEqual(localStorage.getItem('tellor_eth_chain_id'), '11155111', 'Eth chain ID should survive storage round-trip');
+
+    this.assertFunction(window.App.autoReconnectWallets, 'autoReconnectWallets should exist for reconnect cycle');
+
+    keys.forEach(k => localStorage.removeItem(k));
+  }
+
+  async testBridgeNavMemory() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    if (!window.App.switchBridgeDirection) return;
+
+    window.App.switchBridgeDirection('ethereum');
+    await this.wait(100);
+    this.assertEqual(window.App.currentBridgeDirection, 'ethereum', 'Should remember ethereum');
+
+    window.App.switchBridgeDirection('delegate');
+    await this.wait(100);
+
+    this.assertFunction(window.App.resolveBridgeNavDirection, 'Nav must use resolveBridgeNavDirection');
+    const dir = window.App.resolveBridgeNavDirection('bridge');
+    window.App.switchBridgeDirection(dir);
+    await this.wait(100);
+
+    this.assertEqual(window.App.currentBridgeDirection, 'layer', 'After delegate, bridge should default to layer');
+
+    window.App.switchBridgeDirection('layer');
+  }
+
+  async testNetworkDotsReactivity() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+    if (!window.App.updateWalletManagerToggleText) return;
+
+    const origState = {
+      account: window.App.account,
+      isConnected: window.App.isConnected,
+      keplrAddress: window.App.keplrAddress,
+      isKeplrConnected: window.App.isKeplrConnected,
+      chainId: window.App.chainId,
+      cosmosChainId: window.App.cosmosChainId
+    };
+
+    window.App.account = '0xaabbccddee1234567890aabbccddee1234567890';
+    window.App.isConnected = true;
+    window.App.keplrAddress = 'tellor1zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz';
+    window.App.isKeplrConnected = true;
+
+    window.App.chainId = 1;
+    window.App.cosmosChainId = 'tellor-1';
+    window.App.updateWalletManagerToggleText();
+
+    const toggle = document.getElementById('walletManagerToggle');
+    if (toggle) {
+      const span = toggle.querySelector('.wallet-manager-text') || toggle;
+      this.assertTrue(span.innerHTML.includes('#10b981'), 'Both mainnet should show green dots');
+      this.assertFalse(span.innerHTML.includes('#f59e0b'), 'No yellow dots on mainnet');
+
+      window.App.chainId = 11155111;
+      window.App.cosmosChainId = 'layertest-5';
+      window.App.updateWalletManagerToggleText();
+      this.assertTrue(span.innerHTML.includes('#f59e0b'), 'Both testnet should show yellow dots');
+      this.assertFalse(span.innerHTML.includes('#10b981'), 'No green dots on testnet');
+    }
+
+    Object.assign(window.App, origState);
   }
 }

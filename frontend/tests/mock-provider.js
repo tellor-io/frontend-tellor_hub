@@ -51,11 +51,11 @@ export class MockProvider {
             signature: new Uint8Array([1, 2, 3, 4]),
             pub_key: { type: 'tendermint/PubKeySecp256k1', value: 'test' }
           },
-          signed: { chainId: 'layertest-4', accountNumber: '0', sequence: '0' }
+          signed: { chainId: 'layertest-5', accountNumber: '0', sequence: '0' }
         })
       }),
       experimentalSuggestChain: async () => true,
-      getChainId: async () => 'layertest-4'
+      getChainId: async () => 'layertest-5'
     };
 
     // Mock Cosmostation

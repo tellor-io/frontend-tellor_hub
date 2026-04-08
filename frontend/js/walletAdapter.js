@@ -11,8 +11,8 @@ class CosmosWalletAdapter {
         
         // Chain configurations for both networks
         this.chainConfigs = {
-            'layertest-4': {
-                chainId: "layertest-4",
+            'layertest-5': {
+                chainId: "layertest-5",
                 chainName: "Layer Testnet",
                 rpc: "https://node-palmito.tellorlayer.com/rpc",
                 rest: "https://node-palmito.tellorlayer.com/rpc",

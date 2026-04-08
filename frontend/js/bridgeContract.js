@@ -95,6 +95,14 @@ export const isWithdrawClaimed = async (id) => {
     return data.claimed;
 };
 
+// Query type string must match Layer / reporters: Palmito (layertest-*) uses TRBBridgeV2; Tellor mainnet still TRBBridge.
+const bridgeQueryTypeString = () => {
+    if (typeof window !== 'undefined' && window.App && window.App.chainId === 1) {
+        return 'TRBBridge';
+    }
+    return 'TRBBridgeV2';
+};
+
 // Query ID generation functions
 export const generateDepositQueryId = (depositId) => {
     // Create a new Web3 instance for ABI encoding
@@ -109,7 +117,7 @@ export const generateDepositQueryId = (depositId) => {
     // Encode outer data (string, bytes)
     const queryData = web3.eth.abi.encodeParameters(
         ['string', 'bytes'],
-        ['TRBBridge', innerData]
+        [bridgeQueryTypeString(), innerData]
     );
 
     // Hash the query data and remove '0x' prefix
@@ -130,7 +138,7 @@ export const generateWithdrawalQueryId = (withdrawalId) => {
     // Encode outer data (string, bytes)
     const queryData = web3.eth.abi.encodeParameters(
         ['string', 'bytes'],
-        ['TRBBridge', innerData]
+        [bridgeQueryTypeString(), innerData]
     );
 
     // Hash the query data and remove '0x' prefix

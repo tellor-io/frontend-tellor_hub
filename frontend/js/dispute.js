@@ -149,7 +149,7 @@ class DisputeProposer {
                 offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
             } else if (window.keplr) {
                 // Use the detected chain ID instead of hardcoded fallback
-                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-5';
                 offlineSigner = window.keplr.getOfflineSigner(chainId);
             } else {
                 throw new Error('No wallet connected.');
@@ -394,7 +394,7 @@ class DisputeProposer {
                 offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
             } else if (window.keplr) {
                 // Use the detected chain ID instead of hardcoded fallback
-                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-5';
                 offlineSigner = window.keplr.getOfflineSigner(chainId);
             } else {
                 throw new Error('No wallet connected.');
@@ -553,7 +553,7 @@ class DisputeProposer {
                 offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
             } else if (window.keplr) {
                 // Use the detected chain ID instead of hardcoded fallback
-                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-4';
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-5';
                 offlineSigner = window.keplr.getOfflineSigner(chainId);
             } else {
                 throw new Error('No wallet connected.');

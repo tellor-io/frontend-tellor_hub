@@ -259,7 +259,7 @@ export class TestSuite {
       },
       getChainId: async () => {
         // Default to testnet, but can be overridden
-        return 'layertest-4';
+        return 'layertest-5';
       },
       getKey: async (chainId) => {
         return {

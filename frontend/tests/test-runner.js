@@ -85,7 +85,7 @@ export class TestRunner {
       }
       
       // Store original methods before mocking
-      ['connectMetaMask', 'connectKeplr', 'connectKeplrLegacy', 'connectCosmosWallet', 'disconnectMetaMask', 'disconnectKeplr', 'switchCosmosNetwork'].forEach(method => {
+      ['connectMetaMask', 'connectKeplr', 'connectKeplrLegacy', 'connectCosmosWallet', 'connectEthereumWallet', 'connectMetaMaskLegacy', 'disconnectMetaMask', 'disconnectKeplr', 'switchCosmosNetwork', 'autoReconnectWallets', 'updateWalletManagerToggleText', 'switchBridgeDirection', 'resolveBridgeNavDirection'].forEach(method => {
         if (window.App[method]) {
           window.App._originalMethods[method] = window.App[method];
         }
@@ -111,7 +111,7 @@ export class TestRunner {
     
     // Reset App state
     if (window.App) {
-      window.App.cosmosChainId = 'layertest-4'; // Default to testnet
+      window.App.cosmosChainId = 'layertest-5'; // Default to testnet
       window.App.isKeplrConnected = false;
       window.App.isConnected = false;
       window.App.keplrAddress = null;
@@ -139,6 +139,16 @@ export class TestRunner {
       delete window.keplr;
     }
     
+    // Clear test localStorage keys
+    ['tellor_cosmos_wallet_type', 'tellor_cosmos_chain_id',
+     'tellor_eth_wallet_type', 'tellor_eth_wallet_connected', 'tellor_eth_chain_id'
+    ].forEach(k => localStorage.removeItem(k));
+
+    // Clear auto-reconnect flag
+    if (window.App) {
+      delete window.App._isAutoReconnecting;
+    }
+
     // Clear any timers
     const highestTimeoutId = setTimeout(";");
     for (let i = 0; i < highestTimeoutId; i++) {
