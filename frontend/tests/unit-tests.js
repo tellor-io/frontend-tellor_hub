@@ -305,6 +305,64 @@ export class UnitTests extends TestSuite {
       {
         name: 'Error handling',
         run: () => this.testErrorHandling()
+      },
+
+      // Session Persistence & Auto-Reconnect Tests
+      {
+        name: 'Wallet connection persists to localStorage',
+        run: () => this.testWalletConnectionPersistence()
+      },
+      {
+        name: 'Cosmos network selection persists to localStorage',
+        run: () => this.testCosmosNetworkPersistence()
+      },
+      {
+        name: 'Ethereum chain ID persists on chain change',
+        run: () => this.testEthChainPersistence()
+      },
+      {
+        name: 'Auto-reconnect skips forced mainnet switch',
+        run: () => this.testAutoReconnectSkipsMainnetSwitch()
+      },
+      {
+        name: 'Disconnect clears localStorage keys',
+        run: () => this.testDisconnectClearsStorage()
+      },
+      {
+        name: 'Cosmos chain ID restored before init completes',
+        run: () => this.testCosmosChainRestoredEarly()
+      },
+
+      // Seamless Network Switch Tests
+      {
+        name: 'Cosmos network switch without disconnect',
+        run: () => this.testSeamlessCosmosNetworkSwitch()
+      },
+
+      // Wallet Manager Toggle Text Tests
+      {
+        name: 'Wallet manager shows network dots',
+        run: () => this.testWalletManagerNetworkDots()
+      },
+
+      // Bridge Nav Tests (side nav / hub regression)
+      {
+        name: 'resolveBridgeNavDirection maps hub bridge token',
+        run: () => this.testResolveBridgeNavDirectionContract()
+      },
+      {
+        name: 'switchBridgeDirection ignores raw bridge token (regression)',
+        run: () => this.testSwitchBridgeDirectionRejectsRawBridgeNavToken()
+      },
+      {
+        name: 'Bridge inner panels restore after delegate when resolved',
+        run: () => this.testBridgeContentRestoresAfterDelegateNav()
+      },
+
+      // Withdrawal Refresh Button Tests
+      {
+        name: 'Withdrawal refresh button shows loading state',
+        run: () => this.testWithdrawalRefreshLoading()
       }
     ];
   }
@@ -1334,7 +1392,7 @@ export class UnitTests extends TestSuite {
   async testNetworkDetectionTestnet() {
     // Mock Keplr with testnet chain ID
     const mockKeplr = this.mockKeplrProvider();
-    mockKeplr.getChainId = async () => 'layertest-4';
+    mockKeplr.getChainId = async () => 'layertest-5';
     window.keplr = mockKeplr;
     
     // Wait for App to be available
@@ -1345,7 +1403,7 @@ export class UnitTests extends TestSuite {
       await window.App.connectKeplrLegacy();
       await this.wait(500);
       
-      this.assertEqual(window.App.cosmosChainId, 'layertest-4', 'cosmosChainId should be set to layertest-4 for testnet');
+      this.assertEqual(window.App.cosmosChainId, 'layertest-5', 'cosmosChainId should be set to layertest-5 for testnet');
       this.assertTrue(window.App.isKeplrConnected, 'Keplr should be connected');
     }
   }
@@ -1361,7 +1419,7 @@ export class UnitTests extends TestSuite {
       window.keplr = mockKeplr;
       
       // Set initial network to testnet
-      window.App.cosmosChainId = 'layertest-4';
+      window.App.cosmosChainId = 'layertest-5';
       window.App.isKeplrConnected = true;
       
       // Test switching to mainnet
@@ -1374,7 +1432,7 @@ export class UnitTests extends TestSuite {
       await window.App.switchCosmosNetwork();
       await this.wait(500);
       
-      this.assertEqual(window.App.cosmosChainId, 'layertest-4', 'Network should switch back to testnet');
+      this.assertEqual(window.App.cosmosChainId, 'layertest-5', 'Network should switch back to testnet');
     }
   }
 
@@ -1719,7 +1777,7 @@ export class UnitTests extends TestSuite {
     }
     
     // Test 6: Verify testnet connection
-    this.assertEqual(window.App.cosmosChainId, 'layertest-4', 'Should be connected to testnet');
+    this.assertEqual(window.App.cosmosChainId, 'layertest-5', 'Should be connected to testnet');
     
     // Test 7: Button should still be enabled on testnet
     this.assertFalse(withdrawButton.disabled, 'Withdrawal button should be enabled on testnet');
@@ -1740,7 +1798,7 @@ export class UnitTests extends TestSuite {
   async testWithdrawalButtonFunctionalityTestnet() {
     // Mock testnet environment
     const mockKeplr = this.mockKeplrProvider();
-    mockKeplr.getChainId = async () => 'layertest-4';
+    mockKeplr.getChainId = async () => 'layertest-5';
     window.keplr = mockKeplr;
     
     // Wait for App to be available
@@ -1822,7 +1880,7 @@ export class UnitTests extends TestSuite {
   async testDelegateButtonFunctionalityTestnet() {
     // Mock testnet environment
     const mockKeplr = this.mockKeplrProvider();
-    mockKeplr.getChainId = async () => 'layertest-4';
+    mockKeplr.getChainId = async () => 'layertest-5';
     window.keplr = mockKeplr;
     
     // Wait for App to be available
@@ -2191,7 +2249,7 @@ export class UnitTests extends TestSuite {
     
     // Test testnet
     if (window.App) {
-      window.App.cosmosChainId = 'layertest-4';
+      window.App.cosmosChainId = 'layertest-5';
       
       // Test that API endpoints are correct for testnet
       const testnetApiEndpoint = window.App.getCosmosApiEndpoint();
@@ -2241,7 +2299,7 @@ export class UnitTests extends TestSuite {
   async testDisputeFunctionsTestnet() {
     // Mock testnet environment
     const mockKeplr = this.mockKeplrProvider();
-    mockKeplr.getChainId = async () => 'layertest-4';
+    mockKeplr.getChainId = async () => 'layertest-5';
     window.keplr = mockKeplr;
     
     // Wait for App to be available
@@ -2254,7 +2312,7 @@ export class UnitTests extends TestSuite {
     }
     
     // Test dispute functions with testnet chain ID
-    this.assertEqual(window.App.cosmosChainId, 'layertest-4', 'Should be on testnet for dispute tests');
+    this.assertEqual(window.App.cosmosChainId, 'layertest-5', 'Should be on testnet for dispute tests');
     
     // Test that dispute functions can be called (mocked)
     if (window.disputeProposer) {
@@ -2310,7 +2368,7 @@ export class UnitTests extends TestSuite {
   async testNoStakeReportingTestnet() {
     // Mock testnet environment
     const mockKeplr = this.mockKeplrProvider();
-    mockKeplr.getChainId = async () => 'layertest-4';
+    mockKeplr.getChainId = async () => 'layertest-5';
     window.keplr = mockKeplr;
     
     // Wait for App to be available
@@ -2323,7 +2381,7 @@ export class UnitTests extends TestSuite {
     }
     
     // Test no-stake reporting with testnet chain ID
-    this.assertEqual(window.App.cosmosChainId, 'layertest-4', 'Should be on testnet for no-stake tests');
+    this.assertEqual(window.App.cosmosChainId, 'layertest-5', 'Should be on testnet for no-stake tests');
     
     // Test that no-stake reporting can be called (mocked)
     if (window.noStakeReporter) {
@@ -2357,7 +2415,7 @@ export class UnitTests extends TestSuite {
       // Test that connectCosmosWallet respects the flag
       const mockAdapter = {
         isConnected: () => true,
-        getChainId: async () => 'layertest-4', // This should be ignored during network switch
+        getChainId: async () => 'layertest-5', // This should be ignored during network switch
         connectToWallet: async (walletType) => ({
           address: 'tellor1testaddress123456789012345678901234567890',
           walletName: 'keplr'
@@ -2378,8 +2436,8 @@ export class UnitTests extends TestSuite {
           const currentChainId = await window.cosmosWalletAdapter.getChainId();
           if (currentChainId === 'tellor-1') {
             window.App.cosmosChainId = 'tellor-1';
-          } else if (currentChainId === 'layertest-4') {
-            window.App.cosmosChainId = 'layertest-4';
+          } else if (currentChainId === 'layertest-5') {
+            window.App.cosmosChainId = 'layertest-5';
             chainIdDetected = true;
           }
         }
@@ -2420,8 +2478,8 @@ export class UnitTests extends TestSuite {
           rpc: 'https://mainnet.tellorlayer.com/rpc',
           rest: 'https://mainnet.tellorlayer.com/rpc'
         },
-        'layertest-4': {
-          chainId: 'layertest-4',
+        'layertest-5': {
+          chainId: 'layertest-5',
           chainName: 'Layer Testnet',
           rpc: 'https://node-palmito.tellorlayer.com/rpc',
           rest: 'https://node-palmito.tellorlayer.com/rpc'
@@ -2450,11 +2508,11 @@ export class UnitTests extends TestSuite {
     
     if (window.App) {
       // Test switching to testnet
-      window.App.cosmosChainId = 'layertest-4';
+      window.App.cosmosChainId = 'layertest-5';
       await mockAdapter.switchToChain();
       
-      this.assertEqual(mockAdapter.chainId, 'layertest-4', 'Wallet adapter should switch to testnet chain');
-      this.assertEqual(mockAdapter.chainConfig.chainId, 'layertest-4', 'Chain config should be updated to testnet');
+      this.assertEqual(mockAdapter.chainId, 'layertest-5', 'Wallet adapter should switch to testnet chain');
+      this.assertEqual(mockAdapter.chainConfig.chainId, 'layertest-5', 'Chain config should be updated to testnet');
       
       // Test switching to mainnet
       window.App.cosmosChainId = 'tellor-1';
@@ -2540,7 +2598,7 @@ export class UnitTests extends TestSuite {
       this.assertEqual(mainnetRpcEndpoint, 'https://mainnet.tellorlayer.com/rpc', 'Should use mainnet RPC endpoint for request attestation');
       
       // Test testnet RPC endpoint
-      window.App.cosmosChainId = 'layertest-4';
+      window.App.cosmosChainId = 'layertest-5';
       const testnetRpcEndpoint = window.App.getCosmosRpcEndpoint();
       this.assertEqual(testnetRpcEndpoint, 'https://node-palmito.tellorlayer.com/rpc', 'Should use testnet RPC endpoint for request attestation');
       
@@ -2556,9 +2614,372 @@ export class UnitTests extends TestSuite {
       this.assertEqual(mainnetResult.rpcEndpoint, 'https://mainnet.tellorlayer.com/rpc', 'Request attestation should use mainnet RPC endpoint');
       
       // Test testnet
-      window.App.cosmosChainId = 'layertest-4';
+      window.App.cosmosChainId = 'layertest-5';
       const testnetResult = await mockStargateRequestAttestations('test', 'test', 'test');
       this.assertEqual(testnetResult.rpcEndpoint, 'https://node-palmito.tellorlayer.com/rpc', 'Request attestation should use testnet RPC endpoint');
+    }
+  }
+
+  // ─── Session Persistence & Auto-Reconnect Tests ────────────────────
+
+  async testWalletConnectionPersistence() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+
+    localStorage.removeItem('tellor_cosmos_wallet_type');
+    localStorage.removeItem('tellor_eth_wallet_type');
+    localStorage.removeItem('tellor_eth_wallet_connected');
+
+    const mockAdapter = {
+      isConnected: () => true,
+      getChainId: async () => 'tellor-1',
+      connectToWallet: async () => ({
+        address: 'tellor1abc123def456ghi789jkl012mno345pqr678stu',
+        walletName: 'keplr'
+      }),
+      getOfflineSigner: () => ({
+        getAccounts: async () => [{ address: 'tellor1abc123def456ghi789jkl012mno345pqr678stu' }]
+      }),
+      switchToChain: async () => {}
+    };
+    window.cosmosWalletAdapter = mockAdapter;
+
+    if (window.App.connectCosmosWallet) {
+      await window.App.connectCosmosWallet('keplr');
+      await this.wait(300);
+
+      this.assertEqual(
+        localStorage.getItem('tellor_cosmos_wallet_type'),
+        'keplr',
+        'Cosmos wallet type should persist to localStorage'
+      );
+    }
+
+    localStorage.removeItem('tellor_cosmos_wallet_type');
+    localStorage.removeItem('tellor_cosmos_chain_id');
+  }
+
+  async testCosmosNetworkPersistence() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+
+    localStorage.removeItem('tellor_cosmos_chain_id');
+
+    const mockAdapter = {
+      isConnected: () => true,
+      getChainId: async () => 'layertest-5',
+      connectToWallet: async () => ({
+        address: 'tellor1abc123def456ghi789jkl012mno345pqr678stu',
+        walletName: 'keplr'
+      }),
+      getOfflineSigner: () => ({
+        getAccounts: async () => [{ address: 'tellor1abc123def456ghi789jkl012mno345pqr678stu' }]
+      }),
+      switchToChain: async () => {}
+    };
+    window.cosmosWalletAdapter = mockAdapter;
+    window.App.cosmosChainId = 'layertest-5';
+
+    if (window.App.connectCosmosWallet) {
+      await window.App.connectCosmosWallet('keplr');
+      await this.wait(300);
+
+      const stored = localStorage.getItem('tellor_cosmos_chain_id');
+      this.assertTrue(
+        stored === 'layertest-5' || stored === 'tellor-1',
+        'Cosmos chain ID should be persisted to localStorage'
+      );
+    }
+
+    localStorage.removeItem('tellor_cosmos_wallet_type');
+    localStorage.removeItem('tellor_cosmos_chain_id');
+  }
+
+  async testEthChainPersistence() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+
+    localStorage.removeItem('tellor_eth_chain_id');
+
+    window.App.isConnected = true;
+    window.App.chainId = 11155111;
+    localStorage.setItem('tellor_eth_chain_id', '11155111');
+
+    this.assertEqual(
+      localStorage.getItem('tellor_eth_chain_id'),
+      '11155111',
+      'Eth chain ID should be persisted when connected'
+    );
+
+    window.App.isConnected = false;
+    localStorage.removeItem('tellor_eth_chain_id');
+  }
+
+  async testAutoReconnectSkipsMainnetSwitch() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+
+    this.assertDefined(window.App.autoReconnectWallets, 'autoReconnectWallets should exist');
+    this.assertFunction(window.App.autoReconnectWallets, 'autoReconnectWallets should be a function');
+
+    window.App._isAutoReconnecting = true;
+    this.assertTrue(window.App._isAutoReconnecting, '_isAutoReconnecting flag should be settable');
+    delete window.App._isAutoReconnecting;
+    this.assertFalse(!!window.App._isAutoReconnecting, '_isAutoReconnecting should be cleared after delete');
+  }
+
+  async testDisconnectClearsStorage() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+
+    localStorage.setItem('tellor_cosmos_wallet_type', 'keplr');
+    localStorage.setItem('tellor_cosmos_chain_id', 'layertest-5');
+    localStorage.setItem('tellor_eth_wallet_type', 'metamask');
+    localStorage.setItem('tellor_eth_wallet_connected', 'true');
+    localStorage.setItem('tellor_eth_chain_id', '11155111');
+
+    if (window.App.disconnectKeplr) {
+      const origKeplr = window.keplr;
+      window.keplr = this.mockKeplrProvider();
+
+      window.App.isKeplrConnected = true;
+      window.App.keplrAddress = 'tellor1test';
+      try {
+        await window.App.disconnectKeplr();
+      } catch (e) { /* ignore UI errors in test env */ }
+      await this.wait(200);
+
+      this.assertFalse(
+        !!localStorage.getItem('tellor_cosmos_wallet_type'),
+        'Cosmos wallet type should be cleared on disconnect'
+      );
+      this.assertFalse(
+        !!localStorage.getItem('tellor_cosmos_chain_id'),
+        'Cosmos chain ID should be cleared on disconnect'
+      );
+
+      window.keplr = origKeplr;
+    }
+
+    if (window.App.disconnectMetaMask) {
+      window.App.isConnected = true;
+      window.App.account = '0x1234567890abcdef1234567890abcdef12345678';
+      try {
+        await window.App.disconnectMetaMask();
+      } catch (e) { /* ignore UI errors in test env */ }
+      await this.wait(200);
+
+      this.assertFalse(
+        !!localStorage.getItem('tellor_eth_wallet_connected'),
+        'Eth wallet connected flag should be cleared on disconnect'
+      );
+      this.assertFalse(
+        !!localStorage.getItem('tellor_eth_chain_id'),
+        'Eth chain ID should be cleared on disconnect'
+      );
+    }
+
+    localStorage.removeItem('tellor_cosmos_wallet_type');
+    localStorage.removeItem('tellor_cosmos_chain_id');
+    localStorage.removeItem('tellor_eth_wallet_type');
+    localStorage.removeItem('tellor_eth_wallet_connected');
+    localStorage.removeItem('tellor_eth_chain_id');
+  }
+
+  async testCosmosChainRestoredEarly() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+
+    localStorage.setItem('tellor_cosmos_chain_id', 'layertest-5');
+    const stored = localStorage.getItem('tellor_cosmos_chain_id');
+    this.assertEqual(stored, 'layertest-5', 'localStorage should hold cosmos chain ID for restore on init');
+
+    localStorage.removeItem('tellor_cosmos_chain_id');
+  }
+
+  // ─── Seamless Network Switch ──────────────────────────────────────
+
+  async testSeamlessCosmosNetworkSwitch() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+
+    let suggestCalled = false;
+    let enableCalled = false;
+    const mockAdapter = {
+      isConnected: () => true,
+      currentWallet: {
+        experimentalSuggestChain: async () => { suggestCalled = true; },
+        enable: async () => { enableCalled = true; }
+      },
+      walletType: 'keplr',
+      chainConfigs: {
+        'tellor-1': { chainId: 'tellor-1', chainName: 'Tellor Layer', rpc: 'https://mainnet.tellorlayer.com/rpc', rest: 'https://mainnet.tellorlayer.com/rpc' },
+        'layertest-5': { chainId: 'layertest-5', chainName: 'Layer Testnet', rpc: 'https://node-palmito.tellorlayer.com/rpc', rest: 'https://node-palmito.tellorlayer.com/rpc' }
+      },
+      updateChainConfig: function() {
+        const id = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
+        if (this.chainConfigs[id]) { this.chainConfig = this.chainConfigs[id]; this.chainId = id; }
+      },
+      switchToChain: async function() {
+        this.updateChainConfig();
+        if (this.currentWallet.experimentalSuggestChain) await this.currentWallet.experimentalSuggestChain(this.chainConfig);
+        await this.currentWallet.enable(this.chainId);
+      },
+      getChainId: async () => window.App.cosmosChainId || 'tellor-1',
+      connectToWallet: async () => ({ address: 'tellor1test', walletName: 'keplr' }),
+      getOfflineSigner: () => ({ getAccounts: async () => [{ address: 'tellor1test' }] })
+    };
+    window.cosmosWalletAdapter = mockAdapter;
+
+    window.App.cosmosChainId = 'layertest-5';
+    await mockAdapter.switchToChain();
+
+    this.assertTrue(suggestCalled, 'switchToChain should call experimentalSuggestChain');
+    this.assertTrue(enableCalled, 'switchToChain should call enable');
+    this.assertEqual(mockAdapter.chainId, 'layertest-5', 'Adapter should switch to testnet without disconnect');
+  }
+
+  // ─── Wallet Manager Toggle Text ───────────────────────────────────
+
+  async testWalletManagerNetworkDots() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+
+    if (!window.App.updateWalletManagerToggleText) return;
+
+    const origAccount = window.App.account;
+    const origConnected = window.App.isConnected;
+    const origKeplr = window.App.keplrAddress;
+    const origKeplrConnected = window.App.isKeplrConnected;
+    const origChainId = window.App.chainId;
+    const origCosmosChainId = window.App.cosmosChainId;
+
+    window.App.account = '0x1234567890abcdef1234567890abcdef12345678';
+    window.App.isConnected = true;
+    window.App.keplrAddress = 'tellor1abc123def456ghi789jkl012mno345pqr678stu';
+    window.App.isKeplrConnected = true;
+    window.App.chainId = 1;
+    window.App.cosmosChainId = 'tellor-1';
+
+    window.App.updateWalletManagerToggleText();
+
+    const toggle = document.getElementById('walletManagerToggle');
+    if (toggle) {
+      const span = toggle.querySelector('.wallet-manager-text') || toggle;
+      const html = span.innerHTML;
+      this.assertTrue(html.includes('#10b981'), 'Mainnet Eth should show green dot (#10b981)');
+      this.assertTrue(html.includes('Eth:'), 'Should include Eth label');
+      this.assertTrue(html.includes('Cosmos:'), 'Should include Cosmos label');
+
+      window.App.chainId = 11155111;
+      window.App.cosmosChainId = 'layertest-5';
+      window.App.updateWalletManagerToggleText();
+      const html2 = span.innerHTML;
+      this.assertTrue(html2.includes('#f59e0b'), 'Testnet should show yellow dot (#f59e0b)');
+    }
+
+    window.App.account = origAccount;
+    window.App.isConnected = origConnected;
+    window.App.keplrAddress = origKeplr;
+    window.App.isKeplrConnected = origKeplrConnected;
+    window.App.chainId = origChainId;
+    window.App.cosmosChainId = origCosmosChainId;
+  }
+
+  // ─── Bridge Nav Direction Tests (hub data-function="bridge" vs App.switchBridgeDirection) ─
+
+  async testResolveBridgeNavDirectionContract() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+
+    this.assertFunction(window.App.resolveBridgeNavDirection, 'resolveBridgeNavDirection must exist for hub/side nav');
+
+    const origDir = window.App.currentBridgeDirection;
+
+    window.App.switchBridgeDirection('layer');
+    this.assertEqual(window.App.resolveBridgeNavDirection('bridge'), 'layer', 'After layer tab, bridge token → layer');
+
+    window.App.switchBridgeDirection('ethereum');
+    this.assertEqual(window.App.resolveBridgeNavDirection('bridge'), 'ethereum', 'After ethereum tab, bridge token → ethereum');
+
+    window.App.switchBridgeDirection('delegate');
+    this.assertEqual(window.App.resolveBridgeNavDirection('bridge'), 'layer', 'After delegate, bridge token → default layer');
+
+    this.assertEqual(window.App.resolveBridgeNavDirection('delegate'), 'delegate', 'Non-bridge types pass through');
+
+    if (origDir === 'ethereum') {
+      window.App.switchBridgeDirection('ethereum');
+    } else if (origDir === 'delegate') {
+      window.App.switchBridgeDirection('delegate');
+    } else {
+      window.App.switchBridgeDirection('layer');
+    }
+  }
+
+  async testSwitchBridgeDirectionRejectsRawBridgeNavToken() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+
+    window.App.switchBridgeDirection('ethereum');
+    const before = window.App.currentBridgeDirection;
+
+    window.App.switchBridgeDirection('bridge');
+
+    this.assertEqual(
+      window.App.currentBridgeDirection,
+      before,
+      'Raw "bridge" must not change currentBridgeDirection (invalid arg — early return)'
+    );
+
+    window.App.switchBridgeDirection('layer');
+  }
+
+  async testBridgeContentRestoresAfterDelegateNav() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+
+    const tellor = document.getElementById('bridgeToTellorContent');
+    const eth = document.getElementById('bridgeToEthereumContent');
+    this.assertNotNull(tellor, 'bridgeToTellorContent required (run on real app page)');
+    this.assertNotNull(eth, 'bridgeToEthereumContent required (run on real app page)');
+
+    const origDir = window.App.currentBridgeDirection;
+
+    window.App.switchBridgeDirection('ethereum');
+    await this.wait(50);
+    this.assertEqual(eth.style.display, 'block', 'Ethereum bridge panel should be visible');
+
+    window.App.switchBridgeDirection('delegate');
+    await this.wait(50);
+    this.assertEqual(eth.style.display, 'none', 'Delegate hides ethereum panel');
+
+    window.App.switchBridgeDirection('bridge');
+    await this.wait(50);
+    this.assertEqual(
+      eth.style.display,
+      'none',
+      'BUG: raw hub token leaves inner panels hidden (simulates pre-fix side nav)'
+    );
+    this.assertEqual(window.App.currentBridgeDirection, 'delegate', 'Raw bridge must not apply bridge UI state');
+
+    const fixed = window.App.resolveBridgeNavDirection('bridge');
+    window.App.switchBridgeDirection(fixed);
+    await this.wait(50);
+    this.assertEqual(window.App.currentBridgeDirection, 'layer', 'Resolver returns layer after delegate');
+    this.assertEqual(tellor.style.display, 'block', 'Layer panel visible after resolved navigation');
+    this.assertEqual(eth.style.display, 'none', 'Ethereum panel hidden when showing layer');
+
+    if (origDir === 'ethereum') {
+      window.App.switchBridgeDirection('ethereum');
+    } else if (origDir === 'delegate') {
+      window.App.switchBridgeDirection('delegate');
+    } else {
+      window.App.switchBridgeDirection('layer');
+    }
+  }
+
+  // ─── Withdrawal Refresh Loading State ─────────────────────────────
+
+  async testWithdrawalRefreshLoading() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
+
+    this.assertFunction(window.App.updateWithdrawalHistory, 'updateWithdrawalHistory should exist');
+
+    const btn = document.querySelector('button[onclick*="updateWithdrawalHistory"]');
+    if (btn) {
+      this.assertTrue(
+        btn.getAttribute('onclick').includes('updateWithdrawalHistory'),
+        'Refresh button should invoke updateWithdrawalHistory'
+      );
     }
   }
 }

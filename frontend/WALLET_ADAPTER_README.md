@@ -135,7 +135,7 @@ Open `test-wallet-adapter.html` in your browser to:
 The adapter uses the same chain configuration as the original Keplr implementation:
 ```javascript
 {
-    chainId: "layertest-4",
+    chainId: "layertest-5",
     chainName: "Layer",
     rpc: "https://node-palmito.tellorlayer.com/rpc",
     // ... other chain settings
@@ -211,7 +211,7 @@ A: Ensure you have a Cosmos wallet installed and refresh the page
 A: Check that the wallet is unlocked and the correct network is selected
 
 **Q: Balance not updating**
-A: Verify the wallet is connected to the correct chain (layertest-4)
+A: Verify the wallet is connected to the correct chain (layertest-5)
 
 **Q: Modal not appearing**
 A: Check browser console for JavaScript errors

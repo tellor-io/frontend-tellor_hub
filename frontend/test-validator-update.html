@@ -101,7 +101,7 @@
     <script>
         // Mock App object for testing
         const mockApp = {
-            cosmosChainId: 'layertest-4', // Default to testnet
+            cosmosChainId: 'layertest-5', // Default to testnet
             chainId: 11155111, // Default to Sepolia
             
             getCosmosApiEndpoint: function() {
@@ -219,7 +219,7 @@
             
             switchCosmosNetwork: function() {
                 if (this.cosmosChainId === 'tellor-1') {
-                    this.cosmosChainId = 'layertest-4';
+                    this.cosmosChainId = 'layertest-5';
                 } else {
                     this.cosmosChainId = 'tellor-1';
                 }
