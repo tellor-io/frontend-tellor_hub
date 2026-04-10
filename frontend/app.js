@@ -1321,6 +1321,17 @@ const App = {
         if (networkGroup) networkGroup.style.display = 'none';
       }
     }
+    App.updateBridgeConstructionState();
+  },
+
+  // Show construction overlay when either chain is on a testnet (Sepolia / Palmito)
+  updateBridgeConstructionState: function() {
+    const bridgeSection = document.getElementById('bridgeSection');
+    if (!bridgeSection) return;
+    const isTestnet =
+      App.chainId === 11155111 ||
+      App.cosmosChainId === 'layertest-4';
+    bridgeSection.classList.toggle('under-construction', isTestnet);
   },
 
   // Update Cosmos network display in UI
@@ -1329,7 +1340,9 @@ const App = {
     const cosmosToggleButton = document.getElementById('cosmos-network-toggle-btn');
     const cosmosToggleText = document.getElementById('cosmos-toggle-text');
     const cosmosNetworkGroup = cosmosNetworkDisplay ? cosmosNetworkDisplay.closest('.network-group') : null;
-    
+
+    App.updateBridgeConstructionState();
+
     if (cosmosNetworkDisplay) {
       if (App.cosmosChainId === 'tellor-1') {
         cosmosNetworkDisplay.textContent = '*Tellor Mainnet';
