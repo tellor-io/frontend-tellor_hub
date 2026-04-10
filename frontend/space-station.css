@@ -2231,19 +2231,22 @@ body:has(.function-focus-state) .frontend-code-link {
 }
 
 /* ── Under Construction Mode (bridge module) ── */
-.function-section.under-construction .bridge-real-content {
+.function-section.under-construction .bridge-real-content,
+#bridgeSection[data-bridge-under-construction="1"] .bridge-real-content {
   display: none !important;
 }
 
 /* Fill the white function panel when Bridge is the active tab */
-.function-container > #bridgeSection.function-section.active.under-construction {
+.function-container > #bridgeSection.function-section.active.under-construction,
+.function-container > #bridgeSection.function-section.active[data-bridge-under-construction="1"] {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
 }
 
-#bridgeSection.function-section.active.under-construction .under-construction-overlay {
+#bridgeSection.function-section.active.under-construction .under-construction-overlay,
+#bridgeSection.function-section.active[data-bridge-under-construction="1"] .under-construction-overlay {
   flex: 1;
   width: 100%;
   box-sizing: border-box;
@@ -2260,7 +2263,8 @@ body:has(.function-focus-state) .frontend-code-link {
   gap: 12px;
 }
 
-.function-section.under-construction .under-construction-overlay {
+.function-section.under-construction .under-construction-overlay,
+#bridgeSection[data-bridge-under-construction="1"] .under-construction-overlay {
   display: flex;
 }
 
