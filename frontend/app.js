@@ -3,33 +3,25 @@ import {
     generateWithdrawalQueryId
 } from './js/bridgeContract.js';
 
-// Layer testnet (Palmito stand-in). Revert after testing:
-//   LCD → https://node-palmito.tellorlayer.com
-//   RPC → https://node-palmito.tellorlayer.com/rpc
-// Cosmos testnet chain_id (must match node). Revert Palmito: 'layertest-5'
-const LAYER_TESTNET_CHAIN_ID = 'layer-internal';
-// Used for non-mainnet Cosmos + Sepolia-only Layer HTTP (getApiEndpoint).
-const LAYER_TESTNET_LCD = 'http://52.90.94.126:1317';
-const LAYER_TESTNET_RPC = 'http://52.90.94.126:26657';
+// Cosmos testnet (Palmito): chain_id layertest-5; LCD + Sepolia bridge REST share this host.
+const LAYER_TESTNET_CHAIN_ID = 'layertest-5';
+const LAYER_TESTNET_LCD = 'https://node-palmito.tellorlayer.com';
+const LAYER_TESTNET_RPC = 'https://node-palmito.tellorlayer.com/rpc';
 
-// Sepolia bridge selection (testing vs production):
-//   Set SEPOLIA_USE_DNS_DEV_BRIDGE = false to restore TokenBridgeV2 + 12h attestation wait UX.
-//   DNS dev bridge: 5-minute wait after withdrawal request (matches devnet contract).
-const SEPOLIA_USE_DNS_DEV_BRIDGE = true;
-const SEPOLIA_TOKEN_BRIDGE_DNS = '0xb4b16Ec5f92C178f8Cff38E19093fB2366CBe49B';
-const SEPOLIA_TOKEN_BRIDGE_V2 = '0xd37a3644bf5DFb9da56608e3431402B4502a8683';
+const SEPOLIA_TOKEN_BRIDGE_ADDRESS = '0x55355157703A44f7516FBB831333317E98944e32';
+const ETHEREUM_MAINNET_TOKEN_BRIDGE_ADDRESS = '0x6ec401744008f4B018Ed9A36f76e6629799Ee50E';
 const SEPOLIA_V2_STARTING_WITHDRAW_ID = 0;
 
-function sepoliaBridgeContractAddress() {
-  return SEPOLIA_USE_DNS_DEV_BRIDGE ? SEPOLIA_TOKEN_BRIDGE_DNS : SEPOLIA_TOKEN_BRIDGE_V2;
-}
-
-function sepoliaBridgeAbiPath() {
-  return SEPOLIA_USE_DNS_DEV_BRIDGE ? './abis/TokenBridgeDNS.json' : './abis/TokenBridgeV2.json';
+/** Migrate deprecated dev chain id saved in localStorage / wallet. */
+function normalizeCosmosChainId(chainId) {
+  if (!chainId || typeof chainId !== 'string') {
+    return chainId;
+  }
+  return chainId === 'layer-internal' ? 'layertest-5' : chainId;
 }
 
 function isLayerCosmosTestnet(chainId) {
-  return chainId === LAYER_TESTNET_CHAIN_ID || chainId === 'layertest-5';
+  return normalizeCosmosChainId(chainId) === 'layertest-5';
 }
 
 // Create the App object
@@ -287,7 +279,11 @@ const App = {
         // Restore persisted network selections before anything else
         const savedCosmosChain = localStorage.getItem('tellor_cosmos_chain_id');
         if (savedCosmosChain && (savedCosmosChain === 'tellor-1' || isLayerCosmosTestnet(savedCosmosChain))) {
-          App.cosmosChainId = savedCosmosChain;
+          const normalized = normalizeCosmosChainId(savedCosmosChain);
+          if (normalized !== savedCosmosChain) {
+            localStorage.setItem('tellor_cosmos_chain_id', normalized);
+          }
+          App.cosmosChainId = normalized;
         }
         
         // Initialize delegate section immediately (doesn't depend on Web3 or CosmJS)
@@ -423,7 +419,11 @@ const App = {
     if (savedCosmosWalletType && window.cosmosWalletAdapter) {
       try {
         if (savedCosmosChainId) {
-          App.cosmosChainId = savedCosmosChainId;
+          const normalized = normalizeCosmosChainId(savedCosmosChainId);
+          if (normalized !== savedCosmosChainId) {
+            localStorage.setItem('tellor_cosmos_chain_id', normalized);
+          }
+          App.cosmosChainId = normalized;
         }
         await App.connectCosmosWallet(savedCosmosWalletType);
         console.log('Auto-reconnected Cosmos wallet:', savedCosmosWalletType);
@@ -881,7 +881,7 @@ const App = {
                 if (currentChainId === 'tellor-1') {
                     App.cosmosChainId = 'tellor-1';
                 } else if (isLayerCosmosTestnet(currentChainId)) {
-                    App.cosmosChainId = currentChainId;
+                    App.cosmosChainId = normalizeCosmosChainId(currentChainId);
                 }
             } catch (error) {
                 console.log('Could not detect current network from wallet adapter, using default');
@@ -982,7 +982,7 @@ const App = {
             if (currentChainId === 'tellor-1') {
                 App.cosmosChainId = 'tellor-1';
             } else if (isLayerCosmosTestnet(currentChainId)) {
-                App.cosmosChainId = currentChainId;
+                App.cosmosChainId = normalizeCosmosChainId(currentChainId);
             }
         } catch (error) {
             console.log('Could not detect current network from Keplr, using default');
@@ -992,9 +992,7 @@ const App = {
         restUrl = App.getCosmosApiEndpoint();
         chainName = App.cosmosChainId === 'tellor-1'
             ? 'Tellor Layer'
-            : App.cosmosChainId === LAYER_TESTNET_CHAIN_ID
-                ? 'Layer Internal (Dev)'
-                : 'Tellor Layer Testnet';
+            : 'Tellor Layer Testnet';
 
         // Suggest adding the chain if it's not already added
         await window.keplr.experimentalSuggestChain({
@@ -1399,8 +1397,7 @@ const App = {
             throw new Error('Web3 not properly initialized');
         }
 
-        const abiPath =
-            App.chainId === 11155111 ? sepoliaBridgeAbiPath() : './abis/TokenBridgeV2.json';
+        const abiPath = './abis/TokenBridgeV2.json';
         const response = await fetch(abiPath);
         if (!response.ok) {
             throw new Error(`Failed to load ABI: ${response.statusText}`);
@@ -1419,13 +1416,13 @@ const App = {
         // Withdrawals below this ID belong to V1 and can't be claimed on V2.
         const v2StartingWithdrawId = {
             11155111: SEPOLIA_V2_STARTING_WITHDRAW_ID,
-            1: 0,          // Mainnet: still on V1, no cutoff yet
+            1: 0,
         };
         App.v2StartingWithdrawId = v2StartingWithdrawId[App.chainId] || 0;
 
         const contractAddresses = {
-            11155111: sepoliaBridgeContractAddress(),
-            1: "0x5589e306b1920F009979a50B88caE32aecD471E4",        // Mainnet
+            11155111: SEPOLIA_TOKEN_BRIDGE_ADDRESS,
+            1: ETHEREUM_MAINNET_TOKEN_BRIDGE_ADDRESS,
             421613: "0xb2CB696fE5244fB9004877e58dcB680cB86Ba444",   // Arbitrum Goerli
             137: "0x62733e63499a25E35844c91275d4c3bdb159D29d",      // Polygon
             80001: "0x62733e63499a25E35844c91275d4c3bdb159D29d",    // Mumbai
@@ -1591,7 +1588,7 @@ const App = {
         if (cosmosToggleText) cosmosToggleText.textContent = 'Switch to Testnet';
         if (cosmosNetworkGroup) cosmosNetworkGroup.style.display = 'flex';
       } else if (isLayerCosmosTestnet(App.cosmosChainId)) {
-        cosmosNetworkDisplay.textContent = App.cosmosChainId === LAYER_TESTNET_CHAIN_ID ? '*Layer Internal (Dev)' : '*Palmito Testnet';
+        cosmosNetworkDisplay.textContent = '*Palmito Testnet';
         cosmosNetworkDisplay.style.color = '#f59e0b'; // Orange for testnet
         // Show network toggle for testnet
         if (cosmosToggleButton) {
@@ -3297,19 +3294,12 @@ const App = {
   _withdrawalCooldownTimer: null,
   _withdrawalCooldownRefreshScheduled: false,
 
-  /** Sepolia + DNS dev bridge uses 5m; otherwise 12h (matches production bridge UX). */
-  usesSepoliaDnsDevBridge: function () {
-    return SEPOLIA_USE_DNS_DEV_BRIDGE === true && App.chainId === 11155111;
-  },
-
   withdrawalAttestationDelayMs: function () {
-    return App.usesSepoliaDnsDevBridge() ? 5 * 60 * 1000 : 12 * 60 * 60 * 1000;
+    return 12 * 60 * 60 * 1000;
   },
 
   withdrawalAttestationDelayLabel: function () {
-    return App.usesSepoliaDnsDevBridge()
-      ? { long: '5 minutes', short: '5m' }
-      : { long: '12 hours', short: '12h' };
+    return { long: '12 hours', short: '12h' };
   },
 
   syncWithdrawalAttestationHelpCopy: function () {

@@ -92,13 +92,8 @@ export const isWithdrawClaimed = async (id) => {
     return data.claimed;
 };
 
-// Query type string must match Layer / reporters: Palmito (layertest-*) uses TRBBridgeV2; Tellor mainnet still TRBBridge.
-const bridgeQueryTypeString = () => {
-    if (typeof window !== 'undefined' && window.App && window.App.chainId === 1) {
-        return 'TRBBridge';
-    }
-    return 'TRBBridgeV2';
-};
+// Query type string must match Layer / reporters (TokenBridgeV2 on mainnet and testnet).
+const bridgeQueryTypeString = () => 'TRBBridgeV2';
 
 // Query ID generation functions
 export const generateDepositQueryId = (depositId) => {

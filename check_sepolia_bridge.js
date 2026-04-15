@@ -2,7 +2,7 @@ const { ethers } = require('ethers');
 
 // Sepolia configuration
 const SEPOLIA_RPC = 'https://sepolia.infura.io/v3/52474cef7b964b4fbf8e954a5dfa481b';
-const BRIDGE_ADDRESS = '0x62733e63499a25E35844c91275d4c3bdb159D29d';
+const BRIDGE_ADDRESS = '0x55355157703A44f7516FBB831333317E98944e32';
 const TOKEN_ADDRESS = '0x80fc34a2f9FfE86F41580F47368289C402DEc660';
 
 // Bridge ABI (minimal for checking state)
