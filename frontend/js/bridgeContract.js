@@ -67,11 +67,8 @@ export class Deposit {
 
 // Helper function to get API endpoint based on current network
 const getApiEndpoint = () => {
-    // Check if App is available and has chainId
-    if (typeof window !== 'undefined' && window.App && window.App.chainId) {
-        if (window.App.chainId === 1) {
-            return 'https://mainnet.tellorlayer.com';
-        }
+    if (typeof window !== 'undefined' && window.App && typeof window.App.getApiEndpoint === 'function') {
+        return window.App.getApiEndpoint();
     }
     return 'https://node-palmito.tellorlayer.com';
 };

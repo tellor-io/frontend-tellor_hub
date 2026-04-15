@@ -2197,20 +2197,17 @@ export class UnitTests extends TestSuite {
       if (window.App && window.App.selectReporter) {
         // Set up form inputs
         const reporterDropdown = document.getElementById('reporterDropdown');
-        const reporterStakeAmount = document.getElementById('reporterStakeAmount');
         const selectedReporterAddress = document.getElementById('selectedReporterAddress');
         
-        if (reporterDropdown && selectedReporterAddress && reporterStakeAmount) {
+        if (reporterDropdown && selectedReporterAddress) {
           // Set test values
-          reporterStakeAmount.value = '1.5';
           selectedReporterAddress.value = 'tellor1reporter123456789012345678901234567890';
           
           // Mock the CosmJS selectReporter function
           if (window.cosmjs && window.cosmjs.stargate) {
-            window.cosmjs.stargate.selectReporter = async (account, reporterAddress, stakeAmount) => {
+            window.cosmjs.stargate.selectReporter = async (account, reporterAddress) => {
               this.assertEqual(account, 'tellor1testselector123456789012345678901234567890', 'Should use correct account');
               this.assertEqual(reporterAddress, 'tellor1reporter123456789012345678901234567890', 'Should use correct reporter address');
-              this.assertEqual(stakeAmount, '1.5', 'Should use correct stake amount');
               
               return {
                 txhash: 'test-reporter-selection-hash-1234567890abcdef',
@@ -2225,7 +2222,6 @@ export class UnitTests extends TestSuite {
           // Verify inputs were cleared
           this.assertEqual(reporterDropdown.value, '', 'Reporter dropdown should be cleared');
           this.assertEqual(selectedReporterAddress.value, '', 'Selected reporter address should be cleared');
-          this.assertEqual(reporterStakeAmount.value, '', 'Reporter stake amount should be cleared');
         }
       }
     } catch (error) {

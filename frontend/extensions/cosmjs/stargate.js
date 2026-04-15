@@ -14,14 +14,21 @@
             this.signer = signer;
         }
 
+        /** LCD / gRPC-gateway base (port 1317). Tendermint RPC (26657) does not serve /cosmos/* REST. */
+        getRestBase() {
+            if (typeof window !== 'undefined' && window.App && typeof window.App.getCosmosApiEndpoint === 'function') {
+                return window.App.getCosmosApiEndpoint();
+            }
+            return this.rpcUrl;
+        }
+
         static async connectWithSigner(rpcUrl, signer) {
             return new SigningStargateClient(rpcUrl, signer);
         }
 
         async getAccount(address) {
             try {
-                // Use the correct REST API endpoint
-                const accountUrl = `${this.rpcUrl}/cosmos/auth/v1beta1/accounts/${address}`;
+                const accountUrl = `${this.getRestBase()}/cosmos/auth/v1beta1/accounts/${address}`;
                 
                 const response = await fetch(accountUrl);
 
@@ -248,8 +255,12 @@
                         const MsgType = root.lookupType("MsgWithdrawTokens");
                         
                         const msgValue = {
-                            creator: message.value.creator,
-                            recipient: message.value.recipient.toLowerCase().replace('0x', ''), // Remove 0x prefix for Layer chain
+                            creator: (message.value.creator || '').trim(),
+                            recipient: String(message.value.recipient || '')
+                                .trim()
+                                .toLowerCase()
+                                .replace(/^0x/, '')
+                                .replace(/\s+/g, ''),
                             amount: {
                                 denom: message.value.amount.denom,
                                 amount: message.value.amount.amount.toString()
@@ -520,7 +531,7 @@
                 const base64Tx = btoa(String.fromCharCode.apply(null, encodedTx));
 
                 // Broadcast the transaction
-                const response = await fetch(`${this.rpcUrl}/cosmos/tx/v1beta1/txs`, {
+                const response = await fetch(`${this.getRestBase()}/cosmos/tx/v1beta1/txs`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -552,7 +563,7 @@
                 while (attempts < maxAttempts) {
                     attempts++;
                     
-                    const statusResponse = await fetch(`${this.rpcUrl}/cosmos/tx/v1beta1/txs/${txHash}`);
+                    const statusResponse = await fetch(`${this.getRestBase()}/cosmos/tx/v1beta1/txs/${txHash}`);
                     const statusData = await statusResponse.json();
                     
                     if (statusResponse.ok && statusData.tx_response) {
@@ -828,7 +839,7 @@
     }
 
     // Function to select a reporter
-    async function selectReporter(account, reporterAddress, stakeAmount = null) {
+    async function selectReporter(account, reporterAddress) {
         try {
             // Get offline signer from wallet adapter or fallback to legacy method
             let offlineSigner;

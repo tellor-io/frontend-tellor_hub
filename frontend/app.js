@@ -3,6 +3,35 @@ import {
     generateWithdrawalQueryId
 } from './js/bridgeContract.js';
 
+// Layer testnet (Palmito stand-in). Revert after testing:
+//   LCD → https://node-palmito.tellorlayer.com
+//   RPC → https://node-palmito.tellorlayer.com/rpc
+// Cosmos testnet chain_id (must match node). Revert Palmito: 'layertest-5'
+const LAYER_TESTNET_CHAIN_ID = 'layer-internal';
+// Used for non-mainnet Cosmos + Sepolia-only Layer HTTP (getApiEndpoint).
+const LAYER_TESTNET_LCD = 'http://52.90.94.126:1317';
+const LAYER_TESTNET_RPC = 'http://52.90.94.126:26657';
+
+// Sepolia bridge selection (testing vs production):
+//   Set SEPOLIA_USE_DNS_DEV_BRIDGE = false to restore TokenBridgeV2 + 12h attestation wait UX.
+//   DNS dev bridge: 5-minute wait after withdrawal request (matches devnet contract).
+const SEPOLIA_USE_DNS_DEV_BRIDGE = true;
+const SEPOLIA_TOKEN_BRIDGE_DNS = '0xb4b16Ec5f92C178f8Cff38E19093fB2366CBe49B';
+const SEPOLIA_TOKEN_BRIDGE_V2 = '0xd37a3644bf5DFb9da56608e3431402B4502a8683';
+const SEPOLIA_V2_STARTING_WITHDRAW_ID = 0;
+
+function sepoliaBridgeContractAddress() {
+  return SEPOLIA_USE_DNS_DEV_BRIDGE ? SEPOLIA_TOKEN_BRIDGE_DNS : SEPOLIA_TOKEN_BRIDGE_V2;
+}
+
+function sepoliaBridgeAbiPath() {
+  return SEPOLIA_USE_DNS_DEV_BRIDGE ? './abis/TokenBridgeDNS.json' : './abis/TokenBridgeV2.json';
+}
+
+function isLayerCosmosTestnet(chainId) {
+  return chainId === LAYER_TESTNET_CHAIN_ID || chainId === 'layertest-5';
+}
+
 // Create the App object
 const App = {
   web3Provider: null,
@@ -29,6 +58,226 @@ const App = {
     return App.depositLimit;
   },
 
+  /** Pull revert hex from Web3 / provider error objects (walks nested cause / innerError). */
+  extractRevertData: function (err) {
+    if (!err) {
+      return null;
+    }
+    const seen = new Set();
+    const walk = (e, depth) => {
+      if (!e || depth > 8 || seen.has(e)) {
+        return null;
+      }
+      seen.add(e);
+      const candidates = [
+        e.data,
+        e?.data?.data,
+        e?.data?.originalError?.data,
+        e?.cause?.data,
+        e?.innerError?.data,
+        e?.reason
+      ];
+      for (const c of candidates) {
+        if (typeof c === 'string' && c.startsWith('0x') && c.length >= 10) {
+          return c;
+        }
+      }
+      return walk(e.cause, depth + 1) || walk(e.innerError, depth + 1);
+    };
+    return walk(err, 0);
+  },
+
+  /** MetaMask sometimes puts revert data only in the message string, not err.data. */
+  parseRevertHexFromString: function (s) {
+    if (!s || typeof s !== 'string') {
+      return null;
+    }
+    const panic = s.match(/0x4e487b71[0-9a-f]{64}/i);
+    if (panic) {
+      return panic[0].toLowerCase();
+    }
+    const any = s.match(/0x[0-9a-f]{74,}/gi);
+    if (any) {
+      for (const h of any) {
+        if (h.toLowerCase().startsWith('0x4e487b71')) {
+          return h.slice(0, 74).toLowerCase();
+        }
+      }
+    }
+    return null;
+  },
+
+  /** Pull Error(string) ABI blob from MetaMask message when err.data is missing. */
+  parseErrorStringDataFromMessage: function (s) {
+    if (!s || typeof s !== 'string') {
+      return null;
+    }
+    const m = s.match(/0x08c379a0[0-9a-f]{128,}/i);
+    return m ? m[0].toLowerCase() : null;
+  },
+
+  /** On-chain bridge amounts (e.g. withdrawDetails.pendingAmount) use TOKEN_DECIMAL_PRECISION_MULTIPLIER. */
+  bridgeTrbDecimalsFromMultiplier: function (multRaw) {
+    try {
+      const s = ethers.BigNumber.from(multRaw).toString();
+      const n = Number(s);
+      if (Number.isFinite(n) && n > 0) {
+        const d = Math.round(Math.log10(n));
+        if (d >= 0 && d <= 20) {
+          return d;
+        }
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    return 12;
+  },
+
+  /** Human TRB from raw uint (Layer API uses 1e6; bridge contract uses multiplier, often 1e12). */
+  formatBridgePendingTrb: function (raw, decimals) {
+    try {
+      const d = Number.isFinite(decimals) && decimals >= 0 ? Math.min(20, decimals) : 12;
+      return parseFloat(ethers.utils.formatUnits(String(raw), d));
+    } catch (_) {
+      const n = Number(raw);
+      return Number.isFinite(n) ? n / 1e12 : 0;
+    }
+  },
+
+  /**
+   * On-chain pendingAmount may not match TOKEN_DECIMAL_PRECISION_MULTIPLIER on all builds.
+   * Prefer decimals that scale pending close to the main withdrawal TRB (Layer amount uses 1e6).
+   */
+  choosePendingTrbDecimals: function (rawPending, bridgeDefaultDecimals, mainTrbHint) {
+    const s = String(rawPending == null ? '0' : rawPending).trim();
+    if (!/^\d+$/.test(s) || s === '0') {
+      return bridgeDefaultDecimals;
+    }
+    const hint = Number.isFinite(mainTrbHint) && mainTrbHint > 0 ? mainTrbHint : null;
+    const candidates = [...new Set([bridgeDefaultDecimals, 12, 8, 6, 18])].filter(
+      (d) => Number.isFinite(d) && d >= 0 && d <= 20
+    );
+    let bestD = bridgeDefaultDecimals;
+    let bestScore = Infinity;
+    for (const d of candidates) {
+      try {
+        const v = parseFloat(ethers.utils.formatUnits(s, d));
+        if (v < 1e-12 || v > 1e12 || !Number.isFinite(v)) {
+          continue;
+        }
+        let score;
+        if (hint != null && hint >= 1e-6 && hint < 1e9) {
+          if (v > hint * 1e5 || v < hint / 1e5) {
+            continue;
+          }
+          const ratio = Math.max(v, hint) / Math.min(v, hint);
+          score = Math.log10(ratio + 1e-12);
+        } else {
+          score = Math.abs(Math.log10(v + 1e-12));
+        }
+        if (score < bestScore) {
+          bestScore = score;
+          bestD = d;
+        }
+      } catch (_) {
+        /* skip */
+      }
+    }
+    return bestD;
+  },
+
+  /** Custom errors from Tellor TokenBridge (selectors from Solidity `error Name()`). */
+  BRIDGE_CUSTOM_ERROR_MESSAGES: {
+    '0xcabeb655':
+      'InsufficientVotingPower() — signed validator power is below the Layer checkpoint threshold. Re-request attestation so enough validators sign this snapshot, and ensure the valset/checkpoint_params API calls use the same timestamp as the attestation.'
+  },
+
+  /** Decode Panic(uint256), Error(string), or custom error summary. */
+  decodeContractError: function (err) {
+    let data = App.extractRevertData(err);
+    if (!data && err && typeof err.message === 'string') {
+      data = App.parseRevertHexFromString(err.message) || App.parseErrorStringDataFromMessage(err.message);
+    }
+    if (data && data.startsWith('0x4e487b71') && data.length >= 74 && App.ethers) {
+      try {
+        const code = App.ethers.BigNumber.from('0x' + data.slice(10, 74)).toNumber();
+        const panicLabel = {
+          0x00: 'generic panic',
+          0x01: 'assertion failed',
+          0x11: 'arithmetic overflow/underflow',
+          0x12: 'division or modulo by zero',
+          0x21: 'enum out of range',
+          0x22: 'storage byte array encoding error',
+          0x31: 'pop on empty array',
+          0x32: 'array index out of bounds',
+          0x41: 'memory allocation overflow'
+        };
+        const label = panicLabel[code] || `panic 0x${code.toString(16)}`;
+        const limitHint =
+          code === 0x11
+            ? ' Common when the withdrawal is larger than the current **bridge withdraw limit**: claim the amount that fits with **Process withdrawal**, then use **Claim Extra** for the rest after the limit resets (see your row in the withdrawal table). Also possible: attestation amount vs on-chain withdraw state mismatch — try a fresh attestation after the partial claim.'
+            : ' Often inconsistent attestation vs valset/report — request attestation again; if it persists, compare Layer bridge API fields to what the Sepolia contract expects.';
+        return `Solidity ${label}. Claim simulation failed before any tx was sent (no Etherscan link).${limitHint}`;
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    if (data && data.startsWith('0x08c379a0') && data.length > 138 && App.ethers) {
+      try {
+        const decoded = App.ethers.utils.defaultAbiCoder.decode(['string'], '0x' + data.slice(10));
+        const text = decoded[0];
+        if (text && typeof text === 'string') {
+          return text.trim();
+        }
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    if (data && data.length >= 10) {
+      const sel = data.slice(0, 10);
+      const known = App.BRIDGE_CUSTOM_ERROR_MESSAGES[sel];
+      if (known) {
+        return known;
+      }
+      if (data.length <= 10) {
+        return `Contract reverted (custom error ${sel}). Often valset/checkpoint mismatch with attestation, or bridge rules (e.g. withdraw limit). Compare valset to snapshot attestation on your node.`;
+      }
+      return `Contract reverted (${sel}, ${data.length} bytes).`;
+    }
+    const fallback = err.message || String(err);
+    const fromMsg = App.parseErrorStringDataFromMessage(fallback);
+    if (fromMsg && fromMsg.startsWith('0x08c379a0') && fromMsg.length > 138 && App.ethers) {
+      try {
+        const decoded = App.ethers.utils.defaultAbiCoder.decode(['string'], '0x' + fromMsg.slice(10));
+        if (decoded[0]) {
+          return decoded[0].trim();
+        }
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    return fallback.replace(/\s+0x08c379a0[0-9a-f]{80,}/gi, '').trim() || fallback;
+  },
+
+  /**
+   * MetaMask caps dapp gas at 16777216. When estimate succeeds above that, cap with buffer.
+   * When estimate reverts, do not mask with a high gas limit — surface the revert (same as on-chain failure).
+   */
+  estimateBridgeClaimGas: async function (method) {
+    const MM_DAPP_GAS_CAP = 16777216;
+    try {
+      const est = await method.estimateGas({ from: App.account });
+      const n = Number(est);
+      if (!Number.isFinite(n) || n <= 0) {
+        return MM_DAPP_GAS_CAP;
+      }
+      return Math.min(Math.ceil(n * 1.2), MM_DAPP_GAS_CAP);
+    } catch (e) {
+      const decoded = App.decodeContractError(e);
+      throw new Error(decoded || e.message || 'Gas estimation failed');
+    }
+  },
+
   init: function () {
     return new Promise((resolve, reject) => {
       try {
@@ -37,7 +286,7 @@ const App = {
         
         // Restore persisted network selections before anything else
         const savedCosmosChain = localStorage.getItem('tellor_cosmos_chain_id');
-        if (savedCosmosChain && (savedCosmosChain === 'tellor-1' || savedCosmosChain === 'layertest-5')) {
+        if (savedCosmosChain && (savedCosmosChain === 'tellor-1' || isLayerCosmosTestnet(savedCosmosChain))) {
           App.cosmosChainId = savedCosmosChain;
         }
         
@@ -410,7 +659,8 @@ const App = {
         // Update balances and limits
         await Promise.all([
             App.updateBalance(),
-            App.fetchDepositLimit()
+            App.fetchDepositLimit(),
+            App.fetchWithdrawLimit()
         ]);
         
         App.setPageParams();
@@ -567,7 +817,8 @@ const App = {
         // Update balances and limits
         await Promise.all([
             App.updateBalance(),
-            App.fetchDepositLimit()
+            App.fetchDepositLimit(),
+            App.fetchWithdrawLimit()
         ]);
         
         App.setPageParams();
@@ -629,8 +880,8 @@ const App = {
                 const currentChainId = await window.cosmosWalletAdapter.getChainId();
                 if (currentChainId === 'tellor-1') {
                     App.cosmosChainId = 'tellor-1';
-                } else if (currentChainId === 'layertest-5') {
-                    App.cosmosChainId = 'layertest-5';
+                } else if (isLayerCosmosTestnet(currentChainId)) {
+                    App.cosmosChainId = currentChainId;
                 }
             } catch (error) {
                 console.log('Could not detect current network from wallet adapter, using default');
@@ -723,35 +974,27 @@ const App = {
             App.cosmosChainId = 'tellor-1'; // Default to mainnet
         }
         
-        // Get the appropriate endpoints based on current Cosmos network
         let rpcUrl, restUrl, chainName;
-        if (App.cosmosChainId === 'tellor-1') {
-            rpcUrl = "https://mainnet.tellorlayer.com/rpc";
-            restUrl = "https://mainnet.tellorlayer.com/rpc";
-            chainName = "Tellor Layer";
-        } else {
-            rpcUrl = "https://node-palmito.tellorlayer.com/rpc";
-            restUrl = "https://node-palmito.tellorlayer.com/rpc";
-            chainName = "Tellor Layer Testnet";
-        }
 
         // Try to detect the current network from Keplr
         try {
             const currentChainId = await window.keplr.getChainId();
             if (currentChainId === 'tellor-1') {
                 App.cosmosChainId = 'tellor-1';
-                rpcUrl = "https://mainnet.tellorlayer.com/rpc";
-                restUrl = "https://mainnet.tellorlayer.com/rpc";
-                chainName = "Tellor Layer";
-            } else if (currentChainId === 'layertest-5') {
-                App.cosmosChainId = 'layertest-5';
-                rpcUrl = "https://node-palmito.tellorlayer.com/rpc";
-                restUrl = "https://node-palmito.tellorlayer.com/rpc";
-                chainName = "Tellor Layer Testnet";
+            } else if (isLayerCosmosTestnet(currentChainId)) {
+                App.cosmosChainId = currentChainId;
             }
         } catch (error) {
             console.log('Could not detect current network from Keplr, using default');
         }
+
+        rpcUrl = App.getCosmosRpcEndpoint();
+        restUrl = App.getCosmosApiEndpoint();
+        chainName = App.cosmosChainId === 'tellor-1'
+            ? 'Tellor Layer'
+            : App.cosmosChainId === LAYER_TESTNET_CHAIN_ID
+                ? 'Layer Internal (Dev)'
+                : 'Tellor Layer Testnet';
 
         // Suggest adding the chain if it's not already added
         await window.keplr.experimentalSuggestChain({
@@ -1066,6 +1309,7 @@ const App = {
         if (App.contracts.Bridge && App.contracts.Token) {
             await Promise.all([
                 App.fetchDepositLimit(),
+                App.fetchWithdrawLimit(),
                 App.updateBalance()
             ]);
         }
@@ -1155,7 +1399,9 @@ const App = {
             throw new Error('Web3 not properly initialized');
         }
 
-        const response = await fetch("./abis/TokenBridgeV2.json");
+        const abiPath =
+            App.chainId === 11155111 ? sepoliaBridgeAbiPath() : './abis/TokenBridgeV2.json';
+        const response = await fetch(abiPath);
         if (!response.ok) {
             throw new Error(`Failed to load ABI: ${response.statusText}`);
         }
@@ -1172,13 +1418,13 @@ const App = {
         // V2 contracts were initialized with a starting withdrawId via init().
         // Withdrawals below this ID belong to V1 and can't be claimed on V2.
         const v2StartingWithdrawId = {
-            11155111: 68,  // Sepolia: V2 deployed Mar 23 2026, IDs 1-67 belong to V1
+            11155111: SEPOLIA_V2_STARTING_WITHDRAW_ID,
             1: 0,          // Mainnet: still on V1, no cutoff yet
         };
         App.v2StartingWithdrawId = v2StartingWithdrawId[App.chainId] || 0;
 
         const contractAddresses = {
-            11155111: "0x55355157703A44f7516FBB831333317E98944e32", // Sepolia (TokenBridgeV2)
+            11155111: sepoliaBridgeContractAddress(),
             1: "0x5589e306b1920F009979a50B88caE32aecD471E4",        // Mainnet
             421613: "0xb2CB696fE5244fB9004877e58dcB680cB86Ba444",   // Arbitrum Goerli
             137: "0x62733e63499a25E35844c91275d4c3bdb159D29d",      // Polygon
@@ -1255,27 +1501,27 @@ const App = {
   getApiEndpoint: function() {
     if (App.chainId === 1) {
       return 'https://mainnet.tellorlayer.com';
-    } else {
-      return 'https://node-palmito.tellorlayer.com';
     }
+    if (App.chainId === 11155111) {
+      return LAYER_TESTNET_LCD;
+    }
+    return 'https://node-palmito.tellorlayer.com';
   },
 
   // Get the appropriate Cosmos API endpoint based on current Cosmos network
   getCosmosApiEndpoint: function() {
     if (App.cosmosChainId === 'tellor-1') {
       return 'https://mainnet.tellorlayer.com';
-    } else {
-      return 'https://node-palmito.tellorlayer.com';
     }
+    return LAYER_TESTNET_LCD;
   },
 
   // Get the appropriate Cosmos RPC endpoint based on current Cosmos network
   getCosmosRpcEndpoint: function() {
     if (App.cosmosChainId === 'tellor-1') {
       return 'https://mainnet.tellorlayer.com/rpc';
-    } else {
-      return 'https://node-palmito.tellorlayer.com/rpc';
     }
+    return LAYER_TESTNET_RPC;
   },
 
   // Update network display in UI
@@ -1321,6 +1567,7 @@ const App = {
         if (networkGroup) networkGroup.style.display = 'none';
       }
     }
+    App.syncWithdrawalAttestationHelpCopy();
   },
 
   // Update Cosmos network display in UI
@@ -1343,8 +1590,8 @@ const App = {
         }
         if (cosmosToggleText) cosmosToggleText.textContent = 'Switch to Testnet';
         if (cosmosNetworkGroup) cosmosNetworkGroup.style.display = 'flex';
-      } else if (App.cosmosChainId === 'layertest-5') {
-        cosmosNetworkDisplay.textContent = '*Palmito Testnet';
+      } else if (isLayerCosmosTestnet(App.cosmosChainId)) {
+        cosmosNetworkDisplay.textContent = App.cosmosChainId === LAYER_TESTNET_CHAIN_ID ? '*Layer Internal (Dev)' : '*Palmito Testnet';
         cosmosNetworkDisplay.style.color = '#f59e0b'; // Orange for testnet
         // Show network toggle for testnet
         if (cosmosToggleButton) {
@@ -1507,8 +1754,8 @@ const App = {
     try {
       let targetChainId;
       if (App.cosmosChainId === 'tellor-1') {
-        targetChainId = 'layertest-5';
-      } else if (App.cosmosChainId === 'layertest-5') {
+        targetChainId = LAYER_TESTNET_CHAIN_ID;
+      } else if (isLayerCosmosTestnet(App.cosmosChainId)) {
         targetChainId = 'tellor-1';
       } else {
         App.showValidationErrorPopup('Cannot switch from unsupported Cosmos network');
@@ -1635,7 +1882,8 @@ const App = {
       // Update balances and limits
       await Promise.all([
         App.updateBalance(),
-        App.fetchDepositLimit()
+        App.fetchDepositLimit(),
+        App.fetchWithdrawLimit()
       ]);
       
       // Update UI
@@ -1713,6 +1961,31 @@ const App = {
     }
   },
 
+  fetchWithdrawLimit: async function() {
+    const el = document.getElementById('withdrawLimitDisplay');
+    const setText = (text) => {
+      if (el) el.textContent = text;
+    };
+    try {
+      if (!App.contracts.Bridge || !App.contracts.Bridge.methods) {
+        setText('—');
+        return null;
+      }
+      if (!App.contracts.Bridge.methods.withdrawLimit) {
+        setText('—');
+        return null;
+      }
+      const result = await App.contracts.Bridge.methods.withdrawLimit().call();
+      const readable = App.web3.utils.fromWei(result, 'ether');
+      setText(`Limit: ${readable} TRB`);
+      return readable;
+    } catch (error) {
+      console.warn('fetchWithdrawLimit failed:', error);
+      setText('—');
+      return null;
+    }
+  },
+
   setPageParams: function() {
     // Update connected address in UI
     const connectedAddressElement = document.getElementById("connectedAddress");
@@ -1730,6 +2003,7 @@ const App = {
         App.fetchDepositLimit().catch(error => {
           // console.error(...);
         });
+        App.fetchWithdrawLimit().catch(() => {});
       }
       // Update MetaMask balance if connected
       if (App.isConnected) {
@@ -1744,6 +2018,9 @@ const App = {
         App.updateBalance().catch(error => {
           // console.error(...);
         });
+      }
+      if (App.contracts.Bridge && App.contracts.Bridge.methods) {
+        App.fetchWithdrawLimit().catch(() => {});
       }
       if (App.isKeplrConnected) {
         // Update Keplr balance
@@ -1775,16 +2052,8 @@ const App = {
             offlineSigner = window.keplr.getOfflineSigner(App.cosmosChainId);
         }
 
-        // Get the appropriate RPC endpoint based on current Cosmos network
-        let rpcEndpoint;
-        if (App.cosmosChainId === 'tellor-1') {
-            rpcEndpoint = 'https://mainnet.tellorlayer.com/rpc';
-        } else {
-            rpcEndpoint = 'https://node-palmito.tellorlayer.com/rpc';
-        }
+        const rpcEndpoint = App.getCosmosRpcEndpoint();
 
-
-        
         // Force a fresh connection by using a new client each time
         const signingClient = await window.cosmjs.stargate.SigningStargateClient.connectWithSigner(
             rpcEndpoint,
@@ -1794,12 +2063,10 @@ const App = {
             }
         );
 
-
-        
-        // Use REST API directly to get the correct balance for the current network
+        // Use REST (LCD); do not derive from RPC (devnet uses :1317 + :26657)
         let balanceAmount = 0;
         try {
-            const restUrl = rpcEndpoint.replace('/rpc', '');
+            const restUrl = App.getCosmosApiEndpoint();
             const restResponse = await fetch(`${restUrl}/cosmos/bank/v1beta1/balances/${App.keplrAddress}`);
             const restData = await restResponse.json();
             // Find the loya balance in the response
@@ -2561,7 +2828,7 @@ const App = {
         }
 
         const amount = document.getElementById('ethStakeAmount').value;
-        const ethereumAddress = document.getElementById('ethQueryId').value;
+        const ethereumAddress = (document.getElementById('ethQueryId').value || '').trim();
 
         if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
             App.showValidationErrorPopup('Please enter a valid amount');
@@ -2570,6 +2837,12 @@ const App = {
 
         if (!ethereumAddress || !ethereumAddress.startsWith('0x')) {
             App.showValidationErrorPopup('Please enter a valid Ethereum address');
+            return;
+        }
+
+        const recipientHex = ethereumAddress.toLowerCase().replace(/^0x/, '').replace(/\s+/g, '');
+        if (!/^[0-9a-f]{40}$/.test(recipientHex)) {
+            App.showValidationErrorPopup('Ethereum recipient must be 40 hex characters (check for spaces or typos).');
             return;
         }
 
@@ -2590,13 +2863,7 @@ const App = {
             offlineSigner = window.keplr.getOfflineSigner(App.cosmosChainId);
         }
 
-        // Get the appropriate RPC endpoint based on current Cosmos network
-        let rpcEndpoint;
-        if (App.cosmosChainId === 'tellor-1') {
-            rpcEndpoint = 'https://mainnet.tellorlayer.com';
-        } else {
-            rpcEndpoint = 'https://node-palmito.tellorlayer.com';
-        }
+        const rpcEndpoint = App.getCosmosRpcEndpoint();
 
         // Create the client using the stargate implementation
         const client = await window.cosmjs.stargate.SigningStargateClient.connectWithSigner(
@@ -2611,7 +2878,7 @@ const App = {
             typeUrl: '/layer.bridge.MsgWithdrawTokens',
             value: {
                 creator: App.keplrAddress,
-                recipient: ethereumAddress.toLowerCase().replace('0x', ''), // Remove 0x prefix for Layer chain
+                recipient: recipientHex,
                 amount: {
                     denom: 'loya',
                     amount: amountInMicroUnits
@@ -2770,7 +3037,8 @@ const App = {
         if (result && result.code === 0) {
             // Get transaction hash from the result (same as requestAttestation)
             const txHash = result.txhash || result.tx_response?.txhash;
-            App.showSuccessPopup("Withdrawal successful! You will need to wait 12 hours before you can claim your tokens on Ethereum.", txHash, 'cosmos');
+            const w = App.withdrawalAttestationDelayLabel().long;
+            App.showSuccessPopup(`Withdrawal successful! You will need to wait ${w} before you can claim your tokens on Ethereum.`, txHash, 'cosmos');
         } else {
             throw new Error(result?.rawLog || result?.raw_log || "Withdrawal failed");
         }
@@ -3026,12 +3294,104 @@ const App = {
 
   // Function to update withdrawal history UI
   _withdrawalStylesInjected: false,
+  _withdrawalCooldownTimer: null,
+  _withdrawalCooldownRefreshScheduled: false,
+
+  /** Sepolia + DNS dev bridge uses 5m; otherwise 12h (matches production bridge UX). */
+  usesSepoliaDnsDevBridge: function () {
+    return SEPOLIA_USE_DNS_DEV_BRIDGE === true && App.chainId === 11155111;
+  },
+
+  withdrawalAttestationDelayMs: function () {
+    return App.usesSepoliaDnsDevBridge() ? 5 * 60 * 1000 : 12 * 60 * 60 * 1000;
+  },
+
+  withdrawalAttestationDelayLabel: function () {
+    return App.usesSepoliaDnsDevBridge()
+      ? { long: '5 minutes', short: '5m' }
+      : { long: '12 hours', short: '12h' };
+  },
+
+  syncWithdrawalAttestationHelpCopy: function () {
+    const el = document.getElementById('withdrawRequestAttestWaitTooltip');
+    if (!el) {
+      return;
+    }
+    const { long } = App.withdrawalAttestationDelayLabel();
+    el.textContent =
+      `Uses Cosmos Wallet. Must wait ${long} after withdrawal request is made before you can continue to step 2, request Attestation`;
+  },
+
+  withdrawalAttestationUnlockMs: function (tx) {
+    const ts = Number(tx.timestamp);
+    if (!Number.isFinite(ts)) {
+      return Date.now();
+    }
+    const ms = ts < 1e12 ? ts * 1000 : ts;
+    return ms + App.withdrawalAttestationDelayMs();
+  },
+
+  formatWithdrawCooldown: function (remainingMs) {
+    if (remainingMs <= 0) {
+      return '0:00:00';
+    }
+    const totalSec = Math.floor(remainingMs / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  },
+
+  clearWithdrawalCooldownTimer: function () {
+    if (App._withdrawalCooldownTimer) {
+      clearInterval(App._withdrawalCooldownTimer);
+      App._withdrawalCooldownTimer = null;
+    }
+  },
+
+  bindWithdrawalCooldownCountdowns: function () {
+    App.clearWithdrawalCooldownTimer();
+    const spans = document.querySelectorAll('.withdraw-cooldown-remain');
+    if (!spans.length) {
+      return;
+    }
+    const tick = () => {
+      let anyUnlocked = false;
+      spans.forEach((span) => {
+        const wrap =
+          span.closest('[data-withdraw-unlock-ms]') || span.closest('[data-claim-extra-unlock-ms]');
+        if (!wrap) {
+          return;
+        }
+        const unlockMs = Number(
+          wrap.getAttribute('data-withdraw-unlock-ms') || wrap.getAttribute('data-claim-extra-unlock-ms')
+        );
+        const rem = unlockMs - Date.now();
+        if (rem <= 0) {
+          span.textContent = App.formatWithdrawCooldown(0);
+          anyUnlocked = true;
+        } else {
+          span.textContent = App.formatWithdrawCooldown(rem);
+        }
+      });
+      if (anyUnlocked && !App._withdrawalCooldownRefreshScheduled) {
+        App._withdrawalCooldownRefreshScheduled = true;
+        App.clearWithdrawalCooldownTimer();
+        App.updateWithdrawalHistory().finally(() => {
+          App._withdrawalCooldownRefreshScheduled = false;
+        });
+      }
+    };
+    tick();
+    App._withdrawalCooldownTimer = setInterval(tick, 1000);
+  },
 
   updateWithdrawalHistory: async function() {
+    App.clearWithdrawalCooldownTimer();
     const refreshBtn = document.querySelector('button[onclick="App.updateWithdrawalHistory()"]');
     if (refreshBtn) {
-        refreshBtn.disabled = true;
-        refreshBtn.innerHTML = '<span>⏳</span><span>Loading...</span>';
+      refreshBtn.disabled = true;
+      refreshBtn.innerHTML = '<span>⏳</span><span>Loading...</span>';
     }
 
     try {
@@ -3044,6 +3404,38 @@ const App = {
         }
         
         const transactions = await this.getWithdrawalHistory(showAll);
+
+        let bridgeExtraUnlockMs = null;
+        let bridgeTrbDecimals = 12;
+        let bridgeExtraWindowSec = 43200;
+        if (App.contracts && App.contracts.Bridge && App.contracts.Bridge.methods) {
+            try {
+                const [wt, tw, mult] = await Promise.all([
+                    App.contracts.Bridge.methods.withdrawLimitUpdateTime().call(),
+                    App.contracts.Bridge.methods.TWELVE_HOUR_CONSTANT().call(),
+                    App.contracts.Bridge.methods.TOKEN_DECIMAL_PRECISION_MULTIPLIER().call()
+                ]);
+                bridgeExtraUnlockMs = ethers.BigNumber.from(wt).add(tw).mul(1000).toNumber();
+                bridgeTrbDecimals = App.bridgeTrbDecimalsFromMultiplier(mult);
+                App._cachedBridgeTrbDecimals = bridgeTrbDecimals;
+                bridgeExtraWindowSec = ethers.BigNumber.from(tw).toNumber();
+            } catch (e) {
+                console.warn('Bridge withdraw limit timing / TRB multiplier fetch failed:', e);
+            }
+        }
+        const claimExtraWindowLabel = (() => {
+            const sec = bridgeExtraWindowSec;
+            if (sec >= 86400) {
+                return `${Math.round(sec / 86400)} day(s)`;
+            }
+            if (sec >= 3600) {
+                return `${Math.round(sec / 3600)} hour(s)`;
+            }
+            if (sec >= 60) {
+                return `${Math.round(sec / 60)} minute(s)`;
+            }
+            return `${sec}s`;
+        })();
 
         const tableBody = document.querySelector('#withdrawal-history tbody');
         if (!tableBody) {
@@ -3114,6 +3506,37 @@ const App = {
                     background-color: #cbd5e0 !important;
                     cursor: not-allowed;
                     opacity: 0.7;
+                }
+                .withdraw-cooldown-wrap {
+                    max-width: 320px;
+                    padding: 10px 12px;
+                    border-radius: 8px;
+                    background: #fffbeb;
+                    border: 1px solid #f6e05e;
+                }
+                .withdraw-cooldown-msg {
+                    margin: 0 0 8px 0;
+                    font-size: 13px;
+                    color: #744210;
+                    line-height: 1.4;
+                }
+                .withdraw-cooldown-display {
+                    font-size: 15px;
+                    font-weight: 600;
+                    color: #c05621;
+                    font-family: ui-monospace, monospace;
+                }
+                .withdraw-cooldown-label {
+                    font-weight: 500;
+                    color: #744210;
+                    margin-right: 8px;
+                    font-family: inherit;
+                }
+                .claim-extra-panel .claim-button {
+                    display: block;
+                    width: 100%;
+                    margin: 10px 0 0 0;
+                    box-sizing: border-box;
                 }
             `;
             document.head.appendChild(style);
@@ -3201,20 +3624,51 @@ const App = {
                     'background-color: #cbd5e0; color: #718096; border: none;' : 
                     'background-color: #003734; color: #eefffb; border: none;';
                 
-                const pendingTrb = Number(tx.pendingAmount) / 1e6;
+                const pendingDecimals = App.choosePendingTrbDecimals(tx.pendingAmount, bridgeTrbDecimals, amount);
+                const pendingTrb = App.formatBridgePendingTrb(tx.pendingAmount, pendingDecimals);
                 const hasPending = isV2Withdrawal && pendingTrb > 0;
+                const claimExtraUnlockAt =
+                    bridgeExtraUnlockMs != null && Number.isFinite(bridgeExtraUnlockMs)
+                        ? bridgeExtraUnlockMs
+                        : null;
+                const claimExtraLocked =
+                    Boolean(hasPending && claimExtraUnlockAt != null && Date.now() < claimExtraUnlockAt);
+                const claimExtraRemainMs =
+                    claimExtraLocked && claimExtraUnlockAt != null ? claimExtraUnlockAt - Date.now() : 0;
+                const claimExtraBtnDisabled = claimExtraLocked || !App.isConnected;
+                const claimExtraBtnStyle = claimExtraBtnDisabled
+                    ? 'background-color:#a0aec0;color:#fff;border:none;cursor:not-allowed;'
+                    : 'background-color:#d69e2e;color:#fff;border:none;';
 
-                row.innerHTML = `
-                    <td style="white-space: normal;">
-                        ${!isV2Withdrawal ?
-                            `<span style="color: #718096; font-size: 12px;">V1 Bridge</span>`
-                            : !tx.claimed ? 
-                            `<button class="${attestButtonClass}" onclick="App.requestAttestation(${tx.id})" 
+                const unlockMs = App.withdrawalAttestationUnlockMs(tx);
+                const attestCooldownActive = isV2Withdrawal && !tx.claimed && Date.now() < unlockMs;
+                const remainingMs = unlockMs - Date.now();
+                const attestWait = App.withdrawalAttestationDelayLabel();
+
+                let v2ActionsHtml = '';
+                if (!isV2Withdrawal) {
+                    v2ActionsHtml = `<span style="color: #718096; font-size: 12px;">V1 Bridge</span>`;
+                } else if (!tx.claimed) {
+                    if (attestCooldownActive) {
+                        v2ActionsHtml = `
+                            <div class="withdraw-cooldown-wrap" data-withdraw-unlock-ms="${unlockMs}">
+                                <div class="withdraw-cooldown-display">
+                                    <span class="withdraw-cooldown-label">Time remaining</span>
+                                    <span class="withdraw-cooldown-remain">${App.formatWithdrawCooldown(remainingMs)}</span>
+                                </div>
+                                <p class="withdraw-cooldown-msg">
+                                    Request attestation Claim withdrawal buttons will unlock
+                                    <strong>${attestWait.long}</strong> after this withdrawal appears on Layer.
+                                </p>
+                            </div>`;
+                    } else {
+                        v2ActionsHtml = `
+                            <button class="${attestButtonClass}" onclick="App.requestAttestation(${tx.id})" 
                                 style="${attestButtonStyle}" ${attestButtonDisabled ? 'disabled' : ''}>
                                 <span class="tooltip-container">
                                     <span>2. Request</span><span>Attestation</span>
                                     <span class="tooltip-icon tooltip-icon-white">?</span>
-                                    <span class="tooltip-text tooltip-text-right">Uses Cosmos Wallet. Must wait 12 hours after withdrawal request (step 1) is made before you can request Attestation(step 2)</span>
+                                    <span class="tooltip-text tooltip-text-right">Uses Cosmos Wallet. Must wait ${attestWait.long} after withdrawal request (step 1) is made before you can request Attestation (step 2)</span>
                                 </span>
                             </button>
                             <button class="claim-button" onclick="App.claimWithdrawal(${tx.id})" 
@@ -3222,20 +3676,51 @@ const App = {
                                 <span class="tooltip-container">
                                     <span>3. Process</span><span>Withdrawal</span>
                                     <span class="tooltip-icon tooltip-icon-white">?</span>
-                                    <span class="tooltip-text tooltip-text-right">Uses Ethereum Wallet. Must claim withdrawal(step 3) within 12 hours after Attestation request(step 2) is made. Otherwise you must re-request attestation</span>
+                                    <span class="tooltip-text tooltip-text-right">Uses Ethereum Wallet. Must claim withdrawal (step 3) within 12 hours after Attestation request (step 2) is made. Otherwise you must re-request attestation</span>
                                 </span>
-                            </button>` 
-                            : ''}
-                        ${hasPending ?
-                            `<button class="claim-button" onclick="App.claimExtraWithdraw(${tx.id})"
-                                style="background-color: #d69e2e; color: #fff; border: none; margin-top: 4px;"
-                                ${!App.isConnected ? 'disabled' : ''}>
-                                <span class="tooltip-container">
-                                    <span>Claim Extra</span>
-                                    <span class="tooltip-icon tooltip-icon-white">?</span>
-                                    <span class="tooltip-text tooltip-text-right">This withdrawal hit the bridge limit. ${pendingTrb.toFixed(2)} TRB is pending and can be claimed once the limit resets.</span>
-                                </span>
-                            </button>`
+                            </button>`;
+                    }
+                }
+
+                row.innerHTML = `
+                    <td style="white-space: normal;">
+                        ${v2ActionsHtml}
+                        ${hasPending
+                            ? `<div class="withdraw-cooldown-wrap claim-extra-panel" style="margin-top:8px;"${
+                                  claimExtraLocked ? ` data-claim-extra-unlock-ms="${claimExtraUnlockAt}"` : ''
+                              }>
+                                ${
+                                    claimExtraLocked
+                                        ? `<div class="withdraw-cooldown-display">
+                                        <span class="withdraw-cooldown-label">Claim Extra unlocks in</span>
+                                        <span class="withdraw-cooldown-remain">${App.formatWithdrawCooldown(claimExtraRemainMs)}</span>
+                                    </div>
+                                    <p class="withdraw-cooldown-msg" style="font-size:12px;margin:6px 0 0;">
+                                        Limit window: <strong>${claimExtraWindowLabel}</strong> after each bridge withdraw limit update.
+                                    </p>`
+                                        : `<div class="withdraw-cooldown-display" style="font-size:14px;">
+                                        <span class="withdraw-cooldown-label">Claim Extra</span>
+                                        <span>${pendingTrb.toFixed(2)} TRB pending</span>
+                                    </div>
+                                    <p class="withdraw-cooldown-msg" style="font-size:12px;margin:6px 0 0;">
+                                        You can use <strong>Claim Extra</strong> below. If the on-chain limit has not advanced yet, wait for the next window (<strong>${claimExtraWindowLabel}</strong> after each limit update).
+                                    </p>`
+                                }
+                                <button class="claim-button" type="button"
+                                    onclick="App.claimExtraWithdraw(${tx.id})"
+                                    style="${claimExtraBtnStyle}"
+                                    ${claimExtraBtnDisabled ? 'disabled' : ''}>
+                                    <span class="tooltip-container">
+                                        <span>Claim Extra</span>
+                                        <span class="tooltip-icon tooltip-icon-white">?</span>
+                                        <span class="tooltip-text tooltip-text-right">${
+                                            claimExtraLocked
+                                                ? `${pendingTrb.toFixed(2)} TRB pending — enabled when the countdown ends.`
+                                                : `This withdrawal hit the bridge limit. ${pendingTrb.toFixed(2)} TRB pending; claim after the limit resets (${claimExtraWindowLabel} after each limit update).`
+                                        }</span>
+                                    </span>
+                                </button>
+                            </div>`
                             : ''}
                     </td>
                     <td style="font-weight: 500;">${tx.id}</td>
@@ -3248,7 +3733,10 @@ const App = {
                     <td>${date}</td>
                     <td class="status-${tx.claimed}">
                         ${!isV2Withdrawal ? '<span style="color: #718096;">V1</span>'
-                            : tx.claimed ? 'Claimed' : 'Pending'}
+                            : tx.claimed ? 'Claimed'
+                            : attestCooldownActive
+                                ? `<span style="color: #d69e2e;">Waiting ${attestWait.short}</span>`
+                                : 'Pending'}
                         ${hasPending ? '<br><span style="color: #d69e2e; font-size: 12px;">Extra Pending</span>' : ''}
                     </td>
                 `;
@@ -3257,6 +3745,8 @@ const App = {
                 // console.error(...);
             }
         }
+
+        App.bindWithdrawalCooldownCountdowns();
     } catch (error) {
         const tableBody = document.querySelector('#withdrawal-history tbody');
         if (tableBody) {
@@ -3561,7 +4051,6 @@ const App = {
 
         // Get inputs
         const reporterAddress = document.getElementById('selectedReporterAddress').value;
-        const stakeAmount = document.getElementById('reporterStakeAmount').value;
 
         // Validate inputs
         if (!reporterAddress || !reporterAddress.trim()) {
@@ -3572,18 +4061,6 @@ const App = {
         // Validate reporter address format (should be a valid bech32 address)
         if (!reporterAddress.startsWith('tellor')) {
             App.showValidationErrorPopup('Please select a valid reporter from the dropdown');
-            return;
-        }
-
-        // Validate stake amount (required for reporter selection)
-        if (!stakeAmount || !stakeAmount.trim()) {
-            App.showValidationErrorPopup('Please enter a TRB amount for reporter selection');
-            return;
-        }
-        
-        const amount = parseFloat(stakeAmount);
-        if (isNaN(amount) || amount <= 0) {
-            App.showValidationErrorPopup('Please enter a valid TRB amount (greater than 0)');
             return;
         }
 
@@ -3623,16 +4100,14 @@ const App = {
                 // No existing reporter: initial selection
                 result = await window.cosmjs.stargate.selectReporter(
                     layerAccount,
-                    reporterAddress,
-                    stakeAmount
+                    reporterAddress
                 );
             }
         } catch (fetchError) {
             console.error('Error determining current reporter, falling back to selectReporter:', fetchError);
             result = await window.cosmjs.stargate.selectReporter(
                 layerAccount,
-                reporterAddress,
-                stakeAmount
+                reporterAddress
             );
         }
 
@@ -3645,7 +4120,6 @@ const App = {
             // Clear the inputs
             document.getElementById('selectedReporterAddress').value = '';
             document.getElementById('reporterDropdown').value = '';
-            document.getElementById('reporterStakeAmount').value = '';
             // Refresh status to show new selection
             await App.refreshCurrentStatus();
         } else {
@@ -3773,75 +4247,91 @@ const App = {
   },
 
   // Add validation helper functions
-  validateWithdrawalData: async function(withdrawalId, attestData, valset, sigs) {
-        try {
-            // Validate validator set
-            if (!valset || !Array.isArray(valset)) {
-                throw new Error('Invalid validator set: must be an array');
+  validateWithdrawalData: async function(withdrawalId, attestData, valset, sigs, powerThreshold) {
+        // Validate validator set
+        if (!valset || !Array.isArray(valset)) {
+            throw new Error('Invalid validator set: must be an array');
+        }
+
+        if (!sigs || !Array.isArray(sigs)) {
+            throw new Error('Invalid signatures: must be an array');
+        }
+        if (sigs.length !== valset.length) {
+            throw new Error(
+                `Signatures and validator set length mismatch (${sigs.length} vs ${valset.length}). Re-fetch attestation.`
+            );
+        }
+
+        // Check each validator
+        for (let i = 0; i < valset.length; i++) {
+            const validator = valset[i];
+
+            if (!validator.addr || !validator.power) {
+                throw new Error(`Invalid validator at index ${i}: missing required fields`);
             }
 
-            // Check each validator
+            try {
+                ethers.utils.getAddress(validator.addr);
+            } catch (e) {
+                throw new Error(`Invalid validator at index ${i}: invalid address format`);
+            }
+
+            if (!ethers.BigNumber.from(validator.power).gt(0)) {
+                throw new Error(`Invalid validator at index ${i}: power must be positive`);
+            }
+        }
+
+        // Check each signature (v may be number or string from Web3)
+        for (let i = 0; i < sigs.length; i++) {
+            const sig = sigs[i];
+            const vNum = Number(sig.v);
+
+            if (vNum === 0) {
+                const zeroBytes = '0x0000000000000000000000000000000000000000000000000000000000000000';
+                const rHex = typeof sig.r === 'string' ? sig.r : '0x' + sig.r.toString('hex');
+                const sHex = typeof sig.s === 'string' ? sig.s : '0x' + sig.s.toString('hex');
+
+                if (rHex !== zeroBytes || sHex !== zeroBytes) {
+                    throw new Error(`Invalid signature at index ${i}: zero signature must have zero r and s`);
+                }
+            } else if (vNum !== 27 && vNum !== 28) {
+                throw new Error(`Invalid signature at index ${i}: v must be 0, 27, or 28`);
+            }
+        }
+
+        if (powerThreshold !== undefined && powerThreshold !== null && powerThreshold !== '') {
+            const th = ethers.BigNumber.from(String(powerThreshold).trim());
+            let sum = ethers.BigNumber.from(0);
             for (let i = 0; i < valset.length; i++) {
-                const validator = valset[i];
-                
-                // Check if validator has required fields
-                if (!validator.addr || !validator.power) {
-                    // console.error(...);
-                    throw new Error(`Invalid validator at index ${i}: missing required fields`);
-                }
-
-                // Validate address format
-                try {
-                    ethers.utils.getAddress(validator.addr);
-                } catch (e) {
-                    // console.error(...);
-                    throw new Error(`Invalid validator at index ${i}: invalid address format`);
-                }
-
-                // Validate power is a positive number
-                if (!ethers.BigNumber.from(validator.power).gt(0)) {
-                    // console.error(...);
-                    throw new Error(`Invalid validator at index ${i}: power must be positive`);
+                const vNum = Number(sigs[i].v);
+                if (vNum === 27 || vNum === 28) {
+                    sum = sum.add(ethers.BigNumber.from(String(valset[i].power)));
                 }
             }
-
-            // Validate signatures
-            if (!sigs || !Array.isArray(sigs)) {
-                throw new Error('Invalid signatures: must be an array');
+            if (sum.lt(th)) {
+                const hint =
+                    sum.isZero()
+                        ? 'No secp256k1 signatures matched the valset for this checkpoint (wrong digest, attestation encoding, or valset addresses). '
+                        : '';
+                throw new Error(
+                    `${hint}Signed voting power (${sum.toString()}) is below the Layer checkpoint threshold (${th.toString()}). ` +
+                    `Re-request attestation on Layer, or verify get_valset_by_timestamp / get_validator_checkpoint_params match the attestation snapshot.`
+                );
             }
+        }
 
-            // Check each signature
-            for (let i = 0; i < sigs.length; i++) {
-                const sig = sigs[i];
-
-                // For blank attestations, v should be 0 and r/s should be zero bytes
-                if (sig.v === 0) {
-                    const zeroBytes = '0x0000000000000000000000000000000000000000000000000000000000000000';
-                    const rHex = typeof sig.r === 'string' ? sig.r : '0x' + sig.r.toString('hex');
-                    const sHex = typeof sig.s === 'string' ? sig.s : '0x' + sig.s.toString('hex');
-                    
-                    if (rHex !== zeroBytes || sHex !== zeroBytes) {
-                        throw new Error(`Invalid signature at index ${i}: zero signature must have zero r and s`);
-                    }
-                } else if (sig.v !== 27 && sig.v !== 28) {
-                    throw new Error(`Invalid signature at index ${i}: v must be 0, 27, or 28`);
-                }
-            }
-
-            // Check bridge state
-            const bridgeState = await App.contracts.Bridge.methods.bridgeState().call();
-            if (bridgeState !== '0') { // Assuming 0 is the active state
-                throw new Error(`Bridge is not active. Current state: ${bridgeState}`);
-            }
-        } catch (error) {
-            // console.error(...);
-            throw error;
+        // uint8 enum: Web3 may return "0", 0, or BN — only 0 is active for standard Tellor bridge
+        const bridgeState = await App.contracts.Bridge.methods.bridgeState().call();
+        const stateBn = ethers.BigNumber.from(bridgeState);
+        if (!stateBn.isZero()) {
+            throw new Error(`Bridge is not active. Current bridgeState: ${bridgeState}`);
         }
     },
 
   // Modify the claimWithdrawal function to include validation
   claimWithdrawal: async function(withdrawalId) {
     let txHash = null;
+    let withdrawDetailsSnapshot = null;
     try {
         if (!App.isConnected) {
             alert('Please connect your MetaMask wallet first');
@@ -3878,21 +4368,29 @@ const App = {
 
         // Format the data for the contract call
         const txData = await this.formatWithdrawalData(withdrawalId, withdrawalData, attestationData);
-        
-        // Validate the data before sending to contract
+
+        await this.validateWithdrawalData(
+            withdrawalId,
+            txData.attestData,
+            txData.valset,
+            txData.sigs,
+            attestationData.powerThreshold
+        );
+
         try {
-            await this.validateWithdrawalData(withdrawalId, txData.attestData, txData.valset, txData.sigs);
-        } catch (error) {
-            throw new Error('The attestation data is not valid. Please try requesting attestation again to get the latest validator set.');
+            withdrawDetailsSnapshot = await App.contracts.Bridge.methods.withdrawDetails(withdrawalId).call();
+        } catch (_) {
+            withdrawDetailsSnapshot = null;
         }
 
-        // Make the contract call
-        const tx = await App.contracts.Bridge.methods.withdrawFromLayer(
+        const claimMethod = App.contracts.Bridge.methods.withdrawFromLayer(
             txData.attestData,
             txData.valset,
             txData.sigs,
             txData.depositId
-        ).send({ from: App.account });
+        );
+        const gasLimit = await App.estimateBridgeClaimGas(claimMethod);
+        const tx = await claimMethod.send({ from: App.account, gas: gasLimit });
 
         txHash = tx.transactionHash;
         // console.log(...);
@@ -3901,15 +4399,53 @@ const App = {
         return tx;
 
     } catch (error) {
-        // console.error(...);
         // Get transaction hash from error if available
         if (error.transactionHash) {
             txHash = error.transactionHash;
         } else if (error.receipt && error.receipt.transactionHash) {
             txHash = error.receipt.transactionHash;
         }
-        
-        let errorMessage = "Claim Withdrawal failed. Make sure you have waited the full 12 hrs have passed since you requested withdrawal & then try requesting attestation again for updated validator set.";
+
+        const decoded = App.decodeContractError(error);
+        const bareRpc =
+          /^execution reverted$/i.test(String(decoded || '').trim()) ||
+          /^Gas estimation failed$/i.test(String(decoded || '').trim());
+        // estimateBridgeClaimGas throws new Error(decoded) so decoded === error.message for contract reverts — still show decoded.
+        let errorMessage =
+            decoded && decoded.length > 0 && !bareRpc
+                ? decoded.startsWith('Claim withdrawal failed:')
+                    ? decoded
+                    : `Claim withdrawal failed: ${decoded}`
+                : `Claim Withdrawal failed. Make sure the full ${App.withdrawalAttestationDelayLabel().long} have passed since you requested withdrawal, then try requesting attestation again for an updated validator set.`;
+        if (decoded && decoded.includes('custom error')) {
+            errorMessage += ' If you recently changed validators on Layer, request attestation again after the valset used for signing matches.';
+        }
+        const looksLikeLimitPanic =
+            decoded &&
+            (decoded.includes('0x11') ||
+                decoded.includes('overflow/underflow') ||
+                decoded.includes('arithmetic overflow'));
+        if (looksLikeLimitPanic) {
+            try {
+                const wd =
+                    withdrawDetailsSnapshot ||
+                    (await App.contracts.Bridge.methods.withdrawDetails(withdrawalId).call());
+                const pend = ethers.BigNumber.from(wd.pendingAmount || 0);
+                const dec = App._cachedBridgeTrbDecimals != null ? App._cachedBridgeTrbDecimals : 12;
+                const trbPend = pend.gt(0) ? String(App.formatBridgePendingTrb(wd.pendingAmount, dec)) : null;
+                errorMessage += ` <span style="display:block;margin-top:10px;font-size:13px;color:#92400e;">${
+                    trbPend
+                        ? `On-chain <strong>${trbPend} TRB</strong> is still pending under the bridge withdraw limit — use <strong>Claim Extra</strong> after the limit resets, or claim the first tranche then re-attest if the oracle amount no longer matches.`
+                        : 'If this withdrawal is larger than the current bridge withdraw limit, use <strong>Claim Extra</strong> for the remainder after the limit resets, or request a fresh attestation after a partial claim.'
+                }</span>`;
+            } catch (_) {
+                /* ignore */
+            }
+        }
+        console.error('[claimWithdrawal]', error, { decoded, revertHex: App.extractRevertData(error) });
+        if (!txHash) {
+            errorMessage += ' <span style="display:block;margin-top:8px;font-size:13px;color:#6b7280;">No Sepolia transaction was created — MetaMask stopped at simulation (e.g. gas estimate), so there is nothing to open on Etherscan.</span>';
+        }
         if (txHash) {
           // Use correct Etherscan URL based on current Ethereum network
           const etherscanUrl = App.chainId === 1 
@@ -3933,16 +4469,29 @@ const App = {
         }
 
         const details = await App.contracts.Bridge.methods.withdrawDetails(withdrawalId).call();
-        const pendingAmount = Number(details.pendingAmount || 0);
-        if (pendingAmount <= 0) {
+        const pendingBn = ethers.BigNumber.from(details.pendingAmount || 0);
+        if (pendingBn.lte(0)) {
             alert('No extra amount pending for this withdrawal.');
             return;
         }
+        let ped0 = 12;
+        try {
+            const mult = await App.contracts.Bridge.methods.TOKEN_DECIMAL_PRECISION_MULTIPLIER().call();
+            ped0 = App.bridgeTrbDecimalsFromMultiplier(mult);
+        } catch (_) {
+            /* default ped0 */
+        }
+        const mainHintTrb = parseFloat(
+            ethers.utils.formatUnits(String(details.amount || '0'), 6)
+        );
+        const ped = App.choosePendingTrbDecimals(details.pendingAmount, ped0, mainHintTrb);
+        const pendingTrbHuman = App.formatBridgePendingTrb(details.pendingAmount, ped);
 
-        App.showPendingPopup("Claiming extra withdrawal amount...");
+        App.showPendingPopup(`Claiming ${pendingTrbHuman.toFixed(2)} TRB (extra pending)…`);
 
-        const tx = await App.contracts.Bridge.methods.claimExtraWithdrawByWithdrawId(withdrawalId)
-            .send({ from: App.account });
+        const extraMethod = App.contracts.Bridge.methods.claimExtraWithdrawByWithdrawId(withdrawalId);
+        const extraGas = await App.estimateBridgeClaimGas(extraMethod);
+        const tx = await extraMethod.send({ from: App.account, gas: extraGas });
 
         txHash = tx.transactionHash;
         App.showSuccessPopup("Extra withdrawal claimed successfully!", txHash, 'ethereum');
@@ -3956,7 +4505,20 @@ const App = {
             txHash = error.receipt.transactionHash;
         }
 
-        let errorMessage = "Claim extra withdrawal failed. The bridge withdraw limit may not have reset yet. Please try again later.";
+        const decodedExtra = App.decodeContractError(error);
+        const bareExtra =
+            /^execution reverted$/i.test(String(decodedExtra || '').trim()) ||
+            /^Gas estimation failed$/i.test(String(decodedExtra || '').trim());
+        let errorMessage =
+            decodedExtra && decodedExtra.length > 0 && !bareExtra
+                ? decodedExtra.startsWith('Claim extra failed:')
+                    ? decodedExtra
+                    : `Claim extra failed: ${decodedExtra}`
+                : "Claim extra withdrawal failed. The bridge withdraw limit may not have reset yet. Please try again later.";
+        console.error('[claimExtraWithdraw]', error, { decoded: decodedExtra, revertHex: App.extractRevertData(error) });
+        if (!txHash) {
+            errorMessage += ' <span style="display:block;margin-top:8px;font-size:13px;color:#6b7280;">No Sepolia transaction was created — simulation failed before submit.</span>';
+        }
         if (txHash) {
             const etherscanUrl = App.chainId === 1
                 ? `https://etherscan.io/tx/${txHash}`
@@ -4017,19 +4579,35 @@ const App = {
         }
 
         const validatorSetTimestampData = await validatorSetTimestampResponse.json();
-        const currentValidatorSetTimestamp = validatorSetTimestampData.timestamp;
+        // Prefer attestation_timestamp so valset + checkpoint params match the signed snapshot.
+        // Using only "current" valset breaks claims when the set changed after the attestation (common on devnets).
+        let validatorSetTimestampForAttest = validatorSetTimestampData.timestamp;
+        const attTsRaw = rawAttestationData.attestation_timestamp;
+        if (attTsRaw !== undefined && attTsRaw !== null && attTsRaw !== '') {
+            const parsedAttTs = parseInt(String(attTsRaw), 10);
+            if (Number.isFinite(parsedAttTs) && parsedAttTs > 0) {
+                validatorSetTimestampForAttest = String(parsedAttTs);
+            }
+        }
 
-        // Get validator set for the current timestamp
-        const validatorsResponse = await fetch(
-            `${baseEndpoint}/layer/bridge/get_valset_by_timestamp/${currentValidatorSetTimestamp}`
+        // Get validator set for the attestation-aligned timestamp (fallback to chain "current" if API rejects att ts)
+        let valsetTsResolved = validatorSetTimestampForAttest;
+        let validatorsResponse = await fetch(
+            `${baseEndpoint}/layer/bridge/get_valset_by_timestamp/${valsetTsResolved}`
         );
+        if (!validatorsResponse.ok && valsetTsResolved !== validatorSetTimestampData.timestamp) {
+            valsetTsResolved = validatorSetTimestampData.timestamp;
+            validatorsResponse = await fetch(
+                `${baseEndpoint}/layer/bridge/get_valset_by_timestamp/${valsetTsResolved}`
+            );
+        }
 
         if (!validatorsResponse.ok) {
             const errorText = await validatorsResponse.text();
             console.error('Validator response error:', { 
                 status: validatorsResponse.status, 
                 text: errorText,
-                currentTimestamp: currentValidatorSetTimestamp,
+                valsetTimestamp: valsetTsResolved,
                 reportTimestamp: rawAttestationData.timestamp,
                 attestationTimestamp: rawAttestationData.attestation_timestamp
             });
@@ -4038,17 +4616,24 @@ const App = {
 
         const validatorsData = await validatorsResponse.json();
 
-        // Get power threshold for this timestamp
-        const checkpointParamsResponse = await fetch(
-            `${baseEndpoint}/layer/bridge/get_validator_checkpoint_params/${currentValidatorSetTimestamp}`
+        // Get power threshold for the same timestamp as valset
+        let checkpointParamsResponse = await fetch(
+            `${baseEndpoint}/layer/bridge/get_validator_checkpoint_params/${valsetTsResolved}`
         );
+        if (!checkpointParamsResponse.ok && valsetTsResolved !== validatorSetTimestampData.timestamp) {
+            valsetTsResolved = validatorSetTimestampData.timestamp;
+            checkpointParamsResponse = await fetch(
+                `${baseEndpoint}/layer/bridge/get_validator_checkpoint_params/${valsetTsResolved}`
+            );
+        }
 
         if (!checkpointParamsResponse.ok) {
             throw new Error(`Failed to fetch checkpoint params: ${checkpointParamsResponse.statusText}`);
         }
 
         const checkpointParams = await checkpointParamsResponse.json();
-        const powerThreshold = checkpointParams.power_threshold;
+        const powerThreshold =
+            checkpointParams.power_threshold ?? checkpointParams.powerThreshold ?? checkpointParams.threshold;
 
         // Get attestations
         const attestationsResponse = await fetch(
@@ -4064,75 +4649,20 @@ const App = {
         // Process attestations
         const validatorSet = validatorsData.bridge_validator_set;
 
-        // Create a map of validator addresses to their indices
-        const validatorMap = new Map();
-        validatorSet.forEach((validator, index) => {
-            const address = validator.ethereumAddress.toLowerCase();
-            validatorMap.set(address, index);
-        });
-
-        // Process each attestation
-        const signatureMap = new Map();
-        // Ensure checkpoint has 0x prefix before arrayifying
-        const checkpointWithPrefix = rawAttestationData.checkpoint.startsWith('0x') ? 
-            rawAttestationData.checkpoint : 
-            '0x' + rawAttestationData.checkpoint;
-        const messageHash = ethers.utils.sha256(ethers.utils.arrayify(checkpointWithPrefix));
-
-        // Process each attestation
-        for (let i = 0; i < attestationsResult.attestations.length; i++) {
-            const attestation = attestationsResult.attestations[i];
-            if (!attestation || attestation.length === 0) {
-                // Add zero signature for validators who didn't sign
-                signatureMap.set(i, {
-                    v: 0,
-                    r: "0x0000000000000000000000000000000000000000000000000000000000000000",
-                    s: "0x0000000000000000000000000000000000000000000000000000000000000000"
-                });
-                continue;
-            }
-
-            // Try both v values (27 and 28)
-            for (const v of [27, 28]) {
-                const recoveredAddress = ethers.utils.recoverAddress(
-                    messageHash,
-                    ethers.utils.joinSignature({
-                        r: '0x' + attestation.slice(0, 64),
-                        s: '0x' + attestation.slice(64, 128),
-                        v: v
-                    })
-                ).toLowerCase();
-
-                const validatorIndex = validatorMap.get(recoveredAddress);
-                if (validatorIndex !== undefined) {
-                    signatureMap.set(validatorIndex, {
-                        v: v,
-                        r: '0x' + attestation.slice(0, 64),
-                        s: '0x' + attestation.slice(64, 128)
-                    });
-                    break;
-                }
-            }
+        const checkpointSource =
+            rawAttestationData.checkpoint && String(rawAttestationData.checkpoint).length > 0
+                ? rawAttestationData.checkpoint
+                : lastSnapshot;
+        if (!checkpointSource) {
+            throw new Error('Missing checkpoint for attestation signatures');
         }
-
-        // Convert signature map to array
-        const signatures = Array(validatorSet.length).fill(null).map((_, i) => {
-            const sig = signatureMap.get(i);
-            if (!sig) {
-                return {
-                    v: 0,
-                    r: "0x0000000000000000000000000000000000000000000000000000000000000000",
-                    s: "0x0000000000000000000000000000000000000000000000000000000000000000"
-                };
-            }
-            return sig;
-        });
-
-        // Process attestations using deriveSignatures with lastSnapshot as checkpoint
-        const derivedSignatures = this.deriveSignatures(
-            attestationsResult.attestations,
+        const checkpointHex = checkpointSource.startsWith('0x') ? checkpointSource : '0x' + checkpointSource;
+        const attestList = App.coerceBridgeAttestationArray(attestationsResult);
+        const signatures = this.buildWithdrawalSignaturesForValset(
+            attestList,
             validatorSet,
-            lastSnapshot  // Use lastSnapshot instead of rawAttestationData.checkpoint
+            checkpointHex,
+            lastSnapshot
         );
 
         // Format the attestation data according to the contract's expected structure
@@ -4140,25 +4670,46 @@ const App = {
             queryId: ethers.utils.arrayify(this.ensureHexPrefix(rawAttestationData.query_id)),
             report: {
                 value: ethers.utils.arrayify(this.ensureHexPrefix(rawAttestationData.aggregate_value)),
-                timestamp: parseInt(rawAttestationData.timestamp),
-                aggregatePower: parseInt(rawAttestationData.aggregate_power),
-                previousTimestamp: parseInt(rawAttestationData.previous_report_timestamp),
-                nextTimestamp: parseInt(rawAttestationData.next_report_timestamp),
-                lastConsensusTimestamp: parseInt(rawAttestationData.last_consensus_timestamp)
+                timestamp: this.attestApiUintString(rawAttestationData.timestamp, 'report.timestamp'),
+                aggregatePower: this.attestApiUintString(rawAttestationData.aggregate_power, 'report.aggregatePower'),
+                previousTimestamp: this.attestApiUintString(
+                    rawAttestationData.previous_report_timestamp,
+                    'report.previousTimestamp',
+                    { allowMissing: true }
+                ),
+                nextTimestamp: this.attestApiUintString(
+                    rawAttestationData.next_report_timestamp,
+                    'report.nextTimestamp',
+                    { allowMissing: true }
+                ),
+                lastConsensusTimestamp: this.attestApiUintString(
+                    rawAttestationData.last_consensus_timestamp,
+                    'report.lastConsensusTimestamp',
+                    { allowMissing: true }
+                )
             },
-            attestationTimestamp: parseInt(rawAttestationData.attestation_timestamp)
+            attestationTimestamp: this.attestApiUintString(
+                rawAttestationData.attestation_timestamp,
+                'attestationTimestamp'
+            )
         };
 
         // Format the validator set according to the contract's expected structure
-        const formattedValidatorSet = validatorSet.map(validator => ({
-            addr: validator.ethereumAddress,
-            power: parseInt(validator.power)
-        }));
+        const formattedValidatorSet = validatorSet.map((validator) => {
+            const addr = App.bridgeValidatorEthAddress(validator);
+            if (!addr) {
+                throw new Error('Bridge API valset entry missing Ethereum address (ethereumAddress / eth_address)');
+            }
+            return {
+                addr,
+                power: this.attestApiUintString(validator.power, 'validator.power')
+            };
+        });
 
         return {
             attestationData: formattedAttestationData,
             validatorSet: formattedValidatorSet,
-            signatures: derivedSignatures,
+            signatures: signatures,
             powerThreshold: powerThreshold,
             checkpoint: rawAttestationData.checkpoint,
             rawAttestationData: rawAttestationData  // Include raw data for debugging
@@ -4169,87 +4720,10 @@ const App = {
     }
   },
 
-  deriveSignatures: function(signatures, validatorSet, checkpoint) {
-    console.log("Deriving signatures with:", {
-        signatureCount: signatures.length,
-        validatorCount: validatorSet.length,
-        checkpoint
-    });
-
-    const derivedSignatures = [];
-    // Ensure checkpoint has 0x prefix
-    const checkpointHex = checkpoint.startsWith('0x') ? checkpoint : '0x' + checkpoint;
-    
-    // Get message hash using ethers - this matches Python's sha256(data).digest()
-    const messageHash = ethers.utils.sha256(ethers.utils.arrayify(checkpointHex));
-    // console.log(...);
-    
-    const zeroBytes = '0x0000000000000000000000000000000000000000000000000000000000000000';
-    
-    // Create a map of validator addresses to their indices for faster lookup
-    const validatorMap = new Map();
-    validatorSet.forEach((validator, index) => {
-        validatorMap.set(validator.ethereumAddress.toLowerCase(), index);
-    });
-    
-    for (let i = 0; i < signatures.length; i++) {
-        const signature = signatures[i];
-        const validator = validatorSet[i];
-        
-        if (!signature || signature.length === 0) {
-            derivedSignatures.push({
-                v: 0,
-                r: zeroBytes,
-                s: zeroBytes
-            });
-            continue;
-        }
-
-        if (signature.length !== 128) {
-            // console.error(...);
-            derivedSignatures.push({
-                v: 0,
-                r: zeroBytes,
-                s: zeroBytes
-            });
-            continue;
-        }
-
-        const r = '0x' + signature.slice(0, 64);
-        const s = '0x' + signature.slice(64, 128);
-        let foundValidSignature = false;
-        
-        // Try both v values (27 and 28)
-        for (const v of [27, 28]) {
-            try {
-                const recoveredAddress = ethers.utils.recoverAddress(
-                    messageHash,
-                    { r, s, v }
-                ).toLowerCase();
-
-                if (recoveredAddress === validator.ethereumAddress.toLowerCase()) {
-                    derivedSignatures.push({ v, r, s });
-                    foundValidSignature = true;
-                    break;
-                }
-            } catch (error) {
-                // console.error(...);
-            }
-        }
-
-        if (!foundValidSignature) {
-            derivedSignatures.push({
-                v: 0,
-                r: zeroBytes,
-                s: zeroBytes
-            });
-        }
-    }
-    
-    return derivedSignatures;
-  },
-
   showErrorPopup: function(message) {
+    const cleaned = String(message || '')
+      .replace(/\s*0x[0-9a-f]{100,}\s*/gi, ' ')
+      .trim();
     const popup = document.createElement('div');
     popup.id = 'errorPopup';
     popup.style.position = 'fixed';
@@ -4263,13 +4737,19 @@ const App = {
     popup.style.zIndex = '1000';
     popup.style.border = '2px solid #DC2626';
     popup.style.fontFamily = "'PPNeueMontreal-Book', Arial, sans-serif";
-    popup.style.fontSize = "15px";
-    popup.style.width = '300px';
+    popup.style.fontSize = '15px';
+    popup.style.width = 'auto';
+    popup.style.minWidth = '280px';
+    popup.style.maxWidth = 'min(440px, 92vw)';
+    popup.style.boxSizing = 'border-box';
     popup.style.textAlign = 'center';
-    popup.style.lineHeight = '1.4';
-  
+    popup.style.lineHeight = '1.45';
+    popup.style.wordBreak = 'break-word';
+    popup.style.overflowWrap = 'anywhere';
+    popup.style.whiteSpace = 'normal';
+
     // Use innerHTML to allow for the Etherscan link
-    popup.innerHTML = message;
+    popup.innerHTML = cleaned;
   
     document.body.appendChild(popup);
   
@@ -4286,6 +4766,320 @@ const App = {
   ensureHexPrefix: function(value) {
     if (!value) return value;
     return value.startsWith('0x') ? value : '0x' + value;
+  },
+
+  /** Decimal string for uint256 ABI fields from bridge API (avoids JS precision loss on large powers). */
+  attestApiUintString: function (raw, fieldName, { allowMissing = false } = {}) {
+    if (raw === undefined || raw === null || raw === '') {
+      if (allowMissing) {
+        return '0';
+      }
+      throw new Error(`Bridge attestation API: missing ${fieldName}`);
+    }
+    const s = String(raw).trim();
+    if (!/^\d+$/.test(s)) {
+      throw new Error(`Bridge attestation API: invalid non-integer ${fieldName}: ${raw}`);
+    }
+    return s;
+  },
+
+  /** Bridge API may use ethereumAddress, eth_address, etc. */
+  bridgeValidatorEthAddress: function (v) {
+    const primary =
+      v.ethereumAddress ||
+      v.ethereum_address ||
+      v.eth_address ||
+      v.ethAddress ||
+      v.evm_address ||
+      v.evmAddress ||
+      v.operator_eth_address ||
+      v.validator_ethereum_address;
+    const raw = primary || v.address;
+    if (!raw || typeof raw !== 'string') {
+      return null;
+    }
+    let t = raw.trim();
+    if (/^[0-9a-fA-F]{40}$/.test(t)) {
+      t = '0x' + t;
+    }
+    if (!t.startsWith('0x')) {
+      return null;
+    }
+    return ethers.utils.getAddress(t);
+  },
+
+  /** Normalize get_attestations_by_snapshot JSON to an array of raw signature blobs. */
+  coerceBridgeAttestationArray: function (json) {
+    if (!json) {
+      return [];
+    }
+    const arr =
+      json.attestations ||
+      json.Attestations ||
+      json.attestation_signatures ||
+      json.attestationSignatures ||
+      json.signatures ||
+      json.sigs ||
+      (Array.isArray(json) ? json : null);
+    if (!Array.isArray(arr)) {
+      return [];
+    }
+    return arr
+      .map((x) => {
+        if (x == null) {
+          return null;
+        }
+        if (typeof x === 'string') {
+          return x;
+        }
+        if (typeof x === 'object') {
+          if (typeof x.signature === 'string') {
+            return x.signature;
+          }
+          if (typeof x.sig === 'string') {
+            return x.sig;
+          }
+          if (typeof x.data === 'string') {
+            return x.data;
+          }
+          if (typeof x.hex === 'string') {
+            return x.hex;
+          }
+          if (typeof x.attestation === 'string') {
+            return x.attestation;
+          }
+          if (x.r != null && x.s != null) {
+            return x;
+          }
+        }
+        return x;
+      })
+      .filter((x) => x != null);
+  },
+
+  /** Normalize one attestation entry to 64-char r/s hex (no 0x) + optional v hint. */
+  normalizeAttestationEntry: function (att) {
+    if (att == null) {
+      return null;
+    }
+    const pad32 = (hexNo0x) => {
+      let h = String(hexNo0x).replace(/^0x/i, '');
+      if (!/^[0-9a-fA-F]*$/.test(h)) {
+        return null;
+      }
+      while (h.length < 64) {
+        h = '0' + h;
+      }
+      return h.slice(-64);
+    };
+    if (typeof att === 'object' && att.r != null && att.s != null) {
+      const r = pad32(att.r);
+      const s = pad32(att.s);
+      if (!r || !s) {
+        return null;
+      }
+      let vPreferred = null;
+      if (att.v !== undefined && att.v !== null) {
+        const vn = Number(att.v);
+        if (vn === 27 || vn === 28) {
+          vPreferred = vn;
+        } else if (vn === 0 || vn === 1) {
+          vPreferred = vn + 27;
+        }
+      }
+      return { r, s, vPreferred };
+    }
+    let h = String(att).trim().replace(/^0x/i, '');
+    if (h.length === 130) {
+      const r = h.slice(0, 64);
+      const s = h.slice(64, 128);
+      const vb = parseInt(h.slice(128, 130), 16);
+      let vPreferred = null;
+      if (vb === 27 || vb === 28) {
+        vPreferred = vb;
+      } else if (vb === 0 || vb === 1) {
+        vPreferred = vb + 27;
+      }
+      return { r, s, vPreferred };
+    }
+    if (h.length === 128) {
+      return { r: h.slice(0, 64), s: h.slice(64, 128), vPreferred: null };
+    }
+    return null;
+  },
+
+  /** Digests validators may have signed for the checkpoint (try best match). */
+  checkpointMessageDigests: function (checkpointHex, lastSnapshotRaw) {
+    const pairs = [];
+    const push = (label, digest) => {
+      if (digest && typeof digest === 'string' && digest.startsWith('0x')) {
+        pairs.push({ label, digest });
+      }
+    };
+    const cpStr = String(checkpointHex || '').trim();
+    const cpNorm = cpStr.startsWith('0x') ? cpStr : '0x' + cpStr;
+    let cpBytes;
+    try {
+      cpBytes = ethers.utils.arrayify(cpNorm);
+    } catch (_) {
+      cpBytes = ethers.utils.toUtf8Bytes(cpStr);
+    }
+    const sha256Cp = ethers.utils.sha256(cpBytes);
+    push('sha256(checkpoint)', sha256Cp);
+    push('keccak256(checkpoint)', ethers.utils.keccak256(cpBytes));
+    push('hashMessage(bytes(sha256(checkpoint)))', ethers.utils.hashMessage(ethers.utils.arrayify(sha256Cp)));
+    push('hashMessage(checkpoint_bytes)', ethers.utils.hashMessage(cpBytes));
+    push('sha256(utf8(checkpoint_ascii))', ethers.utils.sha256(ethers.utils.toUtf8Bytes(cpStr)));
+    push('keccak256(utf8(checkpoint_ascii))', ethers.utils.keccak256(ethers.utils.toUtf8Bytes(cpStr)));
+    push('hashMessage(utf8(checkpoint_ascii))', ethers.utils.hashMessage(cpStr));
+    try {
+      push('solidityKeccak256(bytes)', ethers.utils.solidityKeccak256(['bytes'], [cpBytes]));
+      if (cpBytes.length === 32) {
+        const b32 = ethers.utils.hexZeroPad(cpNorm, 32);
+        push('solidityKeccak256(bytes32)', ethers.utils.solidityKeccak256(['bytes32'], [b32]));
+      }
+    } catch (_) {
+      /* ignore packing errors */
+    }
+    if (lastSnapshotRaw != null && String(lastSnapshotRaw).trim() !== '') {
+      const ls = String(lastSnapshotRaw).trim();
+      const cpBody = cpStr.replace(/^0x/i, '');
+      if (ls.replace(/^0x/i, '') !== cpBody) {
+        push('sha256(utf8(lastSnapshot))', ethers.utils.sha256(ethers.utils.toUtf8Bytes(ls)));
+        push('keccak256(utf8(lastSnapshot))', ethers.utils.keccak256(ethers.utils.toUtf8Bytes(ls)));
+        push('hashMessage(utf8(lastSnapshot))', ethers.utils.hashMessage(ls));
+        const lsHex = ls.startsWith('0x') ? ls : '0x' + ls;
+        try {
+          const lsb = ethers.utils.arrayify(lsHex);
+          push('sha256(lastSnapshot_bytes)', ethers.utils.sha256(lsb));
+          push('keccak256(lastSnapshot_bytes)', ethers.utils.keccak256(lsb));
+          push('hashMessage(lastSnapshot_bytes)', ethers.utils.hashMessage(lsb));
+        } catch (_) {
+          /* ignore */
+        }
+      }
+    }
+    const seen = new Set();
+    return pairs.filter(({ digest }) => {
+      if (seen.has(digest)) {
+        return false;
+      }
+      seen.add(digest);
+      return true;
+    });
+  },
+
+  _recoverAttestationsToValset: function (messageDigest, normalizedEntries, validatorMap) {
+    const signatureMap = new Map();
+    const recoverOne = (r, s, v) => {
+      try {
+        return ethers.utils
+          .recoverAddress(messageDigest, { r: '0x' + r, s: '0x' + s, v })
+          .toLowerCase();
+      } catch (_) {
+        return null;
+      }
+    };
+    for (const { r, s, vPreferred } of normalizedEntries) {
+      const order =
+        vPreferred === 27 || vPreferred === 28
+          ? [vPreferred, vPreferred === 27 ? 28 : 27]
+          : [27, 28];
+      const rsOrder = [{ r, s }, { r: s, s: r }];
+      let placed = false;
+      for (const { r: rr, s: ss } of rsOrder) {
+        if (placed) {
+          break;
+        }
+        const tried = new Set();
+        for (const v of order) {
+          if (tried.has(v)) {
+            continue;
+          }
+          tried.add(v);
+          const recoveredAddress = recoverOne(rr, ss, v);
+          if (!recoveredAddress) {
+            continue;
+          }
+          const validatorIndex = validatorMap.get(recoveredAddress);
+          if (validatorIndex !== undefined) {
+            signatureMap.set(validatorIndex, {
+              v,
+              r: '0x' + rr,
+              s: '0x' + ss
+            });
+            placed = true;
+            break;
+          }
+        }
+      }
+    }
+    return signatureMap;
+  },
+
+  /**
+   * Map snapshot attestations to validator-ordered signatures (contract expects sigs[i] = validator i).
+   * Never assume attestations[] index aligns with validator order — recover signer and place by valset index.
+   */
+  buildWithdrawalSignaturesForValset: function (attestations, validatorSet, checkpointHex, lastSnapshotRaw) {
+    const zeroSig = {
+      v: 0,
+      r: '0x0000000000000000000000000000000000000000000000000000000000000000',
+      s: '0x0000000000000000000000000000000000000000000000000000000000000000'
+    };
+    const validatorMap = new Map();
+    validatorSet.forEach((validator, index) => {
+      try {
+        const addr = App.bridgeValidatorEthAddress(validator);
+        if (addr) {
+          validatorMap.set(addr.toLowerCase(), index);
+        }
+      } catch (_) {
+        /* skip malformed valset row */
+      }
+    });
+    const list = Array.isArray(attestations) ? attestations : [];
+    const normalizedList = [];
+    for (const raw of list) {
+      const n = App.normalizeAttestationEntry(raw);
+      if (n) {
+        normalizedList.push(n);
+      }
+    }
+    const digests = App.checkpointMessageDigests(checkpointHex, lastSnapshotRaw);
+    let bestMap = new Map();
+    let bestScore = -1;
+    let bestLabel = '';
+    for (const { label, digest } of digests) {
+      const signatureMap = App._recoverAttestationsToValset(digest, normalizedList, validatorMap);
+      const score = signatureMap.size;
+      if (score > bestScore) {
+        bestScore = score;
+        bestMap = signatureMap;
+        bestLabel = label;
+      }
+    }
+    if (bestScore <= 0 && normalizedList.length > 0) {
+      console.warn(
+        '[buildWithdrawalSignaturesForValset] No signatures recovered; tried digests:',
+        digests.map((d) => d.label),
+        'normalizedAttestations:',
+        normalizedList.length,
+        'validators:',
+        validatorSet.length,
+        'valsetEthAddressesSample:',
+        validatorSet.slice(0, 3).map((v) => {
+          try {
+            return App.bridgeValidatorEthAddress(v);
+          } catch (e) {
+            return String(e && e.message);
+          }
+        })
+      );
+    } else if (bestScore > 0) {
+      console.info('[buildWithdrawalSignaturesForValset] Matched', bestScore, 'signatures using digest:', bestLabel);
+    }
+    return Array.from({ length: validatorSet.length }, (_, idx) => bestMap.get(idx) || zeroSig);
   },
 
   formatWithdrawalData: function(withdrawalId, withdrawalData, attestationData) {
@@ -5837,20 +6631,14 @@ const App = {
             // Show pending popup
             App.showPendingPopup("Claiming dispute rewards...");
 
-            // Determine RPC endpoint
-            let rpcEndpoint;
-            if (window.App && window.App.cosmosChainId === 'tellor-1') {
-                rpcEndpoint = 'https://mainnet.tellorlayer.com';
-            } else {
-                rpcEndpoint = 'https://node-palmito.tellorlayer.com';
-            }
+            const rpcEndpoint = App.getCosmosRpcEndpoint();
 
             // Get offline signer
             let offlineSigner;
             if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
                 offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
             } else if (window.keplr) {
-                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-5';
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : LAYER_TESTNET_CHAIN_ID;
                 offlineSigner = window.keplr.getOfflineSigner(chainId);
             } else {
                 throw new Error('No wallet connected.');
@@ -5932,20 +6720,14 @@ const App = {
             // Show pending popup
             App.showPendingPopup("Withdrawing fee refund...");
 
-            // Determine RPC endpoint
-            let rpcEndpoint;
-            if (window.App && window.App.cosmosChainId === 'tellor-1') {
-                rpcEndpoint = 'https://mainnet.tellorlayer.com';
-            } else {
-                rpcEndpoint = 'https://node-palmito.tellorlayer.com';
-            }
+            const rpcEndpoint = App.getCosmosRpcEndpoint();
 
             // Get offline signer
             let offlineSigner;
             if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
                 offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
             } else if (window.keplr) {
-                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'layertest-5';
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : LAYER_TESTNET_CHAIN_ID;
                 offlineSigner = window.keplr.getOfflineSigner(chainId);
             } else {
                 throw new Error('No wallet connected.');

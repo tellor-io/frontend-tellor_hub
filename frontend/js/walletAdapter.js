@@ -11,6 +11,47 @@ class CosmosWalletAdapter {
         
         // Chain configurations for both networks
         this.chainConfigs = {
+            'layer-internal': {
+                chainId: "layer-internal",
+                chainName: "Layer Internal (Dev)",
+                rpc: "https://node-palmito.tellorlayer.com/rpc",
+                rest: "https://node-palmito.tellorlayer.com/rpc",
+                bip44: {
+                    coinType: 118
+                },
+                bech32Config: {
+                    bech32PrefixAccAddr: "tellor",
+                    bech32PrefixAccPub: "tellorpub",
+                    bech32PrefixValAddr: "tellorvaloper",
+                    bech32PrefixValPub: "tellorvaloperpub",
+                    bech32PrefixConsAddr: "tellorvalcons",
+                    bech32PrefixConsPub: "tellorvalconspub",
+                },
+                currencies: [
+                    {
+                        coinDenom: "TRB",
+                        coinMinimalDenom: "loya",
+                        coinDecimals: 6,
+                    },
+                ],
+                feeCurrencies: [
+                    {
+                        coinDenom: "TRB",
+                        coinMinimalDenom: "loya",
+                        coinDecimals: 6,
+                        gasPriceStep: {
+                            low: 0.01,
+                            average: 0.025,
+                            high: 0.04,
+                        }
+                    },
+                ],
+                stakeCurrency: {
+                    coinDenom: "TRB",
+                    coinMinimalDenom: "loya",
+                    coinDecimals: 6,
+                },
+            },
             'layertest-5': {
                 chainId: "layertest-5",
                 chainName: "Layer Testnet",
@@ -231,8 +272,12 @@ class CosmosWalletAdapter {
         const currentChainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
         
         if (this.chainConfigs[currentChainId]) {
-            this.chainConfig = this.chainConfigs[currentChainId];
+            this.chainConfig = { ...this.chainConfigs[currentChainId] };
             this.chainId = currentChainId;
+            if ((currentChainId === 'layertest-5' || currentChainId === 'layer-internal') && window.App && window.App.getCosmosRpcEndpoint && window.App.getCosmosApiEndpoint) {
+                this.chainConfig.rpc = window.App.getCosmosRpcEndpoint();
+                this.chainConfig.rest = window.App.getCosmosApiEndpoint();
+            }
             this.rpcUrl = this.chainConfig.rpc;
             this.restUrl = this.chainConfig.rest;
             
