@@ -314,18 +314,6 @@
             run: () => this.testWalletManagerInteraction()
           },
           {
-            name: 'No-stake reporting tab structure',
-            run: () => this.testNoStakeReportingStructure()
-          },
-          {
-            name: 'No-stake reporting functionality',
-            run: () => this.testNoStakeReportingFunctionality()
-          },
-          {
-            name: 'No-stake input validation',
-            run: () => this.testNoStakeInputValidation()
-          },
-          {
             name: 'Dispute proposer initialization',
             run: () => this.testDisputeProposerInitialization()
           },
@@ -438,40 +426,6 @@
         
         // Test initial state
         this.assert(!walletManagerContent.classList.contains('active'), 'Wallet manager should be closed initially');
-      }
-
-      async testNoStakeReportingStructure() {
-        // Test that no-stake reporting elements exist (if they're in the DOM)
-        // Note: These tests will pass even if elements don't exist yet, as they're testing the structure
-        this.assert(true, 'No-stake reporting structure test completed');
-        
-        // In a real implementation, you would test:
-        // - No-stake tab exists
-        // - Input fields exist
-        // - Labels exist
-        // - Submit button exists
-      }
-
-      async testNoStakeReportingFunctionality() {
-        // Test that no-stake reporting methods exist (if they're available)
-        // Note: These tests will pass even if methods don't exist yet
-        this.assert(true, 'No-stake reporting functionality test completed');
-        
-        // In a real implementation, you would test:
-        // - submitNoStakeReport method exists
-        // - checkNoStakeWalletStatus method exists
-        // - Tab switching works
-      }
-
-      async testNoStakeInputValidation() {
-        // Test no-stake input validation (if inputs exist)
-        // Note: These tests will pass even if inputs don't exist yet
-        this.assert(true, 'No-stake input validation test completed');
-        
-        // In a real implementation, you would test:
-        // - Query data input properties
-        // - Value input properties
-        // - CSS classes and styling
       }
 
       // Dispute Module Tests
@@ -685,10 +639,6 @@
             run: () => this.testUserInteractionFlow()
           },
           {
-            name: 'No-stake reporting integration',
-            run: () => this.testNoStakeReportingIntegration()
-          },
-          {
             name: 'Complete dispute proposal flow',
             run: () => this.testCompleteDisputeProposalFlow()
           },
@@ -734,18 +684,6 @@
         // Test button states
         this.assert(unitTestsButton.disabled === false, 'Unit tests button should be enabled');
         this.assert(integrationTestsButton.disabled === false, 'Integration tests button should be enabled');
-      }
-
-      async testNoStakeReportingIntegration() {
-        // Test no-stake reporting integration (if functionality exists)
-        // Note: These tests will pass even if functionality doesn't exist yet
-        this.assert(true, 'No-stake reporting integration test completed');
-        
-        // In a real implementation, you would test:
-        // - Complete user flow
-        // - Tab switching interaction
-        // - Input value setting
-        // - Method availability
       }
 
       // Dispute Module Integration Tests

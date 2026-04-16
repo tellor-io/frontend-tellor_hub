@@ -292,13 +292,16 @@
                     <div class="input-with-label">
                       <input class="input-address" type="text" id="ethQueryId" placeholder="To address (e.g. 0x...)" />
                     </div>
+                    <div class="withdraw-action-row">
                     <button id="withdrawButton" class="button-style-3" onclick="App.withdrawFromLayer()">
                         <span class="tooltip-container">
                             1. Request Withdrawal
                             <span class="tooltip-icon tooltip-icon-white">?</span>
-                            <span class="tooltip-text tooltip-text-right">Uses Cosmos Wallet. Must wait 12 hours after withdrawal request is made before you can continue to step 2, request Attestation</span>
+                            <span id="withdrawRequestAttestWaitTooltip" class="tooltip-text tooltip-text-right">Uses Cosmos Wallet. Must wait 12 hours after withdrawal request is made before you can continue to step 2, request Attestation</span>
                         </span>
                     </button>
+                    <span id="withdrawLimitDisplay" class="info-text withdraw-limit-display" title="Maximum TRB that can be withdrawn per period (on-chain withdrawLimit)">—</span>
+                    </div>
                   </div>
                 </div>
                 
@@ -416,7 +419,7 @@
                   <!-- Reporter Status Section -->
                   <div class="status-section">
                     <div class="status-header">
-                      <span>Selected Reporter</span>
+                      <span>Current Selected Reporter</span>
                       <button type="button" id="refreshReporterStatusBtn" class="refresh-btn-small" title="Refresh reporter status">↻</button>
                     </div>
                     <div class="status-content" id="currentReporterStatus">
@@ -427,12 +430,6 @@
                   <div class="action-section">
                     
                     <div class="balance-info">
-                        <div class="input-button-container">
-                            <div class="input-with-label">
-                                <span class="input-label">TRB *</span>
-                                <input class="input" type="text" id="reporterStakeAmount" placeholder="Enter TRB amount" required />
-                            </div>
-                        </div>
                         <div class="input-button-container">
                             <div class="input-with-label">
                                 <select class="input-address" id="reporterDropdown">

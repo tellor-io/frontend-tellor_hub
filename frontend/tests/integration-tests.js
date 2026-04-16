@@ -31,10 +31,6 @@ export class IntegrationTests extends TestSuite {
         name: 'Complete Keplr connection and bridge flow',
         run: () => this.testCompleteKeplrFlow()
       },
-      {
-        name: 'Complete no-stake reporting flow',
-        run: () => this.testCompleteNoStakeFlow()
-      },
 
       // Dispute Module Integration Tests
       {
@@ -80,12 +76,6 @@ export class IntegrationTests extends TestSuite {
       {
         name: 'Button state synchronization',
         run: () => this.testButtonStateSync()
-      },
-
-      // No-Stake Reporting Integration Tests
-      {
-        name: 'No-stake reporting tab integration',
-        run: () => this.testNoStakeReportingIntegration()
       },
 
       // Error Handling Integration
@@ -407,34 +397,6 @@ export class IntegrationTests extends TestSuite {
     this.assert(inputResponseTime < 50, `Input response too slow: ${inputResponseTime.toFixed(2)}ms`);
   }
 
-  async testNoStakeReportingIntegration() {
-    // Test the complete no-stake reporting flow
-    const noStakeTab = document.getElementById('noStakeReportBtn');
-    const queryDataInput = document.getElementById('noStakeQueryData');
-    const valueInput = document.getElementById('noStakeValue');
-    const submitButton = document.getElementById('submitNoStakeReportBtn');
-    
-    this.assertNotNull(noStakeTab, 'No-stake tab should exist');
-    this.assertNotNull(queryDataInput, 'Query data input should exist');
-    this.assertNotNull(valueInput, 'Value input should exist');
-    this.assertNotNull(submitButton, 'Submit button should exist');
-
-    // Test tab switching
-    noStakeTab.click();
-    await this.wait(100);
-    this.assertTrue(noStakeTab.classList.contains('active'), 'No-stake tab should be active');
-
-    // Test input interaction
-    this.setInputValue('#noStakeQueryData', '0x1234567890abcdef');
-    this.setInputValue('#noStakeValue', '0x9876543210fedcba');
-    
-    this.assertEqual(queryDataInput.value, '0x1234567890abcdef', 'Query data input should accept value');
-    this.assertEqual(valueInput.value, '0x9876543210fedcba', 'Value input should accept value');
-
-    // Test that submit function exists
-    this.assertFunction(window.App.submitNoStakeReport, 'submitNoStakeReport should be available');
-  }
-
   // NEW: Complete User Flow Tests
   async testCompleteMetaMaskFlow() {
     // Mock everything needed for a complete MetaMask flow
@@ -611,85 +573,6 @@ export class IntegrationTests extends TestSuite {
     // Step 3: Verify final state
     this.assertDefined(window.App.isKeplrConnected, 'App should remain connected to Keplr');
     this.assertDefined(window.App.keplrAddress, 'App should maintain Keplr address');
-  }
-
-  async testCompleteNoStakeFlow() {
-    // Mock everything needed for no-stake reporting
-    const mockProvider = this.mockMetaMaskProvider();
-    const mockWeb3 = this.mockWeb3Instance();
-    
-    // Set up global mocks
-    window.ethereum = mockProvider;
-    window.web3 = mockWeb3;
-    
-    // Wait for App to be available
-    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
-    
-    // Step 1: Connect MetaMask
-    const metaMaskButton = document.getElementById('walletButton') || 
-                          document.querySelector('[data-wallet="metamask"]') ||
-                          document.querySelector('.wallet-button');
-    
-    if (metaMaskButton) {
-      metaMaskButton.click();
-      await this.wait(1000);
-    }
-    
-    // Step 2: Switch to no-stake reporting tab
-    const noStakeTab = document.getElementById('noStakeReportBtn');
-    this.assertNotNull(noStakeTab, 'No-stake reporting tab should exist');
-    
-    noStakeTab.click();
-    await this.wait(100);
-    
-    const noStakeSection = document.getElementById('noStakeReportSection');
-    this.assertTrue(noStakeSection.classList.contains('active'), 'No-stake section should be active');
-    
-    // Step 3: Fill out no-stake form
-    const queryDataInput = document.getElementById('noStakeQueryData');
-    const valueInput = document.getElementById('noStakeValue');
-    
-    this.assertNotNull(queryDataInput, 'Query data input should exist');
-    this.assertNotNull(valueInput, 'Value input should exist');
-    
-    this.setInputValue('#noStakeQueryData', '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef');
-    this.setInputValue('#noStakeValue', '0x9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba');
-    await this.wait(100);
-    
-    // Step 4: Submit no-stake report
-    const submitButton = document.getElementById('submitNoStakeReportBtn');
-    this.assertNotNull(submitButton, 'Submit button should exist');
-    
-    // Enable button if needed
-    if (submitButton.disabled) {
-      if (window.App.validateNoStakeInputs) {
-        const originalValidate = window.App.validateNoStakeInputs;
-        window.App.validateNoStakeInputs = () => true;
-        
-        queryDataInput.dispatchEvent(new Event('input', { bubbles: true }));
-        valueInput.dispatchEvent(new Event('input', { bubbles: true }));
-        await this.wait(100);
-        
-        window.App.validateNoStakeInputs = originalValidate;
-      }
-    }
-    
-    submitButton.click();
-    await this.wait(1000);
-    
-    // Step 5: Verify submission was processed
-    if (window.App.submitNoStakeReport) {
-      const submitSpy = this.spyOn(window.App, 'submitNoStakeReport');
-      
-      submitButton.click();
-      await this.wait(500);
-      
-      this.assert(submitSpy.wasCalled(), 'submitNoStakeReport function should have been called');
-    }
-    
-    // Step 6: Verify final state
-    this.assertEqual(queryDataInput.value, '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef', 'Query data should maintain value');
-    this.assertEqual(valueInput.value, '0x9876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba', 'Value should maintain value');
   }
 
   // NEW: Error Scenario Tests

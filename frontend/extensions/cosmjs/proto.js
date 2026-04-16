@@ -3,7 +3,6 @@ window.layerProto = {
     // Message type URLs
     MSG_WITHDRAW_TOKENS_TYPE: "/layer.bridge.MsgWithdrawTokens",
     MSG_REQUEST_ATTESTATIONS_TYPE: "/layer.bridge.MsgRequestAttestations",
-    MSG_NO_STAKE_REPORT_TYPE: "/layer.oracle.MsgNoStakeReport",
     MSG_PROPOSE_DISPUTE_TYPE: "/layer.dispute.MsgProposeDispute",
     MSG_VOTE_TYPE: "/layer.dispute.MsgVote",
     MSG_ADD_FEE_TO_DISPUTE_TYPE: "/layer.dispute.MsgAddFeeToDispute",
@@ -91,35 +90,6 @@ window.layerProto = {
                         case 1: message.creator = reader.readString(); break;
                         case 2: message.query_id = reader.readString(); break;
                         case 3: message.timestamp = reader.readString(); break;
-                        default: reader.skipField();
-                    }
-                }
-                return message;
-            }
-        },
-
-        // Define the MsgNoStakeReport type
-        MsgNoStakeReport: {
-            create: (data) => ({
-                creator: data.creator || "",
-                query_data: data.query_data || new Uint8Array(0),
-                value: data.value || ""
-            }),
-            encode: (message) => {
-                const writer = protobuf.Writer.create();
-                if (message.creator) writer.uint32(10).string(message.creator);
-                if (message.query_data) writer.uint32(18).bytes(message.query_data);
-                if (message.value) writer.uint32(26).string(message.value);
-                return writer.finish();
-            },
-            decode: (reader) => {
-                const message = {};
-                while (reader.nextField()) {
-                    if (reader.isEndGroup) break;
-                    switch (reader.getFieldNumber()) {
-                        case 1: message.creator = reader.readString(); break;
-                        case 2: message.query_data = reader.readBytes(); break;
-                        case 3: message.value = reader.readString(); break;
                         default: reader.skipField();
                     }
                 }
@@ -262,18 +232,6 @@ window.layerProto = {
         };
     },
 
-    // Helper function to create a MsgNoStakeReport message
-    createMsgNoStakeReport: (creator, queryData, value) => {
-        return {
-            typeUrl: window.layerProto.MSG_NO_STAKE_REPORT_TYPE,
-            value: window.layerProto.bridge.MsgNoStakeReport.create({
-                creator,
-                query_data: queryData,
-                value
-            })
-        };
-    },
-
     // Helper function to create a MsgProposeDispute message
     createMsgProposeDispute: (creator, disputedReporter, reportMetaId, reportQueryId, disputeCategory, fee, payFromBond) => {
         return {
@@ -345,8 +303,6 @@ window.layerProto = {
             encoder = window.layerProto.bridge.MsgWithdrawTokens;
         } else if (message.typeUrl === window.layerProto.MSG_REQUEST_ATTESTATIONS_TYPE) {
             encoder = window.layerProto.bridge.MsgRequestAttestations;
-        } else if (message.typeUrl === window.layerProto.MSG_NO_STAKE_REPORT_TYPE) {
-            encoder = window.layerProto.bridge.MsgNoStakeReport;
         } else if (message.typeUrl === window.layerProto.MSG_PROPOSE_DISPUTE_TYPE) {
             encoder = window.layerProto.bridge.MsgProposeDispute;
         } else if (message.typeUrl === window.layerProto.MSG_VOTE_TYPE) {

@@ -65,10 +65,6 @@ export class UnitTests extends TestSuite {
         name: 'Delegate button functionality',
         run: () => this.testDelegateButtonFunctionality()
       },
-      {
-        name: 'No-stake report button functionality',
-        run: () => this.testNoStakeReportButtonFunctionality()
-      },
 
       // Network Detection Tests - NEW!
       {
@@ -182,14 +178,6 @@ export class UnitTests extends TestSuite {
         name: 'Dispute functions on testnet',
         run: () => this.testDisputeFunctionsTestnet()
       },
-      {
-        name: 'No-stake reporting on mainnet',
-        run: () => this.testNoStakeReportingMainnet()
-      },
-      {
-        name: 'No-stake reporting on testnet',
-        run: () => this.testNoStakeReportingTestnet()
-      },
 
       // Bridge Function Tests
       {
@@ -211,20 +199,6 @@ export class UnitTests extends TestSuite {
       {
         name: 'Delegation flow',
         run: () => this.testDelegationFlow()
-      },
-
-      // No-Stake Reporting Tests
-      {
-        name: 'No-stake reporting tab structure',
-        run: () => this.testNoStakeReportingStructure()
-      },
-      {
-        name: 'No-stake reporting functionality',
-        run: () => this.testNoStakeReportingFunctionality()
-      },
-      {
-        name: 'No-stake input validation',
-        run: () => this.testNoStakeInputValidation()
       },
 
       // Dispute Module Tests
@@ -255,6 +229,18 @@ export class UnitTests extends TestSuite {
       {
         name: 'Dispute utility functions',
         run: () => this.testDisputeUtilityFunctions()
+      },
+      {
+        name: 'Claimable dispute rewards cosmos int UI parsing',
+        run: () => this.testClaimableDisputeRewardsCosmosIntUiNumber()
+      },
+      {
+        name: 'Claimable dispute rewards LCD JSON normalization',
+        run: () => this.testClaimableDisputeRewardsNormalizePayload()
+      },
+      {
+        name: 'Claimable dispute rewards fetch URL and fallback',
+        run: () => this.testClaimableDisputeRewardsFetchUrlAndFallback()
       },
 
       // Input Validation Tests
@@ -631,91 +617,6 @@ export class UnitTests extends TestSuite {
         // Don't actually call it, just verify it exists
       }
     }, 'Error handling should not crash the app');
-  }
-
-  // No-Stake Reporting Tests
-  async testNoStakeReportingStructure() {
-    // Test that no-stake reporting tab exists
-    const noStakeTab = document.getElementById('noStakeReportBtn');
-    this.assertNotNull(noStakeTab, 'No-stake reporting tab should exist');
-    this.assertEqual(noStakeTab.textContent.trim(), 'No-Stake Report', 'Tab should have correct text');
-
-    // Test that no-stake section exists
-    const noStakeSection = document.getElementById('noStakeReportSection');
-    this.assertNotNull(noStakeSection, 'No-stake reporting section should exist');
-    this.assertTrue(noStakeSection.classList.contains('bridge-section'), 'Section should have bridge-section class');
-
-    // Test that input fields exist
-    const queryDataInput = document.getElementById('noStakeQueryData');
-    const valueInput = document.getElementById('noStakeValue');
-    this.assertNotNull(queryDataInput, 'Query data input should exist');
-    this.assertNotNull(valueInput, 'Value input should exist');
-    this.assertTrue(queryDataInput.classList.contains('no-stake-input'), 'Query data should have no-stake-input class');
-    this.assertTrue(valueInput.classList.contains('no-stake-input'), 'Value input should have no-stake-input class');
-
-    // Test that labels exist
-    const queryDataLabel = document.querySelector('.no-stake-query-container .input-label');
-    const valueLabel = document.querySelector('.no-stake-value-container .input-label');
-    this.assertNotNull(queryDataLabel, 'Query data label should exist');
-    this.assertNotNull(valueLabel, 'Value label should exist');
-    this.assertEqual(queryDataLabel.textContent.trim(), 'Query Data (Hex)', 'Query data label should have correct text');
-    this.assertEqual(valueLabel.textContent.trim(), 'Value (Hex)', 'Value label should have correct text');
-
-    // Test that submit button exists
-    const submitButton = document.getElementById('submitNoStakeReportBtn');
-    this.assertNotNull(submitButton, 'Submit button should exist');
-    this.assertEqual(submitButton.textContent.trim(), 'Submit Report', 'Submit button should have correct text');
-  }
-
-  async testNoStakeReportingFunctionality() {
-    // Test that no-stake reporting methods exist
-    this.assertFunction(window.App.submitNoStakeReport, 'submitNoStakeReport method should exist');
-    this.assertFunction(window.App.checkNoStakeWalletStatus, 'checkNoStakeWalletStatus method should exist');
-
-    // Test that no-stake reporting is initialized
-    if (window.App.initNoStakeReporting) {
-      this.assertFunction(window.App.initNoStakeReporting, 'initNoStakeReporting method should exist');
-    }
-
-    // Test that the tab switching works for no-stake reporting
-    const noStakeTab = document.getElementById('noStakeReportBtn');
-    if (noStakeTab) {
-      // Test that clicking the tab makes it active
-      noStakeTab.click();
-      this.assertTrue(noStakeTab.classList.contains('active'), 'No-stake tab should become active when clicked');
-      
-      // Test that the section becomes visible
-      const noStakeSection = document.getElementById('noStakeReportSection');
-      this.assertTrue(this.elementIsVisible(noStakeSection), 'No-stake section should be visible when tab is active');
-    }
-  }
-
-  async testNoStakeInputValidation() {
-    // Test input field properties
-    const queryDataInput = document.getElementById('noStakeQueryData');
-    const valueInput = document.getElementById('noStakeValue');
-
-    if (queryDataInput && valueInput) {
-      // Test query data input properties
-      this.assertEqual(queryDataInput.tagName.toLowerCase(), 'textarea', 'Query data should be a textarea');
-      this.assertEqual(queryDataInput.rows, 10, 'Query data textarea should have 10 rows');
-      this.assertEqual(queryDataInput.placeholder, '0x...', 'Query data should have correct placeholder');
-      this.assertTrue(queryDataInput.classList.contains('no-stake-input'), 'Query data should have no-stake-input class');
-
-      // Test value input properties
-      this.assertEqual(valueInput.type, 'text', 'Value input should be text type');
-      this.assertEqual(valueInput.placeholder, '0x...', 'Value input should have correct placeholder');
-      this.assertTrue(valueInput.classList.contains('no-stake-input'), 'Value input should have no-stake-input class');
-
-      // Test that inputs are properly sized
-      const queryContainer = document.querySelector('.no-stake-query-container');
-      const valueContainer = document.querySelector('.no-stake-value-container');
-      
-      if (queryContainer && valueContainer) {
-        this.assertTrue(queryContainer.classList.contains('input-with-label'), 'Query container should have input-with-label class');
-        this.assertTrue(valueContainer.classList.contains('input-with-label'), 'Value container should have input-with-label class');
-      }
-    }
   }
 
   // NEW: Functional Button Tests
@@ -1131,79 +1032,6 @@ export class UnitTests extends TestSuite {
     this.assertDefined(delegateButton.textContent, 'Delegate button should have text content');
   }
 
-  async testNoStakeReportButtonFunctionality() {
-    // Mock everything needed for no-stake reporting
-    const mockProvider = this.mockMetaMaskProvider();
-    const mockWeb3 = this.mockWeb3Instance();
-    
-    // Set up global mocks
-    window.ethereum = mockProvider;
-    window.web3 = mockWeb3;
-    
-    // Wait for App to be available
-    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
-    
-    // Connect wallet first
-    if (window.App.connectMetaMask) {
-      await window.App.connectMetaMask();
-      await this.wait(500);
-    }
-    
-    // Find the no-stake report submit button
-    const submitButton = document.getElementById('submitNoStakeReportBtn');
-    this.assertNotNull(submitButton, 'No-stake report submit button should exist');
-    
-    // Set inputs
-    const queryDataInput = document.getElementById('noStakeQueryData');
-    const valueInput = document.getElementById('noStakeValue');
-    
-    this.assertNotNull(queryDataInput, 'Query data input should exist');
-    this.assertNotNull(valueInput, 'Value input should exist');
-    
-    this.setInputValue('#noStakeQueryData', '0x1234567890abcdef');
-    this.setInputValue('#noStakeValue', '0x9876543210fedcba');
-    await this.wait(100);
-    
-    // Test initial button state
-    this.assertDefined(submitButton.disabled, 'Submit button should have disabled state');
-    
-    // Enable button if it's disabled (simulate valid input)
-    if (submitButton.disabled) {
-      // Mock the validation to pass
-      if (window.App.validateNoStakeInputs) {
-        const originalValidate = window.App.validateNoStakeInputs;
-        window.App.validateNoStakeInputs = () => true;
-        
-        // Trigger validation
-        queryDataInput.dispatchEvent(new Event('input', { bubbles: true }));
-        valueInput.dispatchEvent(new Event('input', { bubbles: true }));
-        await this.wait(100);
-        
-        // Restore original method
-        window.App.validateNoStakeInputs = originalValidate;
-      }
-    }
-    
-    // Click submit button
-    submitButton.click();
-    await this.wait(1000); // Wait for submission process
-    
-    // Verify the submit function was called
-    if (window.App.submitNoStakeReport) {
-      // Spy on the submit function
-      const submitSpy = this.spyOn(window.App, 'submitNoStakeReport');
-      
-      // Click again to trigger the spied function
-      submitButton.click();
-      await this.wait(500);
-      
-      this.assert(submitSpy.wasCalled(), 'submitNoStakeReport function should have been called');
-    }
-    
-    // Verify button state changes during submission
-    this.assertDefined(submitButton.textContent, 'Submit button should have text content');
-  }
-
   // Dispute Module Tests
   async testDisputeProposerInitialization() {
     // Wait for DisputeProposer to be available
@@ -1367,6 +1195,108 @@ export class UnitTests extends TestSuite {
     this.assertNumber(balance, 'Balance should be a number');
     this.assert(balance > 0, 'Mock balance should be positive');
     this.assertEqual(balance, 1000.0, 'Mock balance should be 1000 TRB');
+  }
+
+  async testClaimableDisputeRewardsCosmosIntUiNumber() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined' && window.App.cosmosIntStringToUiNumber, 10000);
+    const f = window.App.cosmosIntStringToUiNumber.bind(window.App);
+    this.assertEqual(f(''), 0);
+    this.assertEqual(f(null), 0);
+    this.assertEqual(f('0'), 0);
+    this.assertEqual(f('  0  '), 0);
+    this.assertEqual(f('-1'), 0);
+    this.assertEqual(f('5000'), 5000);
+    this.assertEqual(f(String(Number.MAX_SAFE_INTEGER)), Number.MAX_SAFE_INTEGER);
+    const huge = `1${'0'.repeat(24)}`;
+    this.assertEqual(f(huge), 1, 'Oversized positive int should map to 1 for UI truthiness');
+  }
+
+  async testClaimableDisputeRewardsNormalizePayload() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined' && window.App.normalizeClaimableDisputeRewardsPayload, 10000);
+    const n = window.App.normalizeClaimableDisputeRewardsPayload.bind(window.App);
+    let r = n({ 'claim-rewards': '1.5', 'withdraw-fee-refund': '2' });
+    this.assertEqual(r['claim-rewards'], 1.5);
+    this.assertEqual(r['withdraw-fee-refund'], 2);
+    r = n({ claimableAmount: { rewardAmount: '5000', feeRefundAmount: '100', rewardClaimed: false } });
+    this.assertEqual(r['claim-rewards'], 5000);
+    this.assertEqual(r['withdraw-fee-refund'], 100);
+    r = n({
+      claimable_amount: {
+        reward_amount: '10',
+        fee_refund_amount: '3',
+        reward_claimed: true
+      }
+    });
+    this.assertEqual(r['claim-rewards'], 0, 'reward_claimed should zero out claim-rewards');
+    this.assertEqual(r['withdraw-fee-refund'], 3);
+    r = n({ claimableAmount: { rewardAmount: '0', feeRefundAmount: '0', rewardClaimed: false } });
+    this.assertEqual(r['claim-rewards'], 0);
+    this.assertEqual(r['withdraw-fee-refund'], 0);
+    r = n(null);
+    this.assertEqual(r['claim-rewards'], 0);
+    this.assertEqual(r['withdraw-fee-refund'], 0);
+  }
+
+  async testClaimableDisputeRewardsFetchUrlAndFallback() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined' && window.App.fetchClaimableDisputeRewards, 10000);
+    const prevFetch = window.fetch;
+    const prevChain = window.App.cosmosChainId;
+
+    try {
+      const addr = 'tellor196demo000000000000000000000000000000';
+      const id = 99;
+
+      window.App.cosmosChainId = 'layertest-5';
+      const urls = [];
+      window.fetch = async (url) => {
+        urls.push(String(url));
+        if (String(url).includes('claimable-dispute-rewards')) {
+          return { ok: false, status: 404, statusText: 'Not Found' };
+        }
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => ({ 'claim-rewards': 7, 'withdraw-fee-refund': 0 })
+        };
+      };
+      const out = await window.App.fetchClaimableDisputeRewards(addr, id);
+      this.assertEqual(out['claim-rewards'], 7, 'Should use legacy response after proto 404');
+      this.assertEqual(out['withdraw-fee-refund'], 0);
+      this.assertEqual(urls.length, 2, 'Should hit proto URL then legacy');
+      this.assertTrue(urls[0].includes('node-palmito.tellorlayer.com'), 'Palmito should use node-palmito LCD');
+      this.assertTrue(
+        urls[0].includes(`/tellor-io/layer/dispute/claimable-dispute-rewards/${id}/${encodeURIComponent(addr)}`),
+        'Proto path must be dispute_id then encoded address'
+      );
+      this.assertTrue(urls[1].includes('claimabledisputerewards'), 'Second attempt should use legacy path key');
+
+      window.App.cosmosChainId = 'tellor-1';
+      const urlsMain = [];
+      window.fetch = async (url) => {
+        urlsMain.push(String(url));
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => ({
+            claimableAmount: {
+              rewardAmount: '42',
+              feeRefundAmount: '0',
+              rewardClaimed: false
+            }
+          })
+        };
+      };
+      const outMain = await window.App.fetchClaimableDisputeRewards(addr, 3);
+      this.assertEqual(outMain['claim-rewards'], 42);
+      this.assertEqual(urlsMain.length, 1, 'Successful proto response should not call legacy URL');
+      this.assertTrue(urlsMain[0].includes('mainnet.tellorlayer.com'), 'Mainnet should use mainnet LCD');
+      this.assertTrue(urlsMain[0].includes('/claimable-dispute-rewards/3/'), 'Mainnet request should use proto path');
+    } finally {
+      window.fetch = prevFetch;
+      window.App.cosmosChainId = prevChain;
+    }
   }
 
   // Network Detection Tests
@@ -2197,20 +2127,17 @@ export class UnitTests extends TestSuite {
       if (window.App && window.App.selectReporter) {
         // Set up form inputs
         const reporterDropdown = document.getElementById('reporterDropdown');
-        const reporterStakeAmount = document.getElementById('reporterStakeAmount');
         const selectedReporterAddress = document.getElementById('selectedReporterAddress');
         
-        if (reporterDropdown && selectedReporterAddress && reporterStakeAmount) {
+        if (reporterDropdown && selectedReporterAddress) {
           // Set test values
-          reporterStakeAmount.value = '1.5';
           selectedReporterAddress.value = 'tellor1reporter123456789012345678901234567890';
           
           // Mock the CosmJS selectReporter function
           if (window.cosmjs && window.cosmjs.stargate) {
-            window.cosmjs.stargate.selectReporter = async (account, reporterAddress, stakeAmount) => {
+            window.cosmjs.stargate.selectReporter = async (account, reporterAddress) => {
               this.assertEqual(account, 'tellor1testselector123456789012345678901234567890', 'Should use correct account');
               this.assertEqual(reporterAddress, 'tellor1reporter123456789012345678901234567890', 'Should use correct reporter address');
-              this.assertEqual(stakeAmount, '1.5', 'Should use correct stake amount');
               
               return {
                 txhash: 'test-reporter-selection-hash-1234567890abcdef',
@@ -2225,7 +2152,6 @@ export class UnitTests extends TestSuite {
           // Verify inputs were cleared
           this.assertEqual(reporterDropdown.value, '', 'Reporter dropdown should be cleared');
           this.assertEqual(selectedReporterAddress.value, '', 'Selected reporter address should be cleared');
-          this.assertEqual(reporterStakeAmount.value, '', 'Reporter stake amount should be cleared');
         }
       }
     } catch (error) {
@@ -2329,72 +2255,6 @@ export class UnitTests extends TestSuite {
       );
       
       this.assertTrue(result.success, 'Dispute proposal should succeed on testnet');
-    }
-  }
-
-  async testNoStakeReportingMainnet() {
-    // Mock mainnet environment
-    const mockKeplr = this.mockKeplrProvider();
-    mockKeplr.getChainId = async () => 'tellor-1';
-    window.keplr = mockKeplr;
-    
-    // Wait for App to be available
-    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
-    
-    // Connect to mainnet
-    if (window.App.connectKeplrLegacy) {
-      await window.App.connectKeplrLegacy();
-      await this.wait(500);
-    }
-    
-    // Test no-stake reporting with mainnet chain ID
-    this.assertEqual(window.App.cosmosChainId, 'tellor-1', 'Should be on mainnet for no-stake tests');
-    
-    // Test that no-stake reporting can be called (mocked)
-    if (window.noStakeReporter) {
-      const mockNoStakeReporter = this.mockNoStakeReporter();
-      window.noStakeReporter = mockNoStakeReporter;
-      
-      // Test no-stake report submission
-      const result = await mockNoStakeReporter.submitReport(
-        '0x1234567890123456789012345678901234567890',
-        '100'
-      );
-      
-      this.assertTrue(result.success, 'No-stake report should succeed on mainnet');
-    }
-  }
-
-  async testNoStakeReportingTestnet() {
-    // Mock testnet environment
-    const mockKeplr = this.mockKeplrProvider();
-    mockKeplr.getChainId = async () => 'layertest-5';
-    window.keplr = mockKeplr;
-    
-    // Wait for App to be available
-    await this.waitForCondition(() => typeof window.App !== 'undefined', 10000);
-    
-    // Connect to testnet
-    if (window.App.connectKeplrLegacy) {
-      await window.App.connectKeplrLegacy();
-      await this.wait(500);
-    }
-    
-    // Test no-stake reporting with testnet chain ID
-    this.assertEqual(window.App.cosmosChainId, 'layertest-5', 'Should be on testnet for no-stake tests');
-    
-    // Test that no-stake reporting can be called (mocked)
-    if (window.noStakeReporter) {
-      const mockNoStakeReporter = this.mockNoStakeReporter();
-      window.noStakeReporter = mockNoStakeReporter;
-      
-      // Test no-stake report submission
-      const result = await mockNoStakeReporter.submitReport(
-        '0xabcdef1234567890abcdef1234567890abcdef12',
-        '50'
-      );
-      
-      this.assertTrue(result.success, 'No-stake report should succeed on testnet');
     }
   }
 

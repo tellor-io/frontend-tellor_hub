@@ -228,7 +228,6 @@ class WalletModal {
         const colors = {
             'keplr': '#8B5CF6',
             'cosmostation': '#3B82F6',
-            'leap': '#10B981',
             'station': '#F59E0B',
             'walletconnect': '#6366F1'
         };
@@ -266,7 +265,7 @@ class WalletModal {
                 <div style="text-align: center; padding: 20px; color: #6b7280;">
                     <p>No Cosmos wallets detected</p>
                     <p style="font-size: 14px; margin-top: 8px;">
-                        Please install a compatible wallet like Keplr, Cosmostation, or Leap
+                        Please install a compatible wallet like Keplr or Cosmostation
                     </p>
                 </div>
             `;

@@ -4,7 +4,6 @@ export class MockProvider {
     this.originalEthereum = window.ethereum;
     this.originalKeplr = window.keplr;
     this.originalCosmostation = window.cosmostation;
-    this.originalLeap = window.leap;
     this.originalFetch = window.fetch;
   }
 
@@ -83,19 +82,6 @@ export class MockProvider {
         }
       }
     };
-
-    // Mock Leap
-    window.leap = {
-      enable: async (chainId) => true,
-      getKey: async (chainId) => ({
-        address: 'tellor1py3fs8t0s0tde3slqfn65qlmgw64x60q5a7w82'
-      }),
-      getOfflineSigner: (chainId) => ({
-        getAccounts: async () => [{
-          address: 'tellor1py3fs8t0s0tde3slqfn65qlmgw64x60q5a7w82'
-        }]
-      })
-    };
   }
 
   async setupNetworkMocks() {
@@ -144,9 +130,6 @@ export class MockProvider {
     }
     if (this.originalCosmostation) {
       window.cosmostation = this.originalCosmostation;
-    }
-    if (this.originalLeap) {
-      window.leap = this.originalLeap;
     }
     if (this.originalFetch) {
       window.fetch = this.originalFetch;

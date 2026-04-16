@@ -60,8 +60,8 @@
                         <div id="keplrInfo" class="text-sm text-gray-600">Not available</div>
                     </div>
                     <div>
-                        <h3 class="font-semibold">Leap</h3>
-                        <div id="leapInfo" class="text-sm text-gray-600">Not available</div>
+                        <h3 class="font-semibold">Station</h3>
+                        <div id="stationInfo" class="text-sm text-gray-600">Not available</div>
                     </div>
                     <div>
                         <h3 class="font-semibold">Cosmostation</h3>
@@ -87,12 +87,6 @@
             
             if (typeof window.keplr !== 'undefined') {
                 wallets.push('<span class="text-green-600">✓ Keplr</span>');
-            }
-            if (typeof window.leap !== 'undefined') {
-                wallets.push('<span class="text-green-600">✓ Leap</span>');
-            }
-            if (typeof window.leapWallet !== 'undefined') {
-                wallets.push('<span class="text-green-600">✓ Leap Wallet</span>');
             }
             if (typeof window.cosmostation !== 'undefined') {
                 wallets.push('<span class="text-green-600">✓ Cosmostation</span>');
@@ -120,15 +114,15 @@
                 keplrInfo.innerHTML = 'Not available';
             }
 
-            // Leap info
-            const leapInfo = document.getElementById('leapInfo');
-            if (typeof window.leap !== 'undefined') {
-                const methods = Object.getOwnPropertyNames(window.leap).filter(name => 
-                    typeof window.leap[name] === 'function'
+            // Station info
+            const stationInfo = document.getElementById('stationInfo');
+            if (typeof window.station !== 'undefined') {
+                const methods = Object.getOwnPropertyNames(window.station).filter(name => 
+                    typeof window.station[name] === 'function'
                 );
-                leapInfo.innerHTML = `Methods: ${methods.join(', ')}`;
+                stationInfo.innerHTML = `Methods: ${methods.join(', ')}`;
             } else {
-                leapInfo.innerHTML = 'Not available';
+                stationInfo.innerHTML = 'Not available';
             }
 
             // Cosmostation info

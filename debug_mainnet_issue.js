@@ -2,7 +2,7 @@ const { ethers } = require('ethers');
 
 // Mainnet configuration
 const MAINNET_RPC = 'https://mainnet.infura.io/v3/52474cef7b964b4fbf8e954a5dfa481b';
-const BRIDGE_ADDRESS = '0x5589e306b1920F009979a50B88caE32aecD471E4';
+const BRIDGE_ADDRESS = '0x6ec401744008f4B018Ed9A36f76e6629799Ee50E';
 const TOKEN_ADDRESS = '0x88dF592F8eb5D7Bd38bFeF7dEb0fBc02cf3778a0';
 
 // You'll need to replace this with your actual wallet address

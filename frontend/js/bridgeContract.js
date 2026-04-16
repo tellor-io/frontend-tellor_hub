@@ -67,11 +67,8 @@ export class Deposit {
 
 // Helper function to get API endpoint based on current network
 const getApiEndpoint = () => {
-    // Check if App is available and has chainId
-    if (typeof window !== 'undefined' && window.App && window.App.chainId) {
-        if (window.App.chainId === 1) {
-            return 'https://mainnet.tellorlayer.com';
-        }
+    if (typeof window !== 'undefined' && window.App && typeof window.App.getApiEndpoint === 'function') {
+        return window.App.getApiEndpoint();
     }
     return 'https://node-palmito.tellorlayer.com';
 };
@@ -95,13 +92,8 @@ export const isWithdrawClaimed = async (id) => {
     return data.claimed;
 };
 
-// Query type string must match Layer / reporters: Palmito (layertest-*) uses TRBBridgeV2; Tellor mainnet still TRBBridge.
-const bridgeQueryTypeString = () => {
-    if (typeof window !== 'undefined' && window.App && window.App.chainId === 1) {
-        return 'TRBBridge';
-    }
-    return 'TRBBridgeV2';
-};
+// Query type string must match Layer / reporters (TokenBridgeV2 on mainnet and testnet).
+const bridgeQueryTypeString = () => 'TRBBridgeV2';
 
 // Query ID generation functions
 export const generateDepositQueryId = (depositId) => {
