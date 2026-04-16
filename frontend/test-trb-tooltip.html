@@ -79,7 +79,6 @@
                 <li><strong>Bridge to Tellor & Delegate:</strong> Tooltip appears to the right of the input field</li>
                 <li><strong>Bridge to Ethereum:</strong> Tooltip appears above the input field</li>
                 <li><strong>Section Switching:</strong> Tooltip should hide when switching sections</li>
-                <li><strong>No-Stake Report:</strong> Tooltip should hide completely (no TRB inputs)</li>
                 <li><strong>Back to Hub:</strong> Tooltip should hide completely</li>
             </ul>
         </div>
@@ -88,7 +87,6 @@
             <div class="section-tab active" onclick="switchToSection('bridgeToLayer')">Bridge to Tellor</div>
             <div class="section-tab" onclick="switchToSection('bridgeToEth')">Bridge to Ethereum</div>
             <div class="section-tab" onclick="switchToSection('delegate')">Delegate</div>
-            <div class="section-tab" onclick="switchToSection('noStakeReport')">No-Stake Report</div>
         </div>
         
         <div id="bridgeToLayerSection" class="section-content active">
@@ -112,12 +110,6 @@
             <p><em>Type a number to see the USD price tooltip appear</em></p>
         </div>
         
-        <div id="noStakeReportSection" class="section-content">
-            <h3>No-Stake Report Section</h3>
-            <p>This section has no TRB inputs, so no tooltip should appear.</p>
-            <input type="text" class="input-field" id="noStakeValue" placeholder="Enter hex value">
-        </div>
-        
         <div class="test-section">
             <h3>Test Navigation</h3>
             <button class="test-button" onclick="goBackToHub()">Back to Hub</button>
@@ -129,7 +121,6 @@
             <ol>
                 <li>Type a number in any TRB input to see the tooltip</li>
                 <li>Switch between Bridge to Tellor, Bridge to Ethereum, and Delegate - tooltip should work in all</li>
-                <li>Switch to No-Stake Report - tooltip should hide completely</li>
                 <li>Go back to Hub - tooltip should hide completely</li>
                 <li>Return to any relevant section and type again - tooltip should work normally</li>
             </ol>

@@ -3,6 +3,16 @@
 ## Overview
 Comprehensive test suite for the Layer Bridge frontend application, covering both unit and integration tests with enhanced network detection capabilities.
 
+## Running tests manually (recommended)
+
+1. From the repo root, start the static server: `npm run dev` (serves the `frontend/` folder, default **http://localhost:8000**).
+2. In your browser, open **http://localhost:8000/tests/test-suite.html** (same origin as the app so paths resolve correctly).
+3. Use **Run All Tests**, or **Run Unit Tests Only** / **Run Integration Tests Only**. Leave **Mock wallet connections** and **Mock network calls** checked unless you intentionally want real wallets or network.
+
+The in-page suite in `test-suite.html` is self-contained. The larger ES-module suites (`unit-tests.js`, `integration-tests.js`, `test-runner.js`) are meant to be driven from a full app context if you wire them up later; they are not loaded by `test-suite.html` today.
+
+Optional: `frontend/tests/run-tests.js` can automate the same HTML via Puppeteer from the command line if you install `puppeteer`; that path is optional, not required.
+
 ## Test Categories
 
 ### 1. Core App Tests
@@ -46,8 +56,6 @@ Comprehensive test suite for the Layer Bridge frontend application, covering bot
 - **Network switching for delegate functions** - Tests network-specific endpoint usage for delegate functions
 - **Dispute functions on mainnet** - Tests dispute functionality on Tellor Mainnet
 - **Dispute functions on testnet** - Tests dispute functionality on Palmito Testnet
-- **No-stake reporting on mainnet** - Tests no-stake reporting on Tellor Mainnet
-- **No-stake reporting on testnet** - Tests no-stake reporting on Palmito Testnet
 
 ### 5. Bridge Function Tests
 - Bridge direction switching
@@ -56,12 +64,7 @@ Comprehensive test suite for the Layer Bridge frontend application, covering bot
 - Withdrawal request flow
 - Delegation flow
 
-### 6. No-Stake Reporting Tests
-- No-stake reporting tab structure
-- No-stake reporting functionality
-- No-stake reporting validation
-
-### 7. Dispute System Tests
+### 6. Dispute System Tests
 - Dispute proposer structure
 - Dispute proposal functionality
 - Dispute voting functionality
@@ -189,7 +192,7 @@ DEBUG_TESTS=true      # enable detailed logging
 ### Network Detection Improvements
 - ✅ Added automatic network detection from Keplr
 - ✅ Added automatic network detection from wallet adapters
-- ✅ Fixed hardcoded chain ID fallbacks in dispute and no-stake functions
+- ✅ Fixed hardcoded chain ID fallbacks in dispute-related functions
 - ✅ Enhanced button state management for both networks
 - ✅ Added comprehensive network switching tests
 

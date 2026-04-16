@@ -2,7 +2,7 @@
 
 ## Overview
 
-This implementation adds support for multiple Cosmos wallets while maintaining full backward compatibility with the existing Keplr-only functionality. Users can now connect with any compatible Cosmos wallet (Keplr, Cosmostation, Leap, Station, etc.) instead of being restricted to Keplr only.
+This implementation adds support for multiple Cosmos wallets while maintaining full backward compatibility with the existing Keplr-only functionality. Users can now connect with any compatible Cosmos wallet (Keplr, Cosmostation, Station, etc.) instead of being restricted to Keplr only.
 
 ## Key Features
 
@@ -14,7 +14,6 @@ This implementation adds support for multiple Cosmos wallets while maintaining f
 ### ✅ **Multi-Wallet Support**
 - **Keplr** - The most popular Cosmos wallet
 - **Cosmostation** - Mobile-first Cosmos wallet
-- **Leap** - Modern Cosmos wallet with advanced features
 - **Station** - Terra ecosystem wallet
 - **WalletConnect** - Connect any wallet via WalletConnect
 
@@ -109,7 +108,7 @@ Open `test-wallet-adapter.html` in your browser to:
 - View detailed logs
 
 ### Manual Testing
-1. Install multiple Cosmos wallets (Keplr, Cosmostation, Leap)
+1. Install multiple Cosmos wallets (Keplr, Cosmostation, Station)
 2. Open the main application
 3. Click "Connect Cosmos Wallet"
 4. Select different wallets from the modal
@@ -120,7 +119,6 @@ Open `test-wallet-adapter.html` in your browser to:
 ### Supported Wallets
 - **Keplr**: Chrome, Firefox, Edge
 - **Cosmostation**: Chrome, Safari (mobile)
-- **Leap**: Chrome, Firefox
 - **Station**: Chrome, Firefox
 - **WalletConnect**: All browsers
 
@@ -146,9 +144,8 @@ The adapter uses the same chain configuration as the original Keplr implementati
 Wallets are prioritized based on popularity and reliability:
 1. Keplr (highest priority)
 2. Cosmostation
-3. Leap
-4. Station
-5. WalletConnect (lowest priority)
+3. Station
+4. WalletConnect (lowest priority)
 
 ## Error Handling
 

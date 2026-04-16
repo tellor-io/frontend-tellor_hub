@@ -108,6 +108,36 @@ const App = {
     return m ? m[0].toLowerCase() : null;
   },
 
+  /**
+   * Decode Solidity revert Error(string) (selector 0x08c379a0 + ABI tail).
+   * Used when defaultAbiCoder.decode(['string'], …) fails on some wallet/provider payloads.
+   */
+  decodeSolidityErrorString: function (dataHex) {
+    if (!App.ethers || !dataHex || typeof dataHex !== 'string') {
+      return null;
+    }
+    const h = dataHex.trim();
+    if (!h.toLowerCase().startsWith('0x08c379a0') || h.length < 10 + 64) {
+      return null;
+    }
+    try {
+      const body = ethers.utils.arrayify(h).subarray(4);
+      const off = ethers.BigNumber.from(body.subarray(0, 32)).toNumber();
+      if (!Number.isFinite(off) || off < 0 || off > body.length - 32) {
+        return null;
+      }
+      const strChunk = body.subarray(off);
+      const len = ethers.BigNumber.from(strChunk.subarray(0, 32)).toNumber();
+      if (!Number.isFinite(len) || len < 0 || len > 20000 || 32 + len > strChunk.length) {
+        return null;
+      }
+      const out = ethers.utils.toUtf8String(strChunk.subarray(32, 32 + len)).trim();
+      return out || null;
+    } catch (_) {
+      return null;
+    }
+  },
+
   /** On-chain bridge amounts (e.g. withdrawDetails.pendingAmount) use TOKEN_DECIMAL_PRECISION_MULTIPLIER. */
   bridgeTrbDecimalsFromMultiplier: function (multRaw) {
     try {
@@ -218,11 +248,15 @@ const App = {
       try {
         const decoded = App.ethers.utils.defaultAbiCoder.decode(['string'], '0x' + data.slice(10));
         const text = decoded[0];
-        if (text && typeof text === 'string') {
+        if (text && typeof text === 'string' && text.trim()) {
           return text.trim();
         }
       } catch (_) {
         /* ignore */
+      }
+      const manual = App.decodeSolidityErrorString(data);
+      if (manual) {
+        return manual;
       }
     }
     if (data && data.length >= 10) {
@@ -234,6 +268,18 @@ const App = {
       if (data.length <= 10) {
         return `Contract reverted (custom error ${sel}). Often valset/checkpoint mismatch with attestation, or bridge rules (e.g. withdraw limit). Compare valset to snapshot attestation on your node.`;
       }
+      if (data.startsWith('0x08c379a0')) {
+        const manual = App.decodeSolidityErrorString(data);
+        if (manual) {
+          return manual;
+        }
+        const approxBytes = Math.max(0, Math.floor((data.length - 2) / 2));
+        return (
+          `The bridge contract reverted during simulation (Error string could not be decoded, ~${approxBytes} bytes of revert data). ` +
+          `Most often this means **step 2 — Request attestation** has not been completed (or signatures are not on the bridge API yet). ` +
+          `Use your Cosmos wallet to request attestation, wait if your network requires a delay after the withdrawal request, then try **Claim withdrawal** again.`
+        );
+      }
       return `Contract reverted (${sel}, ${data.length} bytes).`;
     }
     const fallback = err.message || String(err);
@@ -241,11 +287,15 @@ const App = {
     if (fromMsg && fromMsg.startsWith('0x08c379a0') && fromMsg.length > 138 && App.ethers) {
       try {
         const decoded = App.ethers.utils.defaultAbiCoder.decode(['string'], '0x' + fromMsg.slice(10));
-        if (decoded[0]) {
-          return decoded[0].trim();
+        if (decoded[0] && String(decoded[0]).trim()) {
+          return String(decoded[0]).trim();
         }
       } catch (_) {
         /* ignore */
+      }
+      const manualMsg = App.decodeSolidityErrorString(fromMsg);
+      if (manualMsg) {
+        return manualMsg;
       }
     }
     return fallback.replace(/\s+0x08c379a0[0-9a-f]{80,}/gi, '').trim() || fallback;
@@ -411,7 +461,11 @@ const App = {
 
   autoReconnectWallets: async function() {
     // Silently reconnect wallets that were connected before page refresh
-    const savedCosmosWalletType = localStorage.getItem('tellor_cosmos_wallet_type');
+    let savedCosmosWalletType = localStorage.getItem('tellor_cosmos_wallet_type');
+    if (savedCosmosWalletType === 'leap') {
+      localStorage.removeItem('tellor_cosmos_wallet_type');
+      savedCosmosWalletType = null;
+    }
     const savedCosmosChainId = localStorage.getItem('tellor_cosmos_chain_id');
     const savedEthWalletType = localStorage.getItem('tellor_eth_wallet_type');
     const savedEthConnected = localStorage.getItem('tellor_eth_wallet_connected');
@@ -532,7 +586,6 @@ const App = {
         // Handle Cosmos wallets
         const hasCosmosWallet = hasKeplr || 
                                typeof window.cosmostation !== 'undefined' || 
-                               typeof window.leap !== 'undefined' || 
                                typeof window.station !== 'undefined';
         
         if (hasCosmosWallet) {
@@ -2250,6 +2303,12 @@ const App = {
             return;
         }
 
+        const bridgeMismatch = App.getEthCosmosBridgeNetworkMismatchMessage();
+        if (bridgeMismatch) {
+            App.showValidationErrorPopup(bridgeMismatch);
+            return;
+        }
+
         const amountToSend = App.web3.utils.toWei(amount, 'ether');
         
         // Validate minimum deposit amount (greater than 0.1 TRB)
@@ -2804,24 +2863,10 @@ const App = {
             return;
         }
 
-        // Validate network compatibility for withdrawal
-        if (App.isConnected && App.isKeplrConnected) {
-            const isEthereumMainnet = App.chainId === 1;
-            const isCosmosMainnet = App.cosmosChainId === 'tellor-1';
-            
-            if (isEthereumMainnet !== isCosmosMainnet) {
-                const ethereumNetwork = isEthereumMainnet ? 'Ethereum Mainnet' : 'Sepolia Testnet';
-                const cosmosNetwork = isCosmosMainnet ? 'Tellor Mainnet' : 'Tellor Testnet';
-                
-                App.showValidationErrorPopup(
-                    `Network mismatch detected!\n\n` +
-                    `Ethereum Wallet: ${ethereumNetwork}\n` +
-                    `Cosmos Wallet: ${cosmosNetwork}\n\n` +
-                    `Both wallets must be on the same network type (both mainnet or both testnet).\n\n` +
-                    `Please switch one of your wallets to match the other network.`
-                );
-                return;
-            }
+        const bridgeMismatch = App.getEthCosmosBridgeNetworkMismatchMessage();
+        if (bridgeMismatch) {
+            App.showValidationErrorPopup(bridgeMismatch);
+            return;
         }
 
         const amount = document.getElementById('ethStakeAmount').value;
@@ -4079,6 +4124,14 @@ const App = {
         try {
             const current = await App.fetchCurrentReporter(layerAccount);
             const hasExistingReporter = current && current.reporter;
+            const normalizedReporter = reporterAddress.trim();
+
+            if (hasExistingReporter && current.reporter === normalizedReporter) {
+                App.showBalanceErrorPopup(
+                    'This reporter is already your selected reporter. Choose a different reporter to switch.'
+                );
+                return;
+            }
 
             if (hasExistingReporter) {
                 // Existing selector: switch reporter
@@ -4113,13 +4166,35 @@ const App = {
             // Refresh status to show new selection
             await App.refreshCurrentStatus();
         } else {
-            const rawLog = result?.rawLog || result?.tx_response?.raw_log;
+            const rawLog =
+                (result && (result.rawLog ||
+                    result.raw_log ||
+                    result.tx_response?.rawLog ||
+                    result.tx_response?.raw_log ||
+                    (Array.isArray(result.logs) && result.logs[0] && result.logs[0].log) ||
+                    (Array.isArray(result.tx_response?.logs) &&
+                        result.tx_response.logs[0] &&
+                        result.tx_response.logs[0].log))) ||
+                '';
             console.error('Reporter selection failed raw log:', rawLog, result);
             throw new Error(rawLog || "Reporter selection failed");
         }
     } catch (error) {
         console.error('Reporter selection error:', error);
-        App.showBalanceErrorPopup(`Reporter selection failed: ${error.message}`);
+        const genericReporterSelectionMsg = 'Reporter selection failed';
+        const raw = error?.message != null ? String(error.message) : '';
+        if (raw.toLowerCase().includes('selector already exists')) {
+            App.showBalanceErrorPopup(
+                'You already have a reporter selected. Choose another reporter to switch, or refresh the page if your current reporter is not displayed.'
+            );
+        } else {
+            const detail = raw.trim() || genericReporterSelectionMsg;
+            const isGenericDetail = detail.toLowerCase() === genericReporterSelectionMsg.toLowerCase();
+            const popupMsg = isGenericDetail
+                ? detail
+                : `${genericReporterSelectionMsg}: ${detail}`;
+            App.showBalanceErrorPopup(popupMsg);
+        }
     } finally {
         // Re-enable the button
         const selectReporterButton = document.getElementById('selectReporterButton');
@@ -4358,6 +4433,16 @@ const App = {
 
         // Format the data for the contract call
         const txData = await this.formatWithdrawalData(withdrawalId, withdrawalData, attestationData);
+
+        const signedValCount = (txData.sigs || []).filter((sig) => {
+          const v = Number(sig.v);
+          return v === 27 || v === 28;
+        }).length;
+        if (signedValCount === 0) {
+          throw new Error(
+            'No validator signatures are available for this withdrawal yet. Complete **step 2 — Request attestation** with your Cosmos wallet first (including any required wait after the withdrawal request), then try **Claim withdrawal** again once attestation data exists on the bridge.'
+          );
+        }
 
         await this.validateWithdrawalData(
             withdrawalId,
@@ -5442,6 +5527,31 @@ const App = {
     }
   },
 
+  /**
+   * When both Ethereum and Cosmos wallets are connected, bridge flows require the same tier
+   * (Ethereum Mainnet ↔ tellor-1, Sepolia ↔ Tellor testnet). Returns null if OK or if either
+   * wallet is disconnected (no cross-check possible).
+   */
+  getEthCosmosBridgeNetworkMismatchMessage: function() {
+    if (!App.isConnected || !App.isKeplrConnected) {
+      return null;
+    }
+    const isEthereumMainnet = App.chainId === 1;
+    const isCosmosMainnet = App.cosmosChainId === 'tellor-1';
+    if (isEthereumMainnet === isCosmosMainnet) {
+      return null;
+    }
+    const ethereumNetwork = isEthereumMainnet ? 'Ethereum Mainnet' : 'Sepolia Testnet';
+    const cosmosNetwork = isCosmosMainnet ? 'Tellor Mainnet' : 'Tellor Testnet';
+    return (
+      `Network mismatch detected!\n\n` +
+      `Ethereum Wallet: ${ethereumNetwork}\n` +
+      `Cosmos Wallet: ${cosmosNetwork}\n\n` +
+      `Both wallets must be on the same network type (both mainnet or both testnet).\n\n` +
+      `Please switch one of your wallets to match the other network.`
+    );
+  },
+
   // Add debug function to check network status
   debugNetworkStatus: function() {
     const status = {
@@ -6351,49 +6461,94 @@ const App = {
         }
     },
 
-    // Fetch claimable dispute rewards for an address and dispute
-    fetchClaimableDisputeRewards: async function(address, disputeId) {
+    /**
+     * Parse a cosmos-sdk integer string for UI checks (Claim / Withdraw Fee buttons use > 0 only).
+     * Returns a safe Number, or 1 when the value exceeds Number.MAX_SAFE_INTEGER but is still > 0.
+     */
+    cosmosIntStringToUiNumber: function (raw) {
+        if (raw == null || raw === '') {
+            return 0;
+        }
+        const s = String(raw).trim();
+        if (s === '0') {
+            return 0;
+        }
         try {
-            // Determine RPC endpoint based on wallet manager's network
-            let rpcEndpoint;
-            if (window.App && window.App.cosmosChainId === 'tellor-1') {
-                rpcEndpoint = 'https://tellorlayer.com';
-            } else {
-                rpcEndpoint = 'https://tellorlayer.com';
+            const b = BigInt(s);
+            if (b <= 0n) {
+                return 0;
             }
-
-            const url = `${rpcEndpoint}/tellor-io/layer/dispute/claimabledisputerewards/${address}/${disputeId}`;
-            console.log('Fetching claimable rewards from:', url);
-
-            const response = await fetch(url);
-            
-            if (!response.ok) {
-                // If endpoint is not active yet, return default values
-                if (response.status === 404 || response.status === 500) {
-                    console.log('Claimable rewards endpoint not active yet, returning defaults');
-                    return {
-                        'claim-rewards': 0,
-                        'withdraw-fee-refund': 0
-                    };
-                }
-                throw new Error(`Failed to fetch claimable rewards: ${response.status} ${response.statusText}`);
+            if (b <= BigInt(Number.MAX_SAFE_INTEGER)) {
+                return Number(b);
             }
+            return 1;
+        } catch {
+            const n = parseFloat(s);
+            return Number.isFinite(n) && n > 0 ? n : 0;
+        }
+    },
 
-            const data = await response.json();
-            console.log('Claimable rewards data:', data);
-
-            // Return the data, ensuring we have numeric values
+    /**
+     * Normalize LCD JSON for claimable dispute rewards.
+     * Supports layer proto (claimableAmount.rewardAmount / feeRefundAmount) and legacy flat keys.
+     */
+    normalizeClaimableDisputeRewardsPayload: function (data) {
+        if (!data || typeof data !== 'object') {
+            return { 'claim-rewards': 0, 'withdraw-fee-refund': 0 };
+        }
+        if (Object.prototype.hasOwnProperty.call(data, 'claim-rewards') ||
+            Object.prototype.hasOwnProperty.call(data, 'withdraw-fee-refund')) {
             return {
-                'claim-rewards': parseFloat(data['claim-rewards'] || 0),
-                'withdraw-fee-refund': parseFloat(data['withdraw-fee-refund'] || 0)
+                'claim-rewards': parseFloat(data['claim-rewards'] ?? 0) || 0,
+                'withdraw-fee-refund': parseFloat(data['withdraw-fee-refund'] ?? 0) || 0
             };
+        }
+        const inner = data.claimable_amount || data.claimableAmount;
+        if (inner && typeof inner === 'object') {
+            const rewardClaimed = inner.reward_claimed === true || inner.rewardClaimed === true;
+            const rewardStr = inner.reward_amount ?? inner.rewardAmount ?? '0';
+            const feeStr = inner.fee_refund_amount ?? inner.feeRefundAmount ?? '0';
+            return {
+                'claim-rewards': rewardClaimed ? 0 : App.cosmosIntStringToUiNumber(rewardStr),
+                'withdraw-fee-refund': App.cosmosIntStringToUiNumber(feeStr)
+            };
+        }
+        return { 'claim-rewards': 0, 'withdraw-fee-refund': 0 };
+    },
+
+    // Fetch claimable dispute rewards for an address and dispute
+    fetchClaimableDisputeRewards: async function (address, disputeId) {
+        const zeros = { 'claim-rewards': 0, 'withdraw-fee-refund': 0 };
+        try {
+            const lcd = App.getCosmosApiEndpoint();
+            const idEnc = encodeURIComponent(String(disputeId));
+            const addrEnc = encodeURIComponent(String(address));
+            const urls = [
+                `${lcd}/tellor-io/layer/dispute/claimable-dispute-rewards/${idEnc}/${addrEnc}`,
+                `${lcd}/tellor-io/layer/dispute/claimabledisputerewards/${addrEnc}/${idEnc}`
+            ];
+
+            for (let i = 0; i < urls.length; i++) {
+                const url = urls[i];
+                console.log('Fetching claimable rewards from:', url);
+                const response = await fetch(url);
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Claimable rewards data:', data);
+                    return App.normalizeClaimableDisputeRewardsPayload(data);
+                }
+                if (response.status !== 404 && response.status !== 500) {
+                    throw new Error(`Failed to fetch claimable rewards: ${response.status} ${response.statusText}`);
+                }
+                if (i === urls.length - 1) {
+                    console.log('Claimable rewards endpoint not active or no data, returning defaults');
+                    return zeros;
+                }
+            }
+            return zeros;
         } catch (error) {
             console.error('Error fetching claimable dispute rewards:', error);
-            // Return defaults if endpoint is not available
-            return {
-                'claim-rewards': 0,
-                'withdraw-fee-refund': 0
-            };
+            return zeros;
         }
     },
 

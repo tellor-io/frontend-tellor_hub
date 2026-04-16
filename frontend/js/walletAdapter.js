@@ -106,8 +106,6 @@ class CosmosWalletAdapter {
         console.log('Detecting available wallets...');
         console.log('window.keplr:', typeof window.keplr !== 'undefined' ? 'Available' : 'Not available');
         console.log('window.cosmostation:', typeof window.cosmostation !== 'undefined' ? 'Available' : 'Not available');
-        console.log('window.leap:', typeof window.leap !== 'undefined' ? 'Available' : 'Not available');
-        console.log('window.leapWallet:', typeof window.leapWallet !== 'undefined' ? 'Available' : 'Not available');
         console.log('window.station:', typeof window.station !== 'undefined' ? 'Available' : 'Not available');
         console.log('window.walletConnect:', typeof window.walletConnect !== 'undefined' ? 'Available' : 'Not available');
         
@@ -131,33 +129,13 @@ class CosmosWalletAdapter {
             });
         }
         
-        // Check for Leap
-        if (typeof window.leap !== 'undefined') {
-            availableWallets.push({
-                name: 'Leap',
-                type: 'leap',
-                provider: window.leap,
-                priority: 3
-            });
-        }
-        
-        // Check for Leap with different possible global names
-        if (typeof window.leapWallet !== 'undefined') {
-            availableWallets.push({
-                name: 'Leap Wallet',
-                type: 'leap',
-                provider: window.leapWallet,
-                priority: 3
-            });
-        }
-        
         // Check for Station (Terra)
         if (typeof window.station !== 'undefined') {
             availableWallets.push({
                 name: 'Station',
                 type: 'station',
                 provider: window.station,
-                priority: 4
+                priority: 3
             });
         }
         
@@ -167,7 +145,7 @@ class CosmosWalletAdapter {
                 name: 'WalletConnect',
                 type: 'walletconnect',
                 provider: window.walletConnect,
-                priority: 5
+                priority: 4
             });
         }
         
@@ -180,7 +158,7 @@ class CosmosWalletAdapter {
         const availableWallets = this.detectWallets();
         
         if (availableWallets.length === 0) {
-            throw new Error('No Cosmos wallets detected. Please install Keplr, Cosmostation, Leap, or another compatible wallet.');
+            throw new Error('No Cosmos wallets detected. Please install Keplr, Cosmostation, or another compatible wallet.');
         }
         
         // If no specific wallet type requested, use the first available
@@ -271,12 +249,6 @@ class CosmosWalletAdapter {
                 }
                 break;
                 
-            case 'leap':
-                if (this.currentWallet.experimentalSuggestChain) {
-                    await this.currentWallet.experimentalSuggestChain(this.chainConfig);
-                }
-                break;
-                
             case 'station':
                 // Station might need different configuration
                 console.log('Station wallet detected - chain configuration may need manual setup');
@@ -308,10 +280,6 @@ class CosmosWalletAdapter {
                 } else {
                     await this.currentWallet.enable(this.chainId);
                 }
-                break;
-                
-            case 'leap':
-                await this.currentWallet.enable(this.chainId);
                 break;
                 
             case 'station':
@@ -359,13 +327,6 @@ class CosmosWalletAdapter {
                         }
                         await this.currentWallet.enable(this.chainId);
                     }
-                    break;
-                    
-                case 'leap':
-                    if (this.currentWallet.experimentalSuggestChain) {
-                        await this.currentWallet.experimentalSuggestChain(this.chainConfig);
-                    }
-                    await this.currentWallet.enable(this.chainId);
                     break;
                     
                 case 'station':
@@ -421,13 +382,6 @@ class CosmosWalletAdapter {
                     throw new Error('Cosmostation wallet does not have getOfflineSigner method');
                 }
                 
-            case 'leap':
-                if (!this.currentWallet.getOfflineSigner) {
-                    console.error('Leap wallet methods:', Object.getOwnPropertyNames(this.currentWallet));
-                    throw new Error('Leap wallet does not have getOfflineSigner method');
-                }
-                return this.currentWallet.getOfflineSigner(currentChainId);
-                
             case 'station':
                 if (!this.currentWallet.getOfflineSigner) {
                     throw new Error('Station wallet does not have getOfflineSigner method');
@@ -462,12 +416,6 @@ class CosmosWalletAdapter {
                 case 'cosmostation':
                     if (this.currentWallet.providers.keplr && this.currentWallet.providers.keplr.disable) {
                         await this.currentWallet.providers.keplr.disable(this.chainId);
-                    }
-                    break;
-                    
-                case 'leap':
-                    if (this.currentWallet.disable) {
-                        await this.currentWallet.disable(this.chainId);
                     }
                     break;
                     
@@ -517,7 +465,6 @@ class CosmosWalletAdapter {
         const descriptions = {
             'keplr': 'The most popular Cosmos wallet',
             'cosmostation': 'Mobile-first Cosmos wallet',
-            'leap': 'Modern Cosmos wallet with advanced features',
             'station': 'Terra ecosystem wallet',
             'walletconnect': 'Connect any wallet via WalletConnect'
         };
@@ -543,12 +490,6 @@ class CosmosWalletAdapter {
                     if (this.currentWallet.providers && this.currentWallet.providers.keplr && this.currentWallet.providers.keplr.getChainId) {
                         return await this.currentWallet.providers.keplr.getChainId();
                     } else if (this.currentWallet.getChainId) {
-                        return await this.currentWallet.getChainId();
-                    }
-                    break;
-                    
-                case 'leap':
-                    if (this.currentWallet.getChainId) {
                         return await this.currentWallet.getChainId();
                     }
                     break;
