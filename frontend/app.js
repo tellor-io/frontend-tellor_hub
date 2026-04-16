@@ -45,20 +45,6 @@ const App = {
   keplrAddress: null,
   currentBridgeDirection: 'layer', // 'layer' or 'ethereum'
   cachedCosmosWalletType: null, // Cache the selected Cosmos wallet type
-  /** When true, bridge UI stays gated (class + data attr + CSS in index.html). Set false when bridge is live again. */
-  bridgeModuleUnderConstruction: true,
-
-  enforceBridgeConstructionGate: function () {
-    const el = document.getElementById('bridgeSection');
-    if (!el) return;
-    if (!App.bridgeModuleUnderConstruction) {
-      el.classList.remove('under-construction');
-      el.removeAttribute('data-bridge-under-construction');
-      return;
-    }
-    el.classList.add('under-construction');
-    el.setAttribute('data-bridge-under-construction', '1');
-  },
 
   _depositLimit: function() {
     return App.depositLimit;
@@ -349,8 +335,6 @@ const App = {
           }
           App.cosmosChainId = normalized;
         }
-        
-        App.enforceBridgeConstructionGate();
 
         // Initialize delegate section immediately (doesn't depend on Web3 or CosmJS)
         App.initDelegateSection();
@@ -1641,8 +1625,6 @@ const App = {
     const cosmosToggleButton = document.getElementById('cosmos-network-toggle-btn');
     const cosmosToggleText = document.getElementById('cosmos-toggle-text');
     const cosmosNetworkGroup = cosmosNetworkDisplay ? cosmosNetworkDisplay.closest('.network-group') : null;
-
-    App.updateBridgeConstructionState();
 
     if (cosmosNetworkDisplay) {
       if (App.cosmosChainId === 'tellor-1') {
@@ -5373,7 +5355,6 @@ const App = {
         bridgeToTellorContent.style.display = direction === 'layer' ? 'block' : 'none';
         bridgeToEthereumContent.style.display = direction === 'ethereum' ? 'block' : 'none';
         bridgeSection.classList.add('active');
-        App.enforceBridgeConstructionGate();
         delegateSection.classList.remove('active');
     } else {
         bridgeToTellorContent.style.display = 'none';
