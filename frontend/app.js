@@ -1306,6 +1306,9 @@ const App = {
             reporterDropdown.disabled = true;
         }
 
+        App._hasCurrentReporterSelection = false;
+        App.updateReporterActionButton();
+
         // Update withdrawal history to reflect wallet disconnection
         await this.updateWithdrawalHistory();
 
@@ -1775,6 +1778,136 @@ const App = {
     modalContent.appendChild(buttonContainer);
     modal.appendChild(modalContent);
     document.body.appendChild(modal);
+  },
+
+  /** Updates Select / Switch Reporter button label from App._hasCurrentReporterSelection */
+  updateReporterActionButton: function() {
+    const btn = document.getElementById('selectReporterButton');
+    if (!btn) return;
+    if (!App.isKeplrConnected) {
+      btn.innerHTML = 'Select Reporter';
+      return;
+    }
+    btn.innerHTML = App._hasCurrentReporterSelection ? 'Switch Reporter' : 'Select Reporter';
+  },
+
+  /**
+   * Modal before switching reporters: power lock / ADR 1009.
+   * @returns {Promise<boolean>} true if user continued, false if cancelled
+   */
+  showReporterSwitchDisclaimerModal: function() {
+    const ADR_URL =
+      'https://github.com/tellor-io/layer/blob/main/adr/adr1009%20-%20handling%20of%20reporter%20delegations.md';
+    return new Promise((resolve) => {
+      const modal = document.createElement('div');
+      modal.id = 'reporterSwitchDisclaimerModal';
+      modal.style.position = 'fixed';
+      modal.style.top = '0';
+      modal.style.left = '0';
+      modal.style.width = '100%';
+      modal.style.height = '100%';
+      modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+      modal.style.zIndex = '1000';
+      modal.style.display = 'flex';
+      modal.style.alignItems = 'center';
+      modal.style.justifyContent = 'center';
+
+      const modalContent = document.createElement('div');
+      modalContent.style.backgroundColor = '#d4d8e3';
+      modalContent.style.color = '#083b44';
+      modalContent.style.borderRadius = '10px';
+      modalContent.style.border = '3px solid black';
+      modalContent.style.padding = '28px';
+      modalContent.style.fontFamily = "'PPNeueMontreal-Book', Arial, sans-serif";
+      modalContent.style.fontSize = '15px';
+      modalContent.style.width = '440px';
+      modalContent.style.maxWidth = '92vw';
+      modalContent.style.textAlign = 'left';
+      modalContent.style.lineHeight = '1.45';
+
+      const title = document.createElement('div');
+      title.textContent = 'Switch reporter';
+      title.style.fontFamily = "'PPNeueMontreal-Bold', Arial, sans-serif";
+      title.style.fontSize = '17px';
+      title.style.marginBottom = '14px';
+      title.style.textAlign = 'center';
+      modalContent.appendChild(title);
+
+      const p1 = document.createElement('p');
+      p1.textContent =
+        'After you switch, your bonded stake may not count toward the new reporter\'s on-chain power until the lock period ends (21 days). Your selection still updates to the new reporter immediately; only the weighting timing is affected.';
+      p1.style.marginBottom = '12px';
+      modalContent.appendChild(p1);
+
+      const p2 = document.createElement('p');
+      p2.style.marginBottom = '14px';
+      const link = document.createElement('a');
+      link.href = ADR_URL;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = 'ADR 1009: reporter selections and selectors';
+      link.style.color = '#0f766e';
+      link.style.textDecoration = 'underline';
+      p2.appendChild(link);
+      modalContent.appendChild(p2);
+
+      const buttonRow = document.createElement('div');
+      buttonRow.style.display = 'flex';
+      buttonRow.style.gap = '15px';
+      buttonRow.style.justifyContent = 'center';
+      buttonRow.style.marginTop = '8px';
+
+      const cancelButton = document.createElement('button');
+      cancelButton.textContent = 'Cancel';
+      cancelButton.style.padding = '10px 20px';
+      cancelButton.style.backgroundColor = '#6b7280';
+      cancelButton.style.color = 'white';
+      cancelButton.style.border = 'none';
+      cancelButton.style.borderRadius = '5px';
+      cancelButton.style.fontFamily = "'PPNeueMontreal-Bold', Arial, sans-serif";
+      cancelButton.style.fontSize = '14px';
+      cancelButton.style.cursor = 'pointer';
+
+      const confirmButton = document.createElement('button');
+      confirmButton.textContent = 'Continue';
+      confirmButton.style.padding = '10px 20px';
+      confirmButton.style.backgroundColor = '#10b981';
+      confirmButton.style.color = 'white';
+      confirmButton.style.border = 'none';
+      confirmButton.style.borderRadius = '5px';
+      confirmButton.style.fontFamily = "'PPNeueMontreal-Bold', Arial, sans-serif";
+      confirmButton.style.fontSize = '14px';
+      confirmButton.style.cursor = 'pointer';
+
+      const finish = (continued) => {
+        if (modal.parentNode) {
+          document.body.removeChild(modal);
+        }
+        document.removeEventListener('keydown', onEscape);
+        resolve(continued);
+      };
+
+      const onEscape = (e) => {
+        if (e.key === 'Escape') {
+          finish(false);
+        }
+      };
+
+      cancelButton.onclick = () => finish(false);
+      confirmButton.onclick = () => finish(true);
+      modal.onclick = (e) => {
+        if (e.target === modal) {
+          finish(false);
+        }
+      };
+      document.addEventListener('keydown', onEscape);
+
+      buttonRow.appendChild(cancelButton);
+      buttonRow.appendChild(confirmButton);
+      modalContent.appendChild(buttonRow);
+      modal.appendChild(modalContent);
+      document.body.appendChild(modal);
+    });
   },
 
   // Switch Cosmos network function
@@ -4055,6 +4188,7 @@ const App = {
 
   // Add function to handle reporter selection
   selectReporter: async function() {
+    const selectReporterButton = document.getElementById('selectReporterButton');
     try {
         if (!App.isKeplrConnected) {
             alert('Please connect your Cosmos wallet first');
@@ -4098,13 +4232,6 @@ const App = {
             return;
         }
 
-        // Disable the button during processing
-        const selectReporterButton = document.getElementById('selectReporterButton');
-        if (selectReporterButton) {
-            selectReporterButton.disabled = true;
-            selectReporterButton.innerHTML = 'Selecting...';
-        }
-
         // Get offline signer
         let offlineSigner;
         if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
@@ -4117,29 +4244,43 @@ const App = {
 
         const accounts = await offlineSigner.getAccounts();
         const layerAccount = accounts[0].address;
+        const normalizedReporter = reporterAddress.trim();
 
-        // Determine whether to select a new reporter or switch an existing one
-        let result;
+        let current = null;
         try {
-            const current = await App.fetchCurrentReporter(layerAccount);
-            const hasExistingReporter = current && current.reporter;
-            const normalizedReporter = reporterAddress.trim();
+            current = await App.fetchCurrentReporter(layerAccount);
+        } catch (fetchErr) {
+            console.error('Error fetching current reporter:', fetchErr);
+        }
+        const hasExistingReporter = !!(current && current.reporter);
 
-            if (hasExistingReporter && current.reporter === normalizedReporter) {
-                App.showBalanceErrorPopup(
-                    'This reporter is already your selected reporter. Choose a different reporter to switch.'
-                );
+        if (hasExistingReporter && current.reporter === normalizedReporter) {
+            App.showBalanceErrorPopup(
+                'This reporter is already your selected reporter. Choose a different reporter to switch.'
+            );
+            return;
+        }
+
+        if (hasExistingReporter) {
+            const continued = await App.showReporterSwitchDisclaimerModal();
+            if (!continued) {
                 return;
             }
+        }
 
+        if (selectReporterButton) {
+            selectReporterButton.disabled = true;
+            selectReporterButton.innerHTML = hasExistingReporter ? 'Switching...' : 'Selecting...';
+        }
+
+        let result;
+        try {
             if (hasExistingReporter) {
-                // Existing selector: switch reporter
                 result = await window.cosmjs.stargate.switchReporter(
                     layerAccount,
                     reporterAddress
                 );
             } else {
-                // No existing reporter: initial selection
                 result = await window.cosmjs.stargate.selectReporter(
                     layerAccount,
                     reporterAddress
@@ -4195,11 +4336,9 @@ const App = {
             App.showBalanceErrorPopup(popupMsg);
         }
     } finally {
-        // Re-enable the button
-        const selectReporterButton = document.getElementById('selectReporterButton');
         if (selectReporterButton) {
             selectReporterButton.disabled = false;
-            selectReporterButton.innerHTML = 'Select Reporter';
+            App.updateReporterActionButton();
         }
     }
   },
@@ -5758,6 +5897,8 @@ const App = {
       
       if (!reporterData) {
         statusElement.innerHTML = '<div class="status-empty">No reporter selected</div>';
+        App._hasCurrentReporterSelection = false;
+        App.updateReporterActionButton();
         return;
       }
 
@@ -5785,9 +5926,13 @@ const App = {
           <button class="copy-btn" onclick="App.copyToClipboard('${reporterAddress}')" data-tooltip="Copy address">⧉</button>
         </div>
       `;
+      App._hasCurrentReporterSelection = true;
+      App.updateReporterActionButton();
     } catch (error) {
       console.error('Error displaying reporter status:', error);
       statusElement.innerHTML = '<div class="status-empty">Error loading reporter status</div>';
+      App._hasCurrentReporterSelection = false;
+      App.updateReporterActionButton();
     }
   },
 
