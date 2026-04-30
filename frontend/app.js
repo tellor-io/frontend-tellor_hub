@@ -3724,7 +3724,9 @@ const App = {
     }
 
     App.clearWithdrawalCooldownTimer();
-    const refreshBtn = document.querySelector('button[onclick="App.updateWithdrawalHistory()"]');
+    const refreshBtn = document.querySelector(
+      'button[data-inline-onclick="App.updateWithdrawalHistory()"], button[onclick="App.updateWithdrawalHistory()"]'
+    );
     if (refreshBtn) {
       refreshBtn.disabled = true;
       refreshBtn.innerHTML = '<span>⏳</span><span>Loading...</span>';
@@ -3739,6 +3741,20 @@ const App = {
             legend.style.display = showAll ? 'inline-flex' : 'none';
         }
         
+        if (!App.isConnected || !App.account) {
+            const tableBody = document.querySelector('#withdrawal-history tbody');
+            if (tableBody) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: #6b7280; padding: 20px;">
+                            Waiting for wallet connections...
+                        </td>
+                    </tr>
+                `;
+            }
+            return;
+        }
+
         const transactions = await this.getWithdrawalHistory(showAll);
 
         let bridgeExtraUnlockMs = null;
@@ -4543,8 +4559,12 @@ const App = {
             return;
         }
 
-        const attestButton = document.querySelector(`button[onclick="App.requestAttestation(${withdrawalId})"]`);
-        const claimButton = document.querySelector(`button[onclick="App.claimWithdrawal(${withdrawalId})"]`);
+        const attestButton = document.querySelector(
+            `button[data-inline-onclick="App.requestAttestation(${withdrawalId})"], button[onclick="App.requestAttestation(${withdrawalId})"]`
+        );
+        const claimButton = document.querySelector(
+            `button[data-inline-onclick="App.claimWithdrawal(${withdrawalId})"], button[onclick="App.claimWithdrawal(${withdrawalId})"]`
+        );
         
         if (attestButton) {
             attestButton.disabled = true;
@@ -4610,7 +4630,9 @@ const App = {
         App.showErrorPopup(error.message || "Error requesting attestation. Please try again.");
         
         // Re-enable the attest button if there was an error
-        const attestButton = document.querySelector(`button[onclick="App.requestAttestation(${withdrawalId})"]`);
+        const attestButton = document.querySelector(
+            `button[data-inline-onclick="App.requestAttestation(${withdrawalId})"], button[onclick="App.requestAttestation(${withdrawalId})"]`
+        );
         if (attestButton) {
             attestButton.disabled = false;
             attestButton.innerHTML = '<span>Request</span><span>Attestation</span>';

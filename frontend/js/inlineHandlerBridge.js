@@ -5,19 +5,56 @@
 (function () {
   'use strict';
 
+  const INLINE_ATTR_MAP = {
+    onclick: 'data-inline-onclick',
+    onchange: 'data-inline-onchange'
+  };
+
+  function hoistInlineHandlers(root) {
+    if (!root) return;
+    const attributes = Object.keys(INLINE_ATTR_MAP);
+
+    const moveAttributes = (el) => {
+      attributes.forEach((attr) => {
+        const bridgeAttr = INLINE_ATTR_MAP[attr];
+        if (!el.hasAttribute(attr)) return;
+        const expression = el.getAttribute(attr);
+        if (expression && !el.hasAttribute(bridgeAttr)) {
+          el.setAttribute(bridgeAttr, expression);
+        }
+        el.removeAttribute(attr);
+      });
+    };
+
+    if (root.nodeType === Node.ELEMENT_NODE) {
+      moveAttributes(root);
+      const selector = attributes.map((attr) => `[${attr}]`).join(',');
+      root.querySelectorAll(selector).forEach(moveAttributes);
+      return;
+    }
+
+    if (root.nodeType === Node.DOCUMENT_NODE) {
+      const selector = attributes.map((attr) => `[${attr}]`).join(',');
+      root.querySelectorAll(selector).forEach(moveAttributes);
+    }
+  }
+
   function resolvePath(path) {
     if (!path) return null;
     const parts = path.split('.');
     let owner = window;
     for (let i = 0; i < parts.length - 1; i += 1) {
       const part = parts[i];
-      if (!Object.prototype.hasOwnProperty.call(owner, part)) {
+      if (!(part in owner)) {
         return null;
       }
       owner = owner[part];
+      if (owner === null || owner === undefined) {
+        return null;
+      }
     }
     const last = parts[parts.length - 1];
-    if (!Object.prototype.hasOwnProperty.call(owner, last)) {
+    if (!(last in owner)) {
       return null;
     }
     return {
@@ -93,7 +130,9 @@
     const rawArgs = match[2];
     const allowed =
       path === 'switchDisputeTab' ||
-      path.startsWith('App.');
+      path.startsWith('App.') ||
+      path.startsWith('window.ethereumWalletModal.') ||
+      path.startsWith('window.walletModal.');
     if (!allowed) return null;
 
     return {
@@ -104,10 +143,12 @@
   }
 
   function runInlineHandler(event, attributeName) {
-    const target = event.target && event.target.closest(`[${attributeName}]`);
+    const bridgeAttribute = INLINE_ATTR_MAP[attributeName];
+    if (!bridgeAttribute) return;
+    const target = event.target && event.target.closest(`[${bridgeAttribute}]`);
     if (!target) return;
 
-    const expression = target.getAttribute(attributeName);
+    const expression = target.getAttribute(bridgeAttribute);
     const parsed = parseCallExpression(expression);
     if (!parsed) return;
 
@@ -135,4 +176,13 @@
   document.addEventListener('change', (event) => {
     runInlineHandler(event, 'onchange');
   });
+
+  hoistInlineHandlers(document);
+
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => hoistInlineHandlers(node));
+    });
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
 })();
