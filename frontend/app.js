@@ -3158,7 +3158,15 @@ const App = {
             return;
         }
 
-        const recipientHex = ethereumAddress.toLowerCase().replace(/^0x/, '').replace(/\s+/g, '');
+        let normalizedEthereumAddress;
+        try {
+            normalizedEthereumAddress = ethers.utils.getAddress(ethereumAddress);
+        } catch (_) {
+            App.showValidationErrorPopup('Please enter a valid Ethereum address checksum/format.');
+            return;
+        }
+
+        const recipientHex = normalizedEthereumAddress.toLowerCase().replace(/^0x/, '');
         if (!/^[0-9a-f]{40}$/.test(recipientHex)) {
             App.showValidationErrorPopup('Ethereum recipient must be 40 hex characters (check for spaces or typos).');
             return;
@@ -3214,7 +3222,7 @@ const App = {
             amount: msg.value.amount,
             amountInMicroUnits: amountInMicroUnits,
             originalAmount: amount,
-            ethereumAddress: ethereumAddress
+            ethereumAddress: normalizedEthereumAddress
         });
         
         // Compare with successful transaction format
@@ -3700,6 +3708,16 @@ const App = {
   updateWithdrawalHistory: async function() {
     // Withdrawal/oracle history is only relevant in Bridge to Ethereum view.
     // Skip heavy oracle polling while on Bridge to Tellor / Delegate views.
+    const ethereumPane = document.getElementById('bridgeToEthereumContent');
+    const ethereumPaneVisible =
+      !!ethereumPane &&
+      window.getComputedStyle(ethereumPane).display !== 'none';
+
+    // Keep internal direction state in sync with visible bridge pane.
+    if (ethereumPaneVisible && App.currentBridgeDirection !== 'ethereum') {
+      App.currentBridgeDirection = 'ethereum';
+    }
+
     if (App.currentBridgeDirection !== 'ethereum') {
       App.clearWithdrawalCooldownTimer();
       return;

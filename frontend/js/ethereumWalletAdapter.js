@@ -7,6 +7,7 @@ class EthereumWalletAdapter {
     constructor() {
         this.currentProvider = null;
         this.currentWallet = null;
+        this.walletConnectProvider = null;
         this.isConnected = false;
         this.account = null;
         this.chainId = null;
@@ -15,13 +16,18 @@ class EthereumWalletAdapter {
         this.debug = typeof window !== 'undefined' &&
             window.localStorage &&
             window.localStorage.getItem('tellor_debug_wallets') === '1';
+
+        // Keep stable listener references so removeListener works correctly.
+        this.boundHandleAccountsChanged = this.handleAccountsChanged.bind(this);
+        this.boundHandleChainChanged = this.handleChainChanged.bind(this);
+        this.boundHandleDisconnect = this.handleDisconnect.bind(this);
         
         // Supported wallet types
         this.supportedWallets = {
             'metamask': {
                 name: 'MetaMask',
                 priority: 1,
-                check: () => typeof window.ethereum !== 'undefined' && window.ethereum.isMetaMask,
+                check: () => !!this.getInjectedProviderForType('metamask'),
                 connect: this.connectMetaMask.bind(this)
             },
             'walletconnect': {
@@ -33,19 +39,19 @@ class EthereumWalletAdapter {
             'coinbase': {
                 name: 'Coinbase Wallet',
                 priority: 3,
-                check: () => typeof window.ethereum !== 'undefined' && window.ethereum.isCoinbaseWallet,
+                check: () => !!this.getInjectedProviderForType('coinbase'),
                 connect: this.connectCoinbase.bind(this)
             },
             'trust': {
                 name: 'Trust Wallet',
                 priority: 4,
-                check: () => typeof window.ethereum !== 'undefined' && window.ethereum.isTrust,
+                check: () => !!this.getInjectedProviderForType('trust'),
                 connect: this.connectTrust.bind(this)
             },
             'rainbow': {
                 name: 'Rainbow',
                 priority: 5,
-                check: () => typeof window.ethereum !== 'undefined' && window.ethereum.isRainbow,
+                check: () => !!this.getInjectedProviderForType('rainbow'),
                 connect: this.connectRainbow.bind(this)
             }
         };
@@ -55,6 +61,31 @@ class EthereumWalletAdapter {
         if (this.debug) {
             console.log(...args);
         }
+    }
+
+    getInjectedProviders() {
+        if (typeof window.ethereum === 'undefined') {
+            return [];
+        }
+        if (Array.isArray(window.ethereum.providers) && window.ethereum.providers.length > 0) {
+            return window.ethereum.providers;
+        }
+        return [window.ethereum];
+    }
+
+    getInjectedProviderForType(type) {
+        const providers = this.getInjectedProviders();
+        if (providers.length === 0) return null;
+
+        const matchers = {
+            metamask: (provider) => provider && provider.isMetaMask,
+            coinbase: (provider) => provider && provider.isCoinbaseWallet,
+            trust: (provider) => provider && provider.isTrust,
+            rainbow: (provider) => provider && provider.isRainbow,
+            generic: (provider) => provider && typeof provider.request === 'function'
+        };
+        const matcher = matchers[type] || matchers.generic;
+        return providers.find(matcher) || null;
     }
 
     // Detect available wallets
@@ -97,11 +128,11 @@ class EthereumWalletAdapter {
             case 'coinbase':
             case 'trust':
             case 'rainbow':
-                return window.ethereum;
+                return this.getInjectedProviderForType(type);
             case 'walletconnect':
-                return this.createWalletConnectProvider();
+                return this.walletConnectProvider;
             case 'generic':
-                return window.ethereum;
+                return this.getInjectedProviderForType('generic');
             default:
                 return null;
         }
@@ -147,7 +178,7 @@ class EthereumWalletAdapter {
         
         // Set wallet state
         this.currentWallet = walletToUse;
-        this.currentProvider = walletToUse.provider;
+        this.currentProvider = connectionResult.provider || walletToUse.provider;
         this.isConnected = true;
         this.account = connectionResult.account;
         this.chainId = connectionResult.chainId;
@@ -172,45 +203,48 @@ class EthereumWalletAdapter {
 
     // Connect to MetaMask
     async connectMetaMask() {
-        if (!window.ethereum || !window.ethereum.isMetaMask) {
+        const provider = this.getInjectedProviderForType('metamask');
+        if (!provider) {
             throw new Error('MetaMask not available');
         }
 
         try {
-            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            const accounts = await provider.request({ method: 'eth_requestAccounts' });
             if (!accounts || accounts.length === 0) {
                 throw new Error('No accounts found in MetaMask');
             }
 
-            const chainId = await this.getChainId(window.ethereum);
-            const web3 = new Web3(window.ethereum);
+            const chainId = await this.getChainId(provider);
+            const web3 = new Web3(provider);
             const ethers = window.ethers;
 
             return {
                 account: accounts[0],
                 chainId: chainId,
                 web3: web3,
-                ethers: ethers
+                ethers: ethers,
+                provider: provider
             };
         } catch (error) {
             // Handle Chrome extension errors gracefully
             if (error.message && error.message.includes('chrome.runtime.sendMessage')) {
                 console.warn('Chrome extension error detected, this is normal for wallet integration');
                 // Continue with the connection as the error is just a warning
-                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                const accounts = await provider.request({ method: 'eth_requestAccounts' });
                 if (!accounts || accounts.length === 0) {
                     throw new Error('No accounts found in wallet');
                 }
 
-                const chainId = await this.getChainId(window.ethereum);
-                const web3 = new Web3(window.ethereum);
+                const chainId = await this.getChainId(provider);
+                const web3 = new Web3(provider);
                 const ethers = window.ethers;
 
                 return {
                     account: accounts[0],
                     chainId: chainId,
                     web3: web3,
-                    ethers: ethers
+                    ethers: ethers,
+                    provider: provider
                 };
             }
             throw error;
@@ -219,7 +253,10 @@ class EthereumWalletAdapter {
 
     // Connect to WalletConnect
     async connectWalletConnect() {
-        const provider = this.createWalletConnectProvider();
+        if (!this.walletConnectProvider) {
+            this.walletConnectProvider = this.createWalletConnectProvider();
+        }
+        const provider = this.walletConnectProvider;
         
         try {
             await provider.enable();
@@ -232,7 +269,8 @@ class EthereumWalletAdapter {
                 account: accounts[0],
                 chainId: chainId,
                 web3: web3,
-                ethers: ethers
+                ethers: ethers,
+                provider: provider
             };
         } catch (error) {
             throw new Error(`WalletConnect connection failed: ${error.message}`);
@@ -241,91 +279,98 @@ class EthereumWalletAdapter {
 
     // Connect to Coinbase Wallet
     async connectCoinbase() {
-        if (!window.ethereum || !window.ethereum.isCoinbaseWallet) {
+        const provider = this.getInjectedProviderForType('coinbase');
+        if (!provider) {
             throw new Error('Coinbase Wallet not available');
         }
 
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        const accounts = await provider.request({ method: 'eth_requestAccounts' });
         if (!accounts || accounts.length === 0) {
             throw new Error('No accounts found in Coinbase Wallet');
         }
 
-        const chainId = await this.getChainId(window.ethereum);
-        const web3 = new Web3(window.ethereum);
+        const chainId = await this.getChainId(provider);
+        const web3 = new Web3(provider);
         const ethers = window.ethers;
 
         return {
             account: accounts[0],
             chainId: chainId,
             web3: web3,
-            ethers: ethers
+            ethers: ethers,
+            provider: provider
         };
     }
 
     // Connect to Trust Wallet
     async connectTrust() {
-        if (!window.ethereum || !window.ethereum.isTrust) {
+        const provider = this.getInjectedProviderForType('trust');
+        if (!provider) {
             throw new Error('Trust Wallet not available');
         }
 
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        const accounts = await provider.request({ method: 'eth_requestAccounts' });
         if (!accounts || accounts.length === 0) {
             throw new Error('No accounts found in Trust Wallet');
         }
 
-        const chainId = await this.getChainId(window.ethereum);
-        const web3 = new Web3(window.ethereum);
+        const chainId = await this.getChainId(provider);
+        const web3 = new Web3(provider);
         const ethers = window.ethers;
 
         return {
             account: accounts[0],
             chainId: chainId,
             web3: web3,
-            ethers: ethers
+            ethers: ethers,
+            provider: provider
         };
     }
 
     // Connect to Rainbow
     async connectRainbow() {
-        if (!window.ethereum || !window.ethereum.isRainbow) {
+        const provider = this.getInjectedProviderForType('rainbow');
+        if (!provider) {
             throw new Error('Rainbow not available');
         }
 
         try {
-            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            const accounts = await provider.request({ method: 'eth_requestAccounts' });
             if (!accounts || accounts.length === 0) {
                 throw new Error('No accounts found in Rainbow');
             }
 
-            const chainId = await this.getChainId(window.ethereum);
-            const web3 = new Web3(window.ethereum);
+            const chainId = await this.getChainId(provider);
+            const web3 = new Web3(provider);
             const ethers = window.ethers;
 
             return {
                 account: accounts[0],
                 chainId: chainId,
                 web3: web3,
-                ethers: ethers
+                ethers: ethers,
+                provider: provider
             };
         } catch (error) {
             // Handle Chrome extension errors gracefully
             if (error.message && error.message.includes('chrome.runtime.sendMessage')) {
                 console.warn('Chrome extension error detected, this is normal for wallet integration');
                 // Continue with the connection as the error is just a warning
-                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                const accounts = await provider.request({ method: 'eth_requestAccounts' });
                 if (!accounts || accounts.length === 0) {
                     throw new Error('No accounts found in wallet');
                 }
 
-                const chainId = await this.getChainId(window.ethereum);
-                const web3 = new Web3(window.ethereum);
+                const chainId = await this.getChainId(provider);
+                const web3 = new Web3(provider);
                 const ethers = window.ethers;
 
                 return {
                     account: accounts[0],
                     chainId: chainId,
                     web3: web3,
-                    ethers: ethers
+                    ethers: ethers,
+                    provider: provider
                 };
             }
             throw error;
@@ -351,7 +396,8 @@ class EthereumWalletAdapter {
             account: accounts[0],
             chainId: chainId,
             web3: web3,
-            ethers: ethers
+            ethers: ethers,
+            provider: provider
         };
     }
 
@@ -459,9 +505,9 @@ class EthereumWalletAdapter {
         this.removeEventListeners();
 
         // Add new listeners
-        this.currentProvider.on('accountsChanged', this.handleAccountsChanged.bind(this));
-        this.currentProvider.on('chainChanged', this.handleChainChanged.bind(this));
-        this.currentProvider.on('disconnect', this.handleDisconnect.bind(this));
+        this.currentProvider.on('accountsChanged', this.boundHandleAccountsChanged);
+        this.currentProvider.on('chainChanged', this.boundHandleChainChanged);
+        this.currentProvider.on('disconnect', this.boundHandleDisconnect);
     }
 
     // Remove event listeners
@@ -469,9 +515,9 @@ class EthereumWalletAdapter {
         if (!this.currentProvider) return;
 
         try {
-            this.currentProvider.removeListener('accountsChanged', this.handleAccountsChanged.bind(this));
-            this.currentProvider.removeListener('chainChanged', this.handleChainChanged.bind(this));
-            this.currentProvider.removeListener('disconnect', this.handleDisconnect.bind(this));
+            this.currentProvider.removeListener('accountsChanged', this.boundHandleAccountsChanged);
+            this.currentProvider.removeListener('chainChanged', this.boundHandleChainChanged);
+            this.currentProvider.removeListener('disconnect', this.boundHandleDisconnect);
         } catch (error) {
             console.warn('Error removing event listeners:', error);
         }
@@ -522,6 +568,7 @@ class EthereumWalletAdapter {
         this.chainId = null;
         this.web3 = null;
         this.ethers = null;
+        this.walletConnectProvider = null;
 
         this.debugLog('Wallet disconnected successfully');
     }
