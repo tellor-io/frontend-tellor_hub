@@ -102,6 +102,77 @@
   }
 }
 
+/* Final compact delegate control normalization (must stay late to win cascade) */
+@media (max-height: 900px) {
+  #delegateSection .input-with-label {
+    display: flex !important;
+    align-items: stretch !important;
+  }
+
+  #delegateSection .input-label {
+    height: 40px !important;
+    min-height: 40px !important;
+    margin-top: 0 !important;
+    padding: 0 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    line-height: 1 !important;
+    font-size: 14px !important;
+  }
+
+  #delegateSection .input-address,
+  #delegateSection .input-with-label select {
+    height: 40px !important;
+    min-height: 40px !important;
+    margin-top: 0 !important;
+    padding: 0 44px 0 12px !important;
+    line-height: 1.2 !important;
+    font-size: 14px !important;
+    box-sizing: border-box !important;
+  }
+
+  #delegateSection .input-with-label:has(.refresh-btn) .input-address,
+  #delegateSection .input-with-label:has(.refresh-btn) select {
+    border-radius: 8px 0 0 8px !important;
+    border-right: none !important;
+  }
+
+  #delegateSection .refresh-btn,
+  #delegateSection .input-with-label .refresh-btn {
+    height: 40px !important;
+    min-height: 40px !important;
+    min-width: 40px !important;
+    margin-top: 0 !important;
+    padding: 0 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    line-height: 1 !important;
+    box-sizing: border-box !important;
+  }
+}
+
+@media (max-height: 900px) {
+  .function-container {
+    height: calc(100vh - 95px);
+    max-height: calc(100vh - 95px);
+    padding: 16px;
+  }
+
+  #delegateSection .button-style-3 {
+    height: 40px !important;
+    font-size: 16px !important;
+    padding: 8px 14px !important;
+    margin: 2px !important;
+  }
+
+  #delegateSection .input-label,
+  #delegateSection .input-address,
+  #delegateSection .refresh-btn {
+    height: 40px !important;
+  }
+}
+
 /* Floating Pods Container */
 .orbit-container {
   position: absolute;
@@ -787,6 +858,12 @@
   margin-bottom: 6px;
 }
 
+#delegateSection .action-container .balance-info,
+#delegateSection .action-container .input-button-container,
+#delegateSection .action-container .bridge-direction {
+  margin-bottom: 2px;
+}
+
 .function-section .input,
 .function-section .input-address {
   width: 100%;
@@ -1441,9 +1518,53 @@
   right: auto !important;
   transform: none !important;
   z-index: auto !important;
-  height: 45px !important; /* Match delegate section input-address height */
-  padding: 18px 12px !important; /* Match delegate section input padding */
-  margin-top: 12px !important;
+  height: 45px !important; /* Match delegate controls */
+  min-height: 45px !important;
+  padding: 0 12px !important;
+  margin-top: 0 !important;
+  line-height: 1 !important;
+}
+
+/* Keep delegate controls on a single baseline */
+#delegateSection .input-with-label {
+  display: flex !important;
+  align-items: stretch !important;
+}
+
+#delegateSection .input-label,
+#delegateSection .input,
+#delegateSection .input-address,
+#delegateSection .input-with-label select {
+  margin-top: 0 !important;
+  box-sizing: border-box !important;
+}
+
+#delegateSection .input {
+  height: 45px !important;
+  min-height: 45px !important;
+  padding: 0 12px !important;
+  line-height: 1.2 !important;
+}
+
+@media (max-height: 900px) {
+  #delegateSection .input-label,
+  #delegateSection .input,
+  #delegateSection .input-address,
+  #delegateSection .input-with-label select,
+  #delegateSection .refresh-btn {
+    height: 40px !important;
+    min-height: 40px !important;
+    margin-top: 0 !important;
+  }
+
+  #delegateSection .input,
+  #delegateSection .input-address,
+  #delegateSection .input-with-label select {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    line-height: 1.2 !important;
+    font-size: 14px !important;
+  }
 }
 
 /* Ensure vote dispute refresh button gets proper connected styling */

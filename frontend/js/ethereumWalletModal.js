@@ -8,6 +8,15 @@ class EthereumWalletModal {
         this.modal = null;
         this.callback = null;
         this.isOpen = false;
+        this.debug = typeof window !== 'undefined' &&
+            window.localStorage &&
+            window.localStorage.getItem('tellor_debug_wallets') === '1';
+    }
+
+    debugLog(...args) {
+        if (this.debug) {
+            console.log(...args);
+        }
     }
 
     // Create modal HTML
@@ -171,7 +180,7 @@ class EthereumWalletModal {
             // Connect to wallet directly using the adapter
             const result = await window.ethereumWalletAdapter.connectToWallet(walletType);
             
-            console.log(`Successfully connected to ${result.walletName}`);
+            this.debugLog(`Successfully connected to ${result.walletName}`);
             
             // Close modal on success (without triggering cancellation callback)
             this.closeOnSuccess();

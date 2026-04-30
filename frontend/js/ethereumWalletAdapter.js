@@ -12,6 +12,9 @@ class EthereumWalletAdapter {
         this.chainId = null;
         this.web3 = null;
         this.ethers = null;
+        this.debug = typeof window !== 'undefined' &&
+            window.localStorage &&
+            window.localStorage.getItem('tellor_debug_wallets') === '1';
         
         // Supported wallet types
         this.supportedWallets = {
@@ -46,6 +49,12 @@ class EthereumWalletAdapter {
                 connect: this.connectRainbow.bind(this)
             }
         };
+    }
+
+    debugLog(...args) {
+        if (this.debug) {
+            console.log(...args);
+        }
     }
 
     // Detect available wallets
@@ -130,7 +139,7 @@ class EthereumWalletAdapter {
             throw new Error(`Wallet type '${walletType}' not found. Available wallets: ${availableWallets.map(w => w.name).join(', ')}`);
         }
         
-        console.log(`Connecting to ${walletToUse.name}...`);
+        this.debugLog(`Connecting to ${walletToUse.name}...`);
         
         // Connect using the appropriate method
         const connectionResult = await this.supportedWallets[walletToUse.type]?.connect() || 
@@ -148,7 +157,7 @@ class EthereumWalletAdapter {
         // Set up event listeners
         this.setupEventListeners();
         
-        console.log(`Connected to ${walletToUse.name}: ${this.account}`);
+        this.debugLog(`Connected to ${walletToUse.name}: ${this.account}`);
         
         return {
             walletName: walletToUse.name,
@@ -474,7 +483,7 @@ class EthereumWalletAdapter {
             this.disconnect();
         } else {
             this.account = accounts[0];
-            console.log('Account changed to:', this.account);
+            this.debugLog('Account changed to:', this.account);
         }
     }
 
@@ -483,12 +492,12 @@ class EthereumWalletAdapter {
         this.chainId = typeof chainId === 'string' && chainId.startsWith('0x') 
             ? parseInt(chainId, 16) 
             : parseInt(chainId);
-        console.log('Chain changed to:', this.chainId);
+        this.debugLog('Chain changed to:', this.chainId);
     }
 
     // Handle disconnect
     handleDisconnect() {
-        console.log('Wallet disconnected');
+        this.debugLog('Wallet disconnected');
         this.disconnect();
     }
 
@@ -514,7 +523,7 @@ class EthereumWalletAdapter {
         this.web3 = null;
         this.ethers = null;
 
-        console.log('Wallet disconnected successfully');
+        this.debugLog('Wallet disconnected successfully');
     }
 
     // Get current connection status
@@ -535,8 +544,8 @@ class EthereumWalletAdapter {
 
     // Test function to verify connection
     async testConnection() {
-        console.log('=== Ethereum Wallet Adapter Test ===');
-        console.log('Current state:', {
+        this.debugLog('=== Ethereum Wallet Adapter Test ===');
+        this.debugLog('Current state:', {
             isConnected: this.isConnected,
             account: this.account,
             chainId: this.chainId,
@@ -547,14 +556,14 @@ class EthereumWalletAdapter {
         if (this.isConnected) {
             try {
                 const balance = await this.web3.eth.getBalance(this.account);
-                console.log('Account balance:', this.web3.utils.fromWei(balance, 'ether'), 'ETH');
+                this.debugLog('Account balance:', this.web3.utils.fromWei(balance, 'ether'), 'ETH');
                 return true;
             } catch (error) {
                 console.error('Error getting balance:', error);
                 return false;
             }
         } else {
-            console.log('No wallet connected');
+            this.debugLog('No wallet connected');
             return false;
         }
     }

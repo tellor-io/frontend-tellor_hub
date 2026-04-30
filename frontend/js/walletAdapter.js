@@ -7,7 +7,10 @@ class CosmosWalletAdapter {
         this.walletType = null;
         this.chainId = 'tellor-1';
         this.rpcUrl = 'https://mainnet.tellorlayer.com/rpc';
-        this.restUrl = 'https://mainnet.tellorlayer.com/rpc';
+        this.restUrl = 'https://mainnet.tellorlayer.com';
+        this.debug = typeof window !== 'undefined' &&
+            window.localStorage &&
+            window.localStorage.getItem('tellor_debug_wallets') === '1';
         
         // Chain configurations for both networks
         this.chainConfigs = {
@@ -15,7 +18,7 @@ class CosmosWalletAdapter {
                 chainId: "layertest-5",
                 chainName: "Layer Testnet",
                 rpc: "https://node-palmito.tellorlayer.com/rpc",
-                rest: "https://node-palmito.tellorlayer.com/rpc",
+                rest: "https://node-palmito.tellorlayer.com",
                 bip44: {
                     coinType: 118
                 },
@@ -56,7 +59,7 @@ class CosmosWalletAdapter {
                 chainId: "tellor-1",
                 chainName: "Tellor Layer Mainnet",
                 rpc: "https://mainnet.tellorlayer.com/rpc",
-                rest: "https://mainnet.tellorlayer.com/rpc",
+                rest: "https://mainnet.tellorlayer.com",
                 bip44: {
                     coinType: 118
                 },
@@ -99,15 +102,21 @@ class CosmosWalletAdapter {
         this.chainConfig = this.chainConfigs['tellor-1'];
     }
 
+    debugLog(...args) {
+        if (this.debug) {
+            console.log(...args);
+        }
+    }
+
     // Detect available wallets
     detectWallets() {
         const availableWallets = [];
         
-        console.log('Detecting available wallets...');
-        console.log('window.keplr:', typeof window.keplr !== 'undefined' ? 'Available' : 'Not available');
-        console.log('window.cosmostation:', typeof window.cosmostation !== 'undefined' ? 'Available' : 'Not available');
-        console.log('window.station:', typeof window.station !== 'undefined' ? 'Available' : 'Not available');
-        console.log('window.walletConnect:', typeof window.walletConnect !== 'undefined' ? 'Available' : 'Not available');
+        this.debugLog('Detecting available wallets...');
+        this.debugLog('window.keplr:', typeof window.keplr !== 'undefined' ? 'Available' : 'Not available');
+        this.debugLog('window.cosmostation:', typeof window.cosmostation !== 'undefined' ? 'Available' : 'Not available');
+        this.debugLog('window.station:', typeof window.station !== 'undefined' ? 'Available' : 'Not available');
+        this.debugLog('window.walletConnect:', typeof window.walletConnect !== 'undefined' ? 'Available' : 'Not available');
         
         // Check for Keplr
         if (typeof window.keplr !== 'undefined') {
@@ -149,7 +158,7 @@ class CosmosWalletAdapter {
             });
         }
         
-        console.log('Detected wallets:', availableWallets.map(w => w.name));
+        this.debugLog('Detected wallets:', availableWallets.map(w => w.name));
         return availableWallets.sort((a, b) => a.priority - b.priority);
     }
 
@@ -218,9 +227,9 @@ class CosmosWalletAdapter {
             this.rpcUrl = this.chainConfig.rpc;
             this.restUrl = this.chainConfig.rest;
             
-            console.log('Updated chain configuration for:', currentChainId);
-            console.log('RPC URL:', this.rpcUrl);
-            console.log('REST URL:', this.restUrl);
+            this.debugLog('Updated chain configuration for:', currentChainId);
+            this.debugLog('RPC URL:', this.rpcUrl);
+            this.debugLog('REST URL:', this.restUrl);
         } else {
             console.warn('Unknown chain ID:', currentChainId, 'using default mainnet configuration');
         }
@@ -251,7 +260,7 @@ class CosmosWalletAdapter {
                 
             case 'station':
                 // Station might need different configuration
-                console.log('Station wallet detected - chain configuration may need manual setup');
+                    this.debugLog('Station wallet detected - chain configuration may need manual setup');
                 break;
                 
             default:
@@ -362,9 +371,9 @@ class CosmosWalletAdapter {
         // Use the current chain ID from the app instead of hardcoded value
         const currentChainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : this.chainId;
         
-        console.log('Getting offline signer for wallet type:', this.walletType);
-        console.log('Current wallet provider:', this.currentWallet);
-        console.log('Using chain ID:', currentChainId);
+        this.debugLog('Getting offline signer for wallet type:', this.walletType);
+        this.debugLog('Current wallet provider:', this.currentWallet);
+        this.debugLog('Using chain ID:', currentChainId);
         
         switch (this.walletType) {
             case 'keplr':

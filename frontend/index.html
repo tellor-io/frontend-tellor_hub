@@ -286,10 +286,11 @@
             <!-- Delegate Section -->
             <div id="delegateSection" class="function-section">
               <div class="section-header">
-                <h2>Delegate Tokens</h2>
-                <p class="section-description">Stake your TRB tokens with validators to earn rewards</p>
+                <h2>Delegate Tokens/Select Reporters</h2>
+                <p class="section-description">Please connect your Cosmos wallet.</p>
+                <div class="wallet-disclaimer"></div>
               </div>
-              <div class="wallet-disclaimer">*Please connect your Cosmos wallet to delegate tokens*</div>
+              
 
               <!-- Action Sections (Side by Side) -->
               <div class="action-sections">
@@ -303,12 +304,15 @@
                   <!-- Validator Status Section -->
                   <div class="status-section">
                     <div class="status-header" onclick="App.toggleDelegationsDropdown()">
-                      <span>Current Delegations</span>
+                      <div class="status-title-with-badge">
+                        <span>Current Delegations</span>
+                        <span id="currentDelegationsCountBadge" class="status-badge" style="display:none;"></span>
+                      </div>
                       <div class="status-header-controls">
                         <button type="button" id="refreshDelegationsBtn" class="refresh-btn-small" title="Refresh delegations" onclick="event.stopPropagation()">↻</button>
                       </div>
                     </div>
-                    <div class="status-content" id="currentDelegationsStatus">
+                    <div class="status-content status-content-align" id="currentDelegationsStatus">
                       <div class="status-loading">Loading...</div>
                     </div>
                     <div class="status-dropdown" id="delegationsDropdown" style="display: none;">
@@ -318,30 +322,48 @@
                     </div>
                   </div>
 
-                  <div class="action-section">
+                  <div class="status-section">
+                    <div class="status-header">
+                      <span>Delegator Rewards</span>
+                      <div class="status-header-controls">
+                        <button type="button" id="refreshDelegatorRewardsBtn" class="refresh-btn-small" title="Refresh delegator rewards">↻</button>
+                      </div>
+                    </div>
+                    <div class="reward-summary-row">
+                      <div class="status-content status-content-align reward-status-content" id="delegatorRewardsStatus">
+                        <div class="status-loading">Connect Cosmos wallet to load rewards...</div>
+                      </div>
+                      <button id="claimDelegatorRewardsButton" class="btn-small claim-pill" type="button">Claim</button>
+                    </div>
+                  </div>
+
+                  <div class="action-section delegate-primary-section">
                     
                     <div class="balance-info">
-                        <div class="input-button-container">
-                            <div class="input-with-label">
-                                <span class="input-label">TRB</span>
-                                <input class="input" type="text" id="delegateStakeAmount" placeholder="0" />
-                            </div>
+                        <div class="delegate-input-row">
+                          <div class="input-button-container trb-input-compact">
+                              <div class="input-with-label">
+                                  <span class="input-label">TRB</span>
+                                  <input class="input" type="text" id="delegateStakeAmount" placeholder="0" />
+                              </div>
+                          </div>
+                          <div class="input-button-container">
+                              <div class="input-with-label">
+                                  <select class="input-address" id="delegateValidatorDropdown">
+                                      <option value="">Select a validator...</option>
+                                  </select>
+                                  <button type="button" id="refreshValidatorsBtn" class="refresh-btn" title="Refresh validator list">↻</button>
+                                  <input type="hidden" id="delegateValidatorAddress" />
+                                  <span class="info-icon" data-tooltip="Select a validator from the list to delegate your tokens to">ⓘ</span>
+                              </div>
+                          </div>
                         </div>
-                        <div class="input-button-container">
-                            <div class="input-with-label">
-                                <select class="input-address" id="delegateValidatorDropdown">
-                                    <option value="">Select a validator...</option>
-                                </select>
-                                <button type="button" id="refreshValidatorsBtn" class="refresh-btn" title="Refresh validator list">↻</button>
-                                <input type="hidden" id="delegateValidatorAddress" />
-                                <span class="info-icon" data-tooltip="Select a validator from the list to delegate your tokens to">ⓘ</span>
-                            </div>
-                        </div>
-                        <div class="bridge-direction">
+                        <div class="bridge-direction primary-action-button-row">
                             <button id="delegateButton" class="button-style-3" onclick="App.delegateTokens()">Delegate Tokens</button>
                         </div>
                     </div>
                   </div>
+
                 </div>
 
                 <!-- Reporter Selection Container -->
@@ -357,29 +379,47 @@
                       <span>Current Selected Reporter</span>
                       <button type="button" id="refreshReporterStatusBtn" class="refresh-btn-small" title="Refresh reporter status">↻</button>
                     </div>
-                    <div class="status-content" id="currentReporterStatus">
+                    <div class="status-content status-content-align" id="currentReporterStatus">
                       <div class="status-loading">Loading...</div>
                     </div>
                   </div>
 
-                  <div class="action-section">
+                  <div class="status-section">
+                    <div class="status-header">
+                      <span>Selector Tip Rewards</span>
+                      <div class="status-header-controls">
+                        <button type="button" id="refreshSelectorTipsBtn" class="refresh-btn-small" title="Refresh selector tip rewards">↻</button>
+                      </div>
+                    </div>
+                    <div class="reward-summary-row">
+                      <div class="status-content status-content-align reward-status-content" id="selectorTipsStatus">
+                        <div class="status-loading">Connect Cosmos wallet to load selector tips...</div>
+                      </div>
+                      <button id="claimSelectorTipsButton" class="btn-small claim-pill" type="button">Claim</button>
+                    </div>
+                  </div>
+
+                  <div class="action-section reporter-primary-section">
                     
                     <div class="balance-info">
-                        <div class="input-button-container">
-                            <div class="input-with-label">
-                                <select class="input-address" id="reporterDropdown">
-                                    <option value="">Select a reporter...</option>
-                                </select>
-                                <button type="button" id="refreshReportersBtn" class="refresh-btn" title="Refresh reporter list">↻</button>
-                                <input type="hidden" id="selectedReporterAddress" />
-                                <span class="info-icon" data-tooltip="Select a reporter from the list to handle data submissions.">ⓘ</span>
-                            </div>
+                        <div class="reporter-input-row">
+                          <div class="input-button-container">
+                              <div class="input-with-label">
+                                  <select class="input-address" id="reporterDropdown">
+                                      <option value="">Select a reporter...</option>
+                                  </select>
+                                  <button type="button" id="refreshReportersBtn" class="refresh-btn" title="Refresh reporter list">↻</button>
+                                  <input type="hidden" id="selectedReporterAddress" />
+                                  <span class="info-icon" data-tooltip="Select a reporter from the list to handle data submissions. Switching can succeed immediately, but if your stake was already counted for the prior reporter, it may not count toward the new reporter's reporting power until ~21 days (unbonding window). This is a reporting-power timing rule, not a direct staking lock. <a href='https://github.com/tellor-io/layer/blob/main/adr/adr1009%20-%20handling%20of%20reporter%20delegations.md' target='_blank'>Read ADR-1009 for full details</a>.">ⓘ</span>
+                              </div>
+                          </div>
                         </div>
-                        <div class="bridge-direction">
+                        <div class="bridge-direction primary-action-button-row">
                             <button id="selectReporterButton" class="button-style-3" onclick="App.selectReporter()">Select Reporter</button>
                         </div>
                     </div>
                   </div>
+
                 </div>
               </div>
             </div>
@@ -707,16 +747,6 @@
         });
     </script>
     <script>
-      // Simple test to see if the button exists
-      document.addEventListener('DOMContentLoaded', function() {
-        const testButton = document.getElementById('walletManagerToggle');
-        if (testButton) {
-          testButton.addEventListener('click', function() {
-            console.log('Button clicked via DOMContentLoaded handler');
-          });
-        }
-      });
-      
       document.addEventListener('DOMContentLoaded', function() {
         const infoIcons = document.querySelectorAll('.info-icon');
         let tooltipTimer;

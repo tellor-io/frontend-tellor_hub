@@ -45,9 +45,22 @@ const App = {
   keplrAddress: null,
   currentBridgeDirection: 'layer', // 'layer' or 'ethereum'
   cachedCosmosWalletType: null, // Cache the selected Cosmos wallet type
+  delegatorRewardRows: [],
+  selectorAvailableTipsRaw: '0',
+  rewardDestinationValidators: [],
+  debug: typeof window !== 'undefined' &&
+    window.localStorage &&
+    window.localStorage.getItem('tellor_debug') === '1',
+  ethereumRestrictedReason: '',
 
   _depositLimit: function() {
     return App.depositLimit;
+  },
+
+  debugLog: function(...args) {
+    if (App.debug) {
+      console.log(...args);
+    }
   },
 
   /** Pull revert hex from Web3 / provider error objects (walks nested cause / innerError). */
@@ -321,7 +334,12 @@ const App = {
   },
 
   init: function () {
-    return new Promise((resolve, reject) => {
+    // Prevent duplicate initialization when multiple boot paths call App.init().
+    if (App._initPromise) {
+      return App._initPromise;
+    }
+
+    App._initPromise = new Promise((resolve, reject) => {
       try {
         // Initialize ethers
         App.ethers = ethers;
@@ -357,6 +375,11 @@ const App = {
         document.addEventListener('walletConnected', () => {
             if (window.App && window.App.refreshDisputesOnWalletConnect) {
                 window.App.refreshDisputesOnWalletConnect();
+            }
+            if (window.App && window.App.isKeplrConnected && window.App.keplrAddress) {
+                window.App.populateValidatorDropdown().catch(() => {});
+                window.App.populateReporterDropdown().catch(() => {});
+                window.App.refreshCurrentStatus().catch(() => {});
             }
         });
             
@@ -450,13 +473,16 @@ const App = {
           })
           .catch(error => {
             // console.error(...);
+            App._initPromise = null;
             reject(error);
           });
       } catch (error) {
         // console.error(...);
+        App._initPromise = null;
         reject(error);
       }
     });
+    return App._initPromise;
   },
 
   autoReconnectWallets: async function() {
@@ -480,7 +506,7 @@ const App = {
           App.cosmosChainId = normalized;
         }
         await App.connectCosmosWallet(savedCosmosWalletType);
-        console.log('Auto-reconnected Cosmos wallet:', savedCosmosWalletType);
+        // Auto-reconnect succeeded; no-op log by default to reduce console noise.
       } catch (err) {
         console.warn('Auto-reconnect Cosmos wallet failed:', err.message);
         localStorage.removeItem('tellor_cosmos_wallet_type');
@@ -499,7 +525,7 @@ const App = {
             await App.connectMetaMask();
           }
         }
-        console.log('Auto-reconnected Ethereum wallet:', savedEthWalletType);
+        // Auto-reconnect succeeded; no-op log by default to reduce console noise.
       } catch (err) {
         console.warn('Auto-reconnect Ethereum wallet failed:', err.message);
         localStorage.removeItem('tellor_eth_wallet_type');
@@ -553,6 +579,7 @@ const App = {
 
             if (App.isConnected) {
               localStorage.setItem('tellor_eth_chain_id', String(newChainId));
+              await App.refreshEthereumConnectionState();
             }
 
             if (App.updateNetworkDisplay) {
@@ -708,15 +735,9 @@ const App = {
         
         // Update wallet manager toggle text
         App.updateWalletManagerToggleText();
-        
-        // Update balances and limits
-        await Promise.all([
-            App.updateBalance(),
-            App.fetchDepositLimit(),
-            App.fetchWithdrawLimit()
-        ]);
-        
-        App.setPageParams();
+
+        App.setPageParams({ skipDataRefresh: true });
+        await App.refreshActiveViewData();
         
         // Update network display
         App.updateNetworkDisplay();
@@ -733,7 +754,7 @@ const App = {
   // Test function to verify Ethereum wallet connection
   testEthereumConnection: async function() {
     // console.log(...);
-    console.log('App state:', {
+    App.debugLog('App state:', {
       isConnected: this.isConnected,
       account: this.account,
       chainId: this.chainId,
@@ -866,15 +887,9 @@ const App = {
         
         // Update wallet manager toggle text
         App.updateWalletManagerToggleText();
-        
-        // Update balances and limits
-        await Promise.all([
-            App.updateBalance(),
-            App.fetchDepositLimit(),
-            App.fetchWithdrawLimit()
-        ]);
-        
-        App.setPageParams();
+
+        App.setPageParams({ skipDataRefresh: true });
+        await App.refreshActiveViewData();
         
         // Update network display
         App.updateNetworkDisplay();
@@ -937,7 +952,7 @@ const App = {
                     App.cosmosChainId = normalizeCosmosChainId(currentChainId);
                 }
             } catch (error) {
-                console.log('Could not detect current network from wallet adapter, using default');
+                App.debugLog('Could not detect current network from wallet adapter, using default');
             }
         }
         
@@ -968,9 +983,6 @@ const App = {
         // Update wallet manager toggle text
         App.updateWalletManagerToggleText();
         
-        // Update balance immediately after connection
-        await App.updateKeplrBalance();
-        
         // Update Cosmos network display
         App.updateCosmosNetworkDisplay();
         
@@ -985,21 +997,13 @@ const App = {
             if (delegateButton) {
                 delegateButton.disabled = false;
             }
-            // Refresh validator dropdown when connecting in delegate section
-            await App.populateValidatorDropdown();
-            await App.populateReporterDropdown();
-            await App.refreshCurrentStatus();
-        } else {
-            // If not in delegate section, still populate validators for when user switches to delegate
-            await App.populateValidatorDropdown();
-            await App.populateReporterDropdown();
-            await App.refreshCurrentStatus();
         }
         
-        App.setPageParams();
+        App.setPageParams({ skipDataRefresh: true });
         
         // Update UI for current direction after wallet connection
         App.updateUIForCurrentDirection();
+        await App.refreshActiveViewData();
         
         // Dispatch wallet connected event for dispute refresh
         document.dispatchEvent(new CustomEvent('walletConnected'));
@@ -1038,7 +1042,7 @@ const App = {
                 App.cosmosChainId = normalizeCosmosChainId(currentChainId);
             }
         } catch (error) {
-            console.log('Could not detect current network from Keplr, using default');
+            App.debugLog('Could not detect current network from Keplr, using default');
         }
 
         rpcUrl = App.getCosmosRpcEndpoint();
@@ -1120,9 +1124,6 @@ const App = {
         // Update wallet manager toggle text
         App.updateWalletManagerToggleText();
         
-        // Update balance immediately after connection
-        await App.updateKeplrBalance();
-        
         // Update Cosmos network display
         App.updateCosmosNetworkDisplay();
         
@@ -1137,21 +1138,13 @@ const App = {
             if (delegateButton) {
                 delegateButton.disabled = false;
             }
-            // Refresh validator dropdown when connecting in delegate section
-            await App.populateValidatorDropdown();
-            await App.populateReporterDropdown();
-            await App.refreshCurrentStatus();
-        } else {
-            // If not in delegate section, still populate validators for when user switches to delegate
-            await App.populateValidatorDropdown();
-            await App.populateReporterDropdown();
-            await App.refreshCurrentStatus();
         }
         
-        App.setPageParams();
+        App.setPageParams({ skipDataRefresh: true });
         
         // Update UI for current direction after wallet connection
         App.updateUIForCurrentDirection();
+        await App.refreshActiveViewData();
     } catch (error) {
         // Clear connection state on error
         App.keplrAddress = null;
@@ -1333,7 +1326,9 @@ const App = {
     
     try {
         if (!accounts || !accounts.length) {
-            throw new Error("No accounts found");
+            // Expected when user disconnects account access in wallet UI.
+            await App.disconnectMetaMask();
+            return;
         }
 
         App.account = accounts[0];
@@ -1348,30 +1343,14 @@ const App = {
             chainId = await App.web3.eth.getChainId();
         }
         App.chainId = chainId;
-        
-        if (!SUPPORTED_CHAIN_IDS[chainId]) {
-            App.showNetworkAlert();
-            await App.disconnectWallet();
-            throw new Error(`Unsupported network: ${chainId}`);
-        }
-        
-        // Initialize contracts sequentially to ensure proper setup
-        await App.initBridgeContract();
-        await App.initTokenContract();
-        
-        // Only proceed with these calls if contracts are properly initialized
-        if (App.contracts.Bridge && App.contracts.Token) {
-            await Promise.all([
-                App.fetchDepositLimit(),
-                App.fetchWithdrawLimit(),
-                App.updateBalance()
-            ]);
-        }
-        
         App.isConnected = true;
+        await App.refreshEthereumConnectionState();
         
         // Update the wallet button
-        document.getElementById('walletButton').innerHTML = `Disconnect <span class="truncated-address">(${truncatedAddress})</span>`;
+        const walletButton = document.getElementById('walletButton');
+        if (walletButton) {
+            walletButton.innerHTML = `Disconnect <span class="truncated-address">(${truncatedAddress})</span>`;
+        }
         
         // Update wallet manager toggle text
         App.updateWalletManagerToggleText();
@@ -1382,9 +1361,9 @@ const App = {
         // Update network compatibility warning
         App.updateNetworkCompatibilityWarning();
     } catch (error) {
-        // console.error(...);
-        App.handleError(error);
-        await App.disconnectWallet();
+        // Account-change events can race with connect/disconnect; keep this quiet for UX.
+        console.warn('Ethereum accountsChanged handling warning:', error?.message || error);
+        await App.disconnectMetaMask();
     } finally {
         App.isProcessingAccountChange = false;
     }
@@ -1440,6 +1419,103 @@ const App = {
   handleError: function(error) {
     // console.error(...);
     alert("An error occurred. Please check the console for more details.");
+  },
+
+  isSupportedEthereumNetwork: function(chainId = App.chainId) {
+    return Boolean(chainId && SUPPORTED_CHAIN_IDS[chainId]);
+  },
+
+  setEthereumActionButtonsEnabled: function(enabled) {
+    const approveButton = document.getElementById('approveButton');
+    const depositButton = document.getElementById('depositButton');
+
+    if (approveButton) {
+      approveButton.disabled = !enabled;
+    }
+    if (depositButton) {
+      depositButton.disabled = !enabled;
+    }
+
+    // For safety, force-disable dynamic claim buttons on unsupported networks.
+    if (!enabled) {
+      const claimButtons = document.querySelectorAll('.claim-button');
+      claimButtons.forEach((button) => {
+        button.disabled = true;
+      });
+    }
+  },
+
+  setEthereumRestrictedMode: function(restricted, reason = '') {
+    App.ethereumRestrictedReason = restricted ? reason : '';
+    if (restricted) {
+      App.setEthereumActionButtonsEnabled(false);
+    }
+  },
+
+  ensureSupportedEthereumNetwork: function(actionName = 'This action') {
+    if (!App.isSupportedEthereumNetwork()) {
+      const message = `${actionName} requires Ethereum Mainnet (1) or Sepolia (11155111). Please switch networks in your wallet.`;
+      App.setEthereumRestrictedMode(true, message);
+      if (typeof App.showValidationErrorPopup === 'function') {
+        App.showValidationErrorPopup(message);
+      } else {
+        alert(message);
+      }
+      return false;
+    }
+    return true;
+  },
+
+  refreshEthereumConnectionState: async function() {
+    if (!App.isConnected) {
+      App.setEthereumRestrictedMode(false);
+      return;
+    }
+
+    if (!App.isSupportedEthereumNetwork()) {
+      const chainLabel = App.chainId != null ? String(App.chainId) : 'unknown';
+      App.setEthereumRestrictedMode(
+        true,
+        `Unsupported Ethereum network (${chainLabel}). Switch to Mainnet or Sepolia.`
+      );
+      if (App.updateNetworkDisplay) {
+        App.updateNetworkDisplay();
+      }
+      if (App.updateWalletManagerToggleText) {
+        App.updateWalletManagerToggleText();
+      }
+      if (App.updateNetworkCompatibilityWarning) {
+        App.updateNetworkCompatibilityWarning();
+      }
+      return;
+    }
+
+    try {
+      await App.initBridgeContract();
+      await App.initTokenContract();
+      if (App.contracts.Bridge && App.contracts.Token) {
+        await Promise.all([
+          App.fetchDepositLimit(),
+          App.fetchWithdrawLimit(),
+          App.updateBalance()
+        ]);
+      }
+      App.setEthereumRestrictedMode(false);
+      App.setEthereumActionButtonsEnabled(true);
+    } catch (error) {
+      App.setEthereumRestrictedMode(true, 'Failed to refresh contracts after network/account change.');
+      console.error('Failed to refresh Ethereum connection state:', error);
+    }
+
+    if (App.updateNetworkDisplay) {
+      App.updateNetworkDisplay();
+    }
+    if (App.updateWalletManagerToggleText) {
+      App.updateWalletManagerToggleText();
+    }
+    if (App.updateNetworkCompatibilityWarning) {
+      App.updateNetworkCompatibilityWarning();
+    }
   },
 
   initBridgeContract: async function () {
@@ -1835,9 +1911,15 @@ const App = {
 
       const p1 = document.createElement('p');
       p1.textContent =
-        'After you switch, your bonded stake may not count toward the new reporter\'s on-chain power until the lock period ends (21 days). Your selection still updates to the new reporter immediately; only the weighting timing is affected.';
+        'Switching can succeed immediately. If your stake was already counted for the prior reporter, it may not count toward the new reporter\'s on-chain power until the 21 day unbonding window ends.';
       p1.style.marginBottom = '12px';
       modalContent.appendChild(p1);
+
+      const p1b = document.createElement('p');
+      p1b.textContent =
+        'This is a reporting-power timing rule, not a direct staking lock.';
+      p1b.style.marginBottom = '12px';
+      modalContent.appendChild(p1b);
 
       const p2 = document.createElement('p');
       p2.style.marginBottom = '14px';
@@ -1975,13 +2057,15 @@ const App = {
         keplrButton.innerHTML = `Disconnect <span class="truncated-address">(${truncatedAddress})</span>`;
       }
 
-      // Refresh validator/reporter dropdowns for the new network
-      try {
-        await App.populateValidatorDropdown(true);
-        await App.populateReporterDropdown(true);
-        await App.refreshCurrentStatus();
-      } catch (error) {
-        console.error('Failed to refresh dropdowns after network switch:', error);
+      // Refresh delegate data only when Delegate section is active.
+      if (App.currentBridgeDirection === 'delegate') {
+        try {
+          await App.populateValidatorDropdown(true);
+          await App.populateReporterDropdown(true);
+          await App.refreshCurrentStatus();
+        } catch (error) {
+          console.error('Failed to refresh dropdowns after network switch:', error);
+        }
       }
       
       App.updateUIForCurrentDirection();
@@ -2072,7 +2156,7 @@ const App = {
       App.updateNetworkDisplay();
       App.setPageParams();
       
-      console.log(`Successfully switched to ${targetChainId === 1 ? 'Mainnet' : 'Sepolia'}`);
+      App.debugLog(`Successfully switched to ${targetChainId === 1 ? 'Mainnet' : 'Sepolia'}`);
       
     } catch (error) {
       console.error('Error switching network:', error);
@@ -2168,7 +2252,49 @@ const App = {
     }
   },
 
-  setPageParams: function() {
+  refreshActiveViewData: async function() {
+    const tasks = [];
+
+    if (App.isConnected) {
+      tasks.push(App.updateBalance().catch(() => {}));
+    }
+
+    if (
+      App.contracts.Bridge &&
+      App.contracts.Token &&
+      App.currentBridgeDirection === 'layer'
+    ) {
+      tasks.push(App.fetchDepositLimit().catch(() => {}));
+    }
+
+    if (
+      App.contracts.Bridge &&
+      App.contracts.Bridge.methods &&
+      (App.currentBridgeDirection === 'layer' || App.currentBridgeDirection === 'ethereum')
+    ) {
+      tasks.push(App.fetchWithdrawLimit().catch(() => {}));
+    }
+
+    if (
+      App.isKeplrConnected &&
+      (App.currentBridgeDirection === 'ethereum' || App.currentBridgeDirection === 'delegate')
+    ) {
+      tasks.push(App.updateKeplrBalance().catch(() => {}));
+    }
+
+    await Promise.all(tasks);
+
+    if (App.currentBridgeDirection === 'delegate' && App.isKeplrConnected) {
+      await Promise.all([
+        App.populateValidatorDropdown(),
+        App.populateReporterDropdown()
+      ]);
+      await App.refreshCurrentStatus();
+    }
+  },
+
+  setPageParams: function(options = {}) {
+    const skipDataRefresh = Boolean(options.skipDataRefresh);
     // Update connected address in UI
     const connectedAddressElement = document.getElementById("connectedAddress");
     if (connectedAddressElement) {
@@ -2176,7 +2302,7 @@ const App = {
     }
 
     // Update balances and limits based on current direction and wallet type
-    if (App.currentBridgeDirection === 'layer') {
+    if (!skipDataRefresh && App.currentBridgeDirection === 'layer') {
       // For Layer section
       if (App.contracts.Bridge && App.contracts.Token) {
         document.getElementById('approveButton').disabled = false;
@@ -2193,7 +2319,7 @@ const App = {
           // console.error(...);
         });
       }
-    } else {
+    } else if (!skipDataRefresh) {
       // For Ethereum section
       if (App.isConnected) {
         // Update MetaMask balance
@@ -2415,6 +2541,10 @@ const App = {
 
   depositToLayer: async function() {
     try {
+        if (!checkWalletConnection()) {
+            return;
+        }
+
         const recipient = document.getElementById('_queryId').value;
         const amount = document.getElementById('stakeAmount').value;
         const tip = "0"; // Set tip to 0 by default
@@ -2586,9 +2716,17 @@ const App = {
         }
     }
 
-    let trbPrice = 0;
-    // Fetch TRB price from CoinGecko API
-    async function updateTrbPrice() {
+    let trbPrice = null;
+    let trbPriceLastFetchMs = 0;
+    const TRB_PRICE_TTL_MS = 300000; // 5 minutes
+
+    // Fetch TRB price on demand (lazy), then cache with TTL.
+    async function updateTrbPrice(force = false) {
+      const now = Date.now();
+      if (!force && trbPrice !== null && (now - trbPriceLastFetchMs) < TRB_PRICE_TTL_MS) {
+        return trbPrice;
+      }
+
       try {
         const response = await fetch(App.getApiEndpoint() + '/tellor-io/layer/oracle/get_current_aggregate_report/5c13cd9c97dbb98f2429c101a2a8150e6c7a0ddaff6124ee176a3a411067ded0', {
           method: 'GET',
@@ -2609,9 +2747,15 @@ const App = {
         
         // Convert to USD (divide by 1e18 since the value is in wei)
         trbPrice = Number(decimalValue) / 1e18;
+        trbPriceLastFetchMs = now;
+        return trbPrice;
       } catch (error) {
         // console.warn(...);
-        trbPrice = 0.5; // Default value in USD
+        if (trbPrice === null) {
+          trbPrice = 0.5; // Default value in USD
+          trbPriceLastFetchMs = now;
+        }
+        return trbPrice;
       }
     }
 
@@ -2635,11 +2779,10 @@ const App = {
         if (!activeInput) return;
 
         const amount = parseFloat(activeInput.value) || 0;
-        console.log('updateTooltip called:', { amount, shouldBeVisible: shouldTooltipBeVisible(), activeInput: activeInput.id });
-        
         if (amount > 0 && shouldTooltipBeVisible()) {
-            if (trbPrice === 0) {
+            if (trbPrice === null || (Date.now() - trbPriceLastFetchMs) >= TRB_PRICE_TTL_MS) {
                 await updateTrbPrice();
+                startPricePollingIfNeeded();
             }
             if (trbPrice > 0) {
                 const usdValue = (amount * trbPrice).toFixed(2);
@@ -2654,24 +2797,25 @@ const App = {
         }
     }
 
-    // Update price every 60 seconds, but only if the page is visible
+    // Start polling only after first on-demand price fetch.
     let priceUpdateInterval;
+    function startPricePollingIfNeeded() {
+      if (priceUpdateInterval || trbPriceLastFetchMs === 0) {
+        return;
+      }
+      priceUpdateInterval = setInterval(() => {
+        updateTrbPrice(true).catch(() => {});
+      }, TRB_PRICE_TTL_MS);
+    }
+
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         clearInterval(priceUpdateInterval);
+        priceUpdateInterval = null;
       } else {
-    updateTrbPrice();
-        // Reduce polling frequency to avoid hosting issues
-        priceUpdateInterval = setInterval(updateTrbPrice, 300000); // 5 minutes instead of 1 minute
+        startPricePollingIfNeeded();
       }
     });
-
-    // Initial price fetch
-    updateTrbPrice().catch(error => {
-      // // console.warn(...);
-    });
-    // Reduce polling frequency to avoid hosting issues
-    priceUpdateInterval = setInterval(updateTrbPrice, 300000); // 5 minutes instead of 1 minute
     
     // Periodically check if tooltip should be visible
     setInterval(() => {
@@ -3064,7 +3208,7 @@ const App = {
 
         // Sign and broadcast using direct signing
         // console.log(...);
-        console.log('Message details:', {
+        App.debugLog('Message details:', {
             creator: msg.value.creator,
             recipient: msg.value.recipient,
             amount: msg.value.amount,
@@ -3074,7 +3218,7 @@ const App = {
         });
         
         // Compare with successful transaction format
-        console.log('Expected format (from successful tx):', {
+        App.debugLog('Expected format (from successful tx):', {
             creator: 'tellor1072q49v0sacgmlq4hkwzhryz5zefgl73jg5493',
             recipient: 'b2d6aaf0bca136c252ec94f0f06c2489f734675f',
             amount: { denom: 'loya', amount: '100000' }
@@ -3104,7 +3248,7 @@ const App = {
                           result.hash ||
                           (result.tx_response && result.tx_response.txhash);
             
-            console.log('Attempting to extract transaction hash from:', {
+            App.debugLog('Attempting to extract transaction hash from:', {
                 result_txhash: result.txhash,
                 result_tx_response_txhash: result.tx_response?.txhash,
                 result_transactionHash: result.transactionHash,
@@ -3168,7 +3312,7 @@ const App = {
                     } else {
                         // console.log(...);
                         // console.warn(...);
-                        console.log('Transaction error details:', {
+                        App.debugLog('Transaction error details:', {
                             code: verifyData.tx_response?.code,
                             raw_log: verifyData.tx_response?.raw_log,
                             events: verifyData.tx_response?.events
@@ -3554,6 +3698,13 @@ const App = {
   },
 
   updateWithdrawalHistory: async function() {
+    // Withdrawal/oracle history is only relevant in Bridge to Ethereum view.
+    // Skip heavy oracle polling while on Bridge to Tellor / Delegate views.
+    if (App.currentBridgeDirection !== 'ethereum') {
+      App.clearWithdrawalCooldownTimer();
+      return;
+    }
+
     App.clearWithdrawalCooldownTimer();
     const refreshBtn = document.querySelector('button[onclick="App.updateWithdrawalHistory()"]');
     if (refreshBtn) {
@@ -4536,8 +4687,7 @@ const App = {
     let txHash = null;
     let withdrawDetailsSnapshot = null;
     try {
-        if (!App.isConnected) {
-            alert('Please connect your MetaMask wallet first');
+        if (!checkWalletConnection()) {
             return;
         }
 
@@ -4676,8 +4826,7 @@ const App = {
   claimExtraWithdraw: async function(withdrawalId) {
     let txHash = null;
     try {
-        if (!App.isConnected) {
-            alert('Please connect your MetaMask wallet first');
+        if (!checkWalletConnection()) {
             return;
         }
 
@@ -5530,6 +5679,11 @@ const App = {
 
     // Update UI for the new direction
     this.updateUIForCurrentDirection();
+
+    // Load withdrawal history only when entering Bridge to Ethereum view.
+    if (direction === 'ethereum') {
+        App.updateWithdrawalHistory().catch(() => {});
+    }
     
     // Update network compatibility warning
     this.updateNetworkCompatibilityWarning();
@@ -5712,12 +5866,12 @@ const App = {
       status.cosmosNetwork = isCosmosMainnet ? 'Mainnet' : 'Testnet';
     }
     
-    console.log('Network Status:', status);
+    App.debugLog('Network Status:', status);
     
     // Check button states
     const withdrawButton = document.getElementById('withdrawButton');
     if (withdrawButton) {
-      console.log('Withdrawal Button State:', {
+      App.debugLog('Withdrawal Button State:', {
         disabled: withdrawButton.disabled,
         text: withdrawButton.textContent,
         title: withdrawButton.title
@@ -5730,11 +5884,11 @@ const App = {
       const isCosmosMainnet = App.cosmosChainId === 'tellor-1';
       
       if (isEthereumMainnet === isCosmosMainnet) {
-        console.log('✅ Networks are compatible - withdrawals should work');
+        App.debugLog('✅ Networks are compatible - withdrawals should work');
       } else {
-        console.log('❌ Networks are incompatible - withdrawals will fail');
-        console.log('Ethereum:', isEthereumMainnet ? 'Mainnet' : 'Testnet');
-        console.log('Cosmos:', isCosmosMainnet ? 'Mainnet' : 'Testnet');
+        App.debugLog('❌ Networks are incompatible - withdrawals will fail');
+        App.debugLog('Ethereum:', isEthereumMainnet ? 'Mainnet' : 'Testnet');
+        App.debugLog('Cosmos:', isCosmosMainnet ? 'Mainnet' : 'Testnet');
       }
     }
     
@@ -5814,13 +5968,13 @@ const App = {
   fetchCurrentReporter: async function(selectorAddress) {
     try {
       const endpoint = `${App.getCosmosApiEndpoint()}/tellor-io/layer/reporter/selector-reporter/${selectorAddress}`;
-      console.log('Fetching current reporter from:', endpoint);
+      App.debugLog('Fetching current reporter from:', endpoint);
       
       const response = await fetch(endpoint);
       
       if (!response.ok) {
         if (response.status === 404) {
-          console.log('No reporter selected for address:', selectorAddress);
+          App.debugLog('No reporter selected for address:', selectorAddress);
           return null; // No reporter selected
         }
         
@@ -5829,7 +5983,7 @@ const App = {
           try {
             const errorData = await response.json();
             if (errorData.message && errorData.message.includes('not found')) {
-              console.log('No reporter selected (500 error format):', selectorAddress);
+              App.debugLog('No reporter selected (500 error format):', selectorAddress);
               return null;
             }
           } catch (e) {
@@ -5841,11 +5995,11 @@ const App = {
       }
       
       const data = await response.json();
-      console.log('Current reporter data:', data);
+      App.debugLog('Current reporter data:', data);
       
       // Handle mainnet-specific error format
       if (data.code && data.message && data.message.includes('not found')) {
-        console.log('No reporter selected (mainnet format):', selectorAddress);
+        App.debugLog('No reporter selected (mainnet format):', selectorAddress);
         return null;
       }
       
@@ -5868,7 +6022,7 @@ const App = {
       }
       
       const data = await response.json();
-      console.log('Delegations data:', data);
+      App.debugLog('Delegations data:', data);
       
       if (!data.delegation_responses || !Array.isArray(data.delegation_responses)) {
         return [];
@@ -5882,6 +6036,551 @@ const App = {
     } catch (error) {
       console.error('Error fetching delegations:', error);
       throw error;
+    }
+  },
+
+  extractLoyaAmountFromCoins: function(coins) {
+    if (!Array.isArray(coins)) {
+      return 0;
+    }
+    const loyaCoin = coins.find((coin) => coin && coin.denom === 'loya');
+    if (!loyaCoin || loyaCoin.amount == null) {
+      return 0;
+    }
+    const parsed = parseFloat(String(loyaCoin.amount));
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  },
+
+  formatLoyaToTrb: function(loyaAmount) {
+    const parsed = Number(loyaAmount);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return '0.000000';
+    }
+    return (parsed / 1000000).toFixed(6);
+  },
+
+  fetchDelegatorRewards: async function(delegatorAddress) {
+    const endpoint = `${App.getCosmosApiEndpoint()}/cosmos/distribution/v1beta1/delegators/${encodeURIComponent(delegatorAddress)}/rewards`;
+    const response = await fetch(endpoint);
+    if (!response.ok) {
+      if (response.status === 404) {
+        return { rewards: [], totalLoya: 0 };
+      }
+      throw new Error(`Failed to fetch delegator rewards: ${response.status}`);
+    }
+    const data = await response.json();
+    const rewards = Array.isArray(data.rewards) ? data.rewards.map((entry) => {
+      const validatorAddress = entry.validator_address || entry.validatorAddress || '';
+      const loyaAmount = App.extractLoyaAmountFromCoins(entry.reward);
+      return {
+        validatorAddress,
+        loyaAmount
+      };
+    }).filter((entry) => entry.validatorAddress) : [];
+    return {
+      rewards,
+      totalLoya: App.extractLoyaAmountFromCoins(data.total)
+    };
+  },
+
+  extractSelectorTipsLoya: function(payload) {
+    if (payload == null) {
+      return 0;
+    }
+    if (typeof payload === 'string' || typeof payload === 'number') {
+      const parsed = parseFloat(String(payload));
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    }
+    if (Array.isArray(payload)) {
+      return App.extractLoyaAmountFromCoins(payload);
+    }
+    if (typeof payload === 'object') {
+      if (Array.isArray(payload.coins)) {
+        return App.extractLoyaAmountFromCoins(payload.coins);
+      }
+      if (Array.isArray(payload.amount)) {
+        return App.extractLoyaAmountFromCoins(payload.amount);
+      }
+      const candidates = [
+        payload.available_tips,
+        payload.availableTips,
+        payload.tip_amount,
+        payload.tipAmount,
+        payload.amount
+      ];
+      for (const candidate of candidates) {
+        const parsed = App.extractSelectorTipsLoya(candidate);
+        if (parsed > 0) {
+          return parsed;
+        }
+      }
+    }
+    return 0;
+  },
+
+  fetchSelectorAvailableTips: async function(selectorAddress) {
+    const endpoint = `${App.getCosmosApiEndpoint()}/tellor-io/layer/reporter/available-tips/${encodeURIComponent(selectorAddress)}`;
+    const response = await fetch(endpoint);
+    if (!response.ok) {
+      if (response.status === 404 || response.status === 500) {
+        return 0;
+      }
+      throw new Error(`Failed to fetch selector tips: ${response.status}`);
+    }
+    const data = await response.json();
+    return App.extractSelectorTipsLoya(data);
+  },
+
+  getClaimableDelegatorRewardRows: function() {
+    return Array.isArray(App.delegatorRewardRows)
+      ? App.delegatorRewardRows.filter((row) => row.loyaAmount > 0)
+      : [];
+  },
+
+  updateDelegatorRewardActionButtons: function() {
+    const hasRewards = App.getClaimableDelegatorRewardRows().length > 0;
+    const claimButton = document.getElementById('claimDelegatorRewardsButton');
+    if (claimButton) {
+      claimButton.disabled = !hasRewards || !App.isKeplrConnected;
+    }
+  },
+
+  updateSelectorTipActionButton: function() {
+    const claimButton = document.getElementById('claimSelectorTipsButton');
+    const available = Number(App.selectorAvailableTipsRaw) || 0;
+    if (claimButton) {
+      claimButton.disabled = !App.isKeplrConnected || available <= 0;
+    }
+  },
+
+  buildRewardClaimModal: function({ title, confirmLabel, bodyBuilder, onConfirm }) {
+    if (typeof App._closeActiveRewardClaimModal === 'function') {
+      App._closeActiveRewardClaimModal();
+    }
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:12000;display:flex;align-items:center;justify-content:center;padding:16px;';
+    const modal = document.createElement('div');
+    modal.style.cssText = 'width:100%;max-width:520px;background:#0f1f1f;border:1px solid #1f4f4f;border-radius:10px;padding:16px;color:#d9f6f6;box-shadow:0 10px 25px rgba(0,0,0,0.35);';
+    const titleNode = document.createElement('h3');
+    titleNode.textContent = title;
+    titleNode.style.cssText = 'margin:0 0 12px 0;font-size:16px;font-weight:600;';
+    const body = document.createElement('div');
+    body.style.cssText = 'margin-bottom:14px;font-size:13px;';
+    bodyBuilder(body);
+    const errorNode = document.createElement('div');
+    errorNode.style.cssText = 'display:none;margin-bottom:10px;color:#ffb4b4;font-size:12px;';
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;justify-content:flex-end;gap:8px;';
+    const cancelButton = document.createElement('button');
+    cancelButton.type = 'button';
+    cancelButton.className = 'btn-small';
+    cancelButton.textContent = 'Cancel';
+    const confirmButton = document.createElement('button');
+    confirmButton.type = 'button';
+    confirmButton.className = 'btn-small';
+    confirmButton.textContent = confirmLabel;
+    actions.appendChild(cancelButton);
+    actions.appendChild(confirmButton);
+    modal.appendChild(titleNode);
+    modal.appendChild(body);
+    modal.appendChild(errorNode);
+    modal.appendChild(actions);
+
+    const infoTooltip = document.createElement('div');
+    infoTooltip.style.cssText = 'display:none;position:fixed;z-index:13000;max-width:260px;background:#f9f9f9;color:#1e2b2b;border:1px solid #d3e5e5;border-radius:6px;padding:8px 10px;font-size:12px;line-height:1.35;box-shadow:0 6px 16px rgba(0,0,0,0.2);pointer-events:none;';
+    document.body.appendChild(infoTooltip);
+
+    const positionInfoTooltip = (target) => {
+      const rect = target.getBoundingClientRect();
+      const tooltipRect = infoTooltip.getBoundingClientRect();
+      let left = rect.left + rect.width + 10;
+      let top = rect.top + (rect.height / 2) - (tooltipRect.height / 2);
+      if (left + tooltipRect.width > window.innerWidth - 8) {
+        left = rect.left - tooltipRect.width - 10;
+      }
+      if (left < 8) left = 8;
+      if (top + tooltipRect.height > window.innerHeight - 8) {
+        top = window.innerHeight - tooltipRect.height - 8;
+      }
+      if (top < 8) top = 8;
+      infoTooltip.style.left = `${left}px`;
+      infoTooltip.style.top = `${top}px`;
+    };
+
+    const showInfoTooltip = (target) => {
+      const msg = target.getAttribute('data-modal-tooltip');
+      if (!msg) return;
+      infoTooltip.textContent = msg;
+      infoTooltip.style.display = 'block';
+      positionInfoTooltip(target);
+    };
+
+    const hideInfoTooltip = () => {
+      infoTooltip.style.display = 'none';
+    };
+
+    modal.querySelectorAll('[data-modal-tooltip]').forEach((icon) => {
+      icon.addEventListener('mouseenter', () => showInfoTooltip(icon));
+      icon.addEventListener('mouseleave', hideInfoTooltip);
+      icon.addEventListener('focus', () => showInfoTooltip(icon));
+      icon.addEventListener('blur', hideInfoTooltip);
+    });
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    const close = () => {
+      hideInfoTooltip();
+      if (infoTooltip.parentNode) {
+        infoTooltip.parentNode.removeChild(infoTooltip);
+      }
+      if (overlay.parentNode) {
+        overlay.parentNode.removeChild(overlay);
+      }
+      if (App._closeActiveRewardClaimModal === close) {
+        App._closeActiveRewardClaimModal = null;
+      }
+    };
+    App._closeActiveRewardClaimModal = close;
+    cancelButton.addEventListener('click', close);
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) {
+        close();
+      }
+    });
+    confirmButton.addEventListener('click', async () => {
+      try {
+        errorNode.style.display = 'none';
+        await onConfirm();
+        close();
+      } catch (error) {
+        errorNode.textContent = error.message || 'Unable to continue.';
+        errorNode.style.display = 'block';
+      }
+    });
+  },
+
+  openDelegatorRewardsClaimModal: function() {
+    const rewardRows = App.getClaimableDelegatorRewardRows();
+    if (!rewardRows.length) {
+      App.showErrorPopup('No claimable delegator rewards available.');
+      return;
+    }
+    App.buildRewardClaimModal({
+      title: 'Claim Delegator Rewards',
+      confirmLabel: 'Continue',
+      bodyBuilder: (container) => {
+        container.innerHTML = `
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div style="font-size:12px;color:#9ac3c3;display:flex;align-items:center;gap:6px;">
+              <span>Delegator rewards become liquid in your wallet after claim.</span>
+              <span data-modal-tooltip="Delegator reward claims withdraw staking rewards directly to your wallet as liquid tokens. No undelegation is required for this claim." style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:1px solid #6fa3a3;color:#9fd6d6;font-size:11px;cursor:help;flex:0 0 auto;" tabindex="0" role="button" aria-label="Delegator reward claim info">ⓘ</span>
+            </div>
+            <label style="display:flex;gap:8px;align-items:center;"><input type="radio" name="delegator-claim-mode" value="all" checked> Claim all validators</label>
+            <label style="display:flex;gap:8px;align-items:center;"><input type="radio" name="delegator-claim-mode" value="single"> Claim one validator</label>
+            <select id="delegatorClaimModalValidator" class="input-address" style="display:none;">
+              <option value="">Select validator reward...</option>
+            </select>
+          </div>
+        `;
+        const select = container.querySelector('#delegatorClaimModalValidator');
+        const validatorMonikerByAddress = new Map(
+          (Array.isArray(App.rewardDestinationValidators) ? App.rewardDestinationValidators : []).map((validator) => [
+            validator.address,
+            validator.moniker || 'Validator'
+          ])
+        );
+        rewardRows.forEach((row) => {
+          const option = document.createElement('option');
+          option.value = row.validatorAddress;
+          const shortAddr = row.validatorAddress.length > 20 ? `${row.validatorAddress.substring(0, 17)}...` : row.validatorAddress;
+          const moniker = validatorMonikerByAddress.get(row.validatorAddress) || 'Validator';
+          option.textContent = `${moniker} (${shortAddr}) - ${App.formatLoyaToTrb(row.loyaAmount)} TRB`;
+          select.appendChild(option);
+        });
+        const radios = container.querySelectorAll('input[name="delegator-claim-mode"]');
+        radios.forEach((radio) => {
+          radio.addEventListener('change', () => {
+            const singleSelected = container.querySelector('input[name="delegator-claim-mode"]:checked').value === 'single';
+            select.style.display = singleSelected ? 'block' : 'none';
+          });
+        });
+      },
+      onConfirm: async () => {
+        const mode = document.querySelector('input[name="delegator-claim-mode"]:checked')?.value || 'all';
+        if (mode === 'all') {
+          await App.claimAllDelegatorRewards();
+          return;
+        }
+        const validatorAddress = document.getElementById('delegatorClaimModalValidator')?.value || '';
+        if (!validatorAddress) {
+          throw new Error('Select a validator reward to claim.');
+        }
+        await App.claimSelectedDelegatorReward(validatorAddress);
+      }
+    });
+  },
+
+  openSelectorTipClaimModal: async function() {
+    const available = Number(App.selectorAvailableTipsRaw) || 0;
+    if (available <= 0) {
+      App.showErrorPopup('No claimable selector tips available.');
+      return;
+    }
+    if (!Array.isArray(App.rewardDestinationValidators) || !App.rewardDestinationValidators.length) {
+      try {
+        const validators = await App.fetchValidators();
+        const activeValidators = Array.isArray(validators) ? validators.filter((validator) => !validator.jailed) : [];
+        App.rewardDestinationValidators = activeValidators.map((validator) => ({
+          address: validator.address,
+          moniker: validator.moniker
+        }));
+      } catch (error) {
+        console.error('Failed to load validator destinations for selector claim:', error);
+      }
+      App.updateSelectorTipActionButton();
+      if (!Array.isArray(App.rewardDestinationValidators) || !App.rewardDestinationValidators.length) {
+        App.showErrorPopup('No validator destinations available. Try refreshing validators.');
+        return;
+      }
+    }
+    App.buildRewardClaimModal({
+      title: 'Claim Selector Tips',
+      confirmLabel: 'Claim Tips',
+      bodyBuilder: (container) => {
+        container.innerHTML = `
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="font-size:12px;color:#9ac3c3;">Available tips: ${App.formatLoyaToTrb(available)} TRB</div>
+            <div style="font-size:12px;color:#9ac3c3;display:flex;align-items:center;gap:6px;">
+              <span>Selector tips are restaked first, not liquid on claim.</span>
+              <span data-modal-tooltip="Selector tip claims restake rewards to the validator you choose. They are not liquid at claim time. To make them liquid, undelegate and wait the ~21 day unbonding period." style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:1px solid #6fa3a3;color:#9fd6d6;font-size:11px;cursor:help;flex:0 0 auto;" tabindex="0" role="button" aria-label="Selector tip claim info">ⓘ</span>
+            </div>
+            <select id="selectorClaimModalValidator" class="input-address">
+              <option value="">Select validator destination...</option>
+            </select>
+          </div>
+        `;
+        const select = container.querySelector('#selectorClaimModalValidator');
+        App.rewardDestinationValidators.forEach((validator) => {
+          const option = document.createElement('option');
+          option.value = validator.address;
+          const shortAddr = validator.address.length > 20 ? `${validator.address.substring(0, 17)}...` : validator.address;
+          const moniker = validator.moniker || 'Validator';
+          option.textContent = `${moniker} (${shortAddr})`;
+          option.title = `Address: ${validator.address}`;
+          select.appendChild(option);
+        });
+      },
+      onConfirm: async () => {
+        const validatorAddress = document.getElementById('selectorClaimModalValidator')?.value || '';
+        if (!validatorAddress) {
+          throw new Error('Select a validator destination for selector tip claim.');
+        }
+        await App.claimSelectorTips(validatorAddress);
+      }
+    });
+  },
+
+  getCosmosSignerAndAddress: async function() {
+    if (!App.isKeplrConnected || !App.keplrAddress) {
+      throw new Error('Cosmos wallet not connected.');
+    }
+    let offlineSigner;
+    if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+      offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+    } else if (window.keplr) {
+      offlineSigner = window.keplr.getOfflineSigner(App.cosmosChainId);
+    } else if (window.getOfflineSigner) {
+      offlineSigner = window.getOfflineSigner(App.cosmosChainId);
+    } else {
+      throw new Error('No Cosmos signer available.');
+    }
+    const accounts = await offlineSigner.getAccounts();
+    const signerAddress = (accounts && accounts[0] && accounts[0].address) || App.keplrAddress;
+    return { offlineSigner, signerAddress };
+  },
+
+  broadcastCosmosMessages: async function(messages, memo = '') {
+    if (!Array.isArray(messages) || messages.length === 0) {
+      throw new Error('No messages to broadcast.');
+    }
+    const { offlineSigner, signerAddress } = await App.getCosmosSignerAndAddress();
+    const client = await window.cosmjs.stargate.SigningStargateClient.connectWithSigner(
+      App.getCosmosRpcEndpoint(),
+      offlineSigner
+    );
+    const gasAmount = Math.max(200000, 120000 * messages.length);
+    const feeAmount = Math.max(15000, 8000 * messages.length);
+    return client.signAndBroadcastDirect(
+      signerAddress,
+      messages,
+      {
+        amount: [{ denom: 'loya', amount: String(feeAmount) }],
+        gas: String(gasAmount)
+      },
+      memo
+    );
+  },
+
+  displayDelegatorRewardsStatus: async function(delegatorAddress) {
+    const statusElement = document.getElementById('delegatorRewardsStatus');
+    if (!statusElement) {
+      return;
+    }
+    try {
+      statusElement.innerHTML = '<div class="status-loading">Loading...</div>';
+      const rewardsData = await App.fetchDelegatorRewards(delegatorAddress);
+      App.delegatorRewardRows = rewardsData.rewards || [];
+      const eligibleRows = App.getClaimableDelegatorRewardRows();
+      if (eligibleRows.length === 0) {
+        statusElement.innerHTML = '<div class="status-empty">No claimable delegator rewards</div>';
+        App.updateDelegatorRewardActionButtons();
+        return;
+      }
+      const totalLoya = eligibleRows.reduce((sum, row) => sum + row.loyaAmount, 0);
+      statusElement.innerHTML = `
+        <div class="status-item">
+          <span class="status-label">Claimable total:</span>
+          <span class="status-amount">${App.formatLoyaToTrb(totalLoya)} TRB</span>
+        </div>
+      `;
+      App.updateDelegatorRewardActionButtons();
+    } catch (error) {
+      console.error('Error displaying delegator rewards status:', error);
+      statusElement.innerHTML = '<div class="status-empty">Error loading delegator rewards</div>';
+      App.delegatorRewardRows = [];
+      App.updateDelegatorRewardActionButtons();
+    }
+  },
+
+  displaySelectorTipsStatus: async function(selectorAddress) {
+    const statusElement = document.getElementById('selectorTipsStatus');
+    if (!statusElement) {
+      return;
+    }
+    try {
+      statusElement.innerHTML = '<div class="status-loading">Loading...</div>';
+      const availableLoya = await App.fetchSelectorAvailableTips(selectorAddress);
+      App.selectorAvailableTipsRaw = String(availableLoya || 0);
+      if (availableLoya <= 0) {
+        statusElement.innerHTML = '<div class="status-empty">No claimable selector tips</div>';
+        App.updateSelectorTipActionButton();
+        return;
+      }
+      statusElement.innerHTML = `
+        <div class="status-item">
+          <span class="status-label">Available tips:</span>
+          <span class="status-amount">${App.formatLoyaToTrb(availableLoya)} TRB</span>
+        </div>
+      `;
+      App.updateSelectorTipActionButton();
+    } catch (error) {
+      console.error('Error displaying selector tips status:', error);
+      statusElement.innerHTML = '<div class="status-empty">Error loading selector tips</div>';
+      App.selectorAvailableTipsRaw = '0';
+      App.updateSelectorTipActionButton();
+    }
+  },
+
+  claimAllDelegatorRewards: async function() {
+    try {
+      const rewardRows = Array.isArray(App.delegatorRewardRows) ? App.delegatorRewardRows.filter((row) => row.loyaAmount > 0) : [];
+      if (rewardRows.length === 0) {
+        throw new Error('No claimable delegator rewards available.');
+      }
+      if (typeof App._closeActiveRewardClaimModal === 'function') {
+        App._closeActiveRewardClaimModal();
+      }
+      App.showPendingPopup('Claiming delegator rewards...');
+      const { signerAddress } = await App.getCosmosSignerAndAddress();
+      const messages = rewardRows.map((row) => ({
+        typeUrl: '/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward',
+        value: {
+          delegatorAddress: signerAddress,
+          validatorAddress: row.validatorAddress
+        }
+      }));
+      const result = await App.broadcastCosmosMessages(messages, 'Claim All Delegator Rewards');
+      App.hidePendingPopup();
+      if (!result || result.code !== 0) {
+        throw new Error(result?.rawLog || 'Delegator reward claim failed');
+      }
+      App.showSuccessPopup('Delegator rewards claimed successfully!', result?.txhash || null, 'cosmos');
+      await App.refreshCurrentStatus();
+    } catch (error) {
+      console.error('Failed to claim all delegator rewards:', error);
+      App.hidePendingPopup();
+      App.showErrorPopup(error.message || 'Failed to claim delegator rewards');
+    }
+  },
+
+  claimSelectedDelegatorReward: async function(validatorAddressInput = '') {
+    try {
+      const validatorAddress = String(validatorAddressInput || '').trim();
+      if (!validatorAddress) {
+        throw new Error('Select a validator reward to claim.');
+      }
+      if (typeof App._closeActiveRewardClaimModal === 'function') {
+        App._closeActiveRewardClaimModal();
+      }
+      App.showPendingPopup('Claiming selected validator reward...');
+      const { signerAddress } = await App.getCosmosSignerAndAddress();
+      const result = await App.broadcastCosmosMessages([
+        {
+          typeUrl: '/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward',
+          value: {
+            delegatorAddress: signerAddress,
+            validatorAddress
+          }
+        }
+      ], 'Claim Selected Delegator Reward');
+      App.hidePendingPopup();
+      if (!result || result.code !== 0) {
+        throw new Error(result?.rawLog || 'Selected reward claim failed');
+      }
+      App.showSuccessPopup('Validator reward claimed successfully!', result?.txhash || null, 'cosmos');
+      await App.refreshCurrentStatus();
+    } catch (error) {
+      console.error('Failed to claim selected delegator reward:', error);
+      App.hidePendingPopup();
+      App.showErrorPopup(error.message || 'Failed to claim selected validator reward');
+    }
+  },
+
+  claimSelectorTips: async function(validatorAddressInput = '') {
+    try {
+      const available = Number(App.selectorAvailableTipsRaw) || 0;
+      if (available <= 0) {
+        throw new Error('No claimable selector tips available.');
+      }
+      const validatorAddress = String(validatorAddressInput || '').trim();
+      if (!validatorAddress) {
+        throw new Error('Select a validator destination for selector tip claim.');
+      }
+      if (typeof App._closeActiveRewardClaimModal === 'function') {
+        App._closeActiveRewardClaimModal();
+      }
+      App.showPendingPopup('Claiming selector tips...');
+      const { signerAddress } = await App.getCosmosSignerAndAddress();
+      const result = await App.broadcastCosmosMessages([
+        {
+          typeUrl: '/layer.reporter.MsgWithdrawTip',
+          value: {
+            selectorAddress: signerAddress,
+            validatorAddress
+          }
+        }
+      ], 'Claim Selector Tips');
+      App.hidePendingPopup();
+      if (!result || result.code !== 0) {
+        throw new Error(result?.rawLog || 'Selector tip claim failed');
+      }
+      App.showSuccessPopup('Selector tips claimed successfully!', result?.txhash || null, 'cosmos');
+      await App.refreshCurrentStatus();
+    } catch (error) {
+      console.error('Failed to claim selector tips:', error);
+      App.hidePendingPopup();
+      App.showErrorPopup(error.message || 'Failed to claim selector tips');
     }
   },
 
@@ -6020,6 +6719,7 @@ const App = {
   // Add function to display current delegations status
   displayCurrentDelegationsStatus: async function(delegatorAddress) {
     const statusElement = document.getElementById('currentDelegationsStatus');
+    const countBadge = document.getElementById('currentDelegationsCountBadge');
     if (!statusElement) return;
 
     try {
@@ -6029,6 +6729,10 @@ const App = {
       
       if (!delegations || delegations.length === 0) {
         statusElement.innerHTML = '<div class="status-empty">No delegations found</div>';
+        if (countBadge) {
+          countBadge.style.display = 'none';
+          countBadge.textContent = '';
+        }
         return;
       }
 
@@ -6058,19 +6762,20 @@ const App = {
 
       const totalTRB = (totalDelegated / 1000000).toFixed(6);
       const delegationCount = delegations.length;
+      if (countBadge) {
+        countBadge.textContent = `${delegationCount} delegation${delegationCount !== 1 ? 's' : ''}`;
+        countBadge.style.display = 'inline-flex';
+      }
 
       // Derive top validator display (moniker + short address), if any
       let topValidatorHtml = '';
       if (topDelegation) {
         const topAddr = topDelegation.validatorAddress;
-        const shortAddr = topAddr.length > 20 ? topAddr.substring(0, 17) + '...' : topAddr;
         const moniker = validatorMonikers[topAddr] || 'Validator';
-        const topAmountTRB = (parseInt(topDelegation.amount) / 1000000).toFixed(6);
         topValidatorHtml = `
           <div class="status-top-validator">
             <span class="status-label">Top validator:</span>
-            <span class="status-address">${moniker} (${shortAddr})</span>
-            <span class="status-amount">${topAmountTRB} TRB</span>
+            <span class="status-address">${moniker}</span>
           </div>
         `;
       }
@@ -6081,7 +6786,6 @@ const App = {
           <div class="status-total-content">
             <span class="status-label">Total:</span>
             <span class="status-amount">${totalTRB} TRB</span>
-            <span class="status-badge">${delegationCount} delegation${delegationCount !== 1 ? 's' : ''}</span>
           </div>
           ${topValidatorHtml}
           <span class="dropdown-arrow" id="delegationsDropdownArrow">▼</span>
@@ -6111,24 +6815,46 @@ const App = {
           `;
         }
         dropdownContent.innerHTML = dropdownHtml;
-        console.log('Dropdown HTML set:', dropdownHtml);
+        App.debugLog('Dropdown HTML set:', dropdownHtml);
       }
     } catch (error) {
       console.error('Error displaying delegations status:', error);
       statusElement.innerHTML = '<div class="status-empty">Error loading delegations</div>';
+      if (countBadge) {
+        countBadge.style.display = 'none';
+        countBadge.textContent = '';
+      }
     }
   },
 
   // Add function to refresh all status
   refreshCurrentStatus: async function() {
     if (!App.isKeplrConnected || !App.keplrAddress) {
+      const delegationsStatus = document.getElementById('currentDelegationsStatus');
+      if (delegationsStatus) {
+        delegationsStatus.innerHTML = '<div class="status-empty">Connect Cosmos wallet to view delegations</div>';
+      }
+      const reporterStatus = document.getElementById('currentReporterStatus');
+      if (reporterStatus) {
+        reporterStatus.innerHTML = '<div class="status-empty">Connect Cosmos wallet to view selected reporter</div>';
+      }
+      const delegatorRewardsStatus = document.getElementById('delegatorRewardsStatus');
+      if (delegatorRewardsStatus) {
+        delegatorRewardsStatus.innerHTML = '<div class="status-empty">Connect Cosmos wallet to view rewards</div>';
+      }
+      const selectorTipsStatus = document.getElementById('selectorTipsStatus');
+      if (selectorTipsStatus) {
+        selectorTipsStatus.innerHTML = '<div class="status-empty">Connect Cosmos wallet to view selector tips</div>';
+      }
       return;
     }
 
     try {
       await Promise.all([
         this.displayCurrentReporterStatus(App.keplrAddress),
-        this.displayCurrentDelegationsStatus(App.keplrAddress)
+        this.displayCurrentDelegationsStatus(App.keplrAddress),
+        this.displayDelegatorRewardsStatus(App.keplrAddress),
+        this.displaySelectorTipsStatus(App.keplrAddress)
       ]);
     } catch (error) {
       console.error('Error refreshing current status:', error);
@@ -6144,6 +6870,22 @@ const App = {
     if (dropdown) {
       dropdown.innerHTML = '<option value="">Connect Cosmos wallet to view validators</option>';
       dropdown.disabled = true;
+    }
+    const delegationsStatus = document.getElementById('currentDelegationsStatus');
+    if (delegationsStatus && !App.isKeplrConnected) {
+      delegationsStatus.innerHTML = '<div class="status-empty">Connect Cosmos wallet to view delegations</div>';
+    }
+    const reporterStatus = document.getElementById('currentReporterStatus');
+    if (reporterStatus && !App.isKeplrConnected) {
+      reporterStatus.innerHTML = '<div class="status-empty">Connect Cosmos wallet to view selected reporter</div>';
+    }
+    const delegatorRewardsStatus = document.getElementById('delegatorRewardsStatus');
+    if (delegatorRewardsStatus && !App.isKeplrConnected) {
+      delegatorRewardsStatus.innerHTML = '<div class="status-empty">Connect Cosmos wallet to view rewards</div>';
+    }
+    const selectorTipsStatus = document.getElementById('selectorTipsStatus');
+    if (selectorTipsStatus && !App.isKeplrConnected) {
+      selectorTipsStatus.innerHTML = '<div class="status-empty">Connect Cosmos wallet to view selector tips</div>';
     }
     
     // Add change event listener to update the hidden input
@@ -6249,6 +6991,63 @@ const App = {
         }
       });
     }
+
+    const refreshDelegatorRewardsBtn = document.getElementById('refreshDelegatorRewardsBtn');
+    if (refreshDelegatorRewardsBtn && !refreshDelegatorRewardsBtn.hasAttribute('data-initialized')) {
+      refreshDelegatorRewardsBtn.setAttribute('data-initialized', 'true');
+      refreshDelegatorRewardsBtn.addEventListener('click', async function() {
+        this.disabled = true;
+        this.textContent = '⟳';
+        try {
+          if (App.isKeplrConnected && App.keplrAddress) {
+            await App.displayDelegatorRewardsStatus(App.keplrAddress);
+          }
+        } catch (error) {
+          console.error('Error refreshing delegator rewards:', error);
+        } finally {
+          this.disabled = false;
+          this.textContent = '↻';
+        }
+      });
+    }
+
+    const refreshSelectorTipsBtn = document.getElementById('refreshSelectorTipsBtn');
+    if (refreshSelectorTipsBtn && !refreshSelectorTipsBtn.hasAttribute('data-initialized')) {
+      refreshSelectorTipsBtn.setAttribute('data-initialized', 'true');
+      refreshSelectorTipsBtn.addEventListener('click', async function() {
+        this.disabled = true;
+        this.textContent = '⟳';
+        try {
+          if (App.isKeplrConnected && App.keplrAddress) {
+            await App.displaySelectorTipsStatus(App.keplrAddress);
+          }
+        } catch (error) {
+          console.error('Error refreshing selector tips:', error);
+        } finally {
+          this.disabled = false;
+          this.textContent = '↻';
+        }
+      });
+    }
+
+    const claimDelegatorRewardsButton = document.getElementById('claimDelegatorRewardsButton');
+    if (claimDelegatorRewardsButton && !claimDelegatorRewardsButton.hasAttribute('data-initialized')) {
+      claimDelegatorRewardsButton.setAttribute('data-initialized', 'true');
+      claimDelegatorRewardsButton.addEventListener('click', function() {
+        App.openDelegatorRewardsClaimModal();
+      });
+    }
+
+    const claimSelectorTipsButton = document.getElementById('claimSelectorTipsButton');
+    if (claimSelectorTipsButton && !claimSelectorTipsButton.hasAttribute('data-initialized')) {
+      claimSelectorTipsButton.setAttribute('data-initialized', 'true');
+      claimSelectorTipsButton.addEventListener('click', async function() {
+        await App.openSelectorTipClaimModal();
+      });
+    }
+
+    App.updateDelegatorRewardActionButtons();
+    App.updateSelectorTipActionButton();
   },
 
   // Add function to populate validator dropdown
@@ -6270,6 +7069,11 @@ const App = {
       dropdown.disabled = true;
       
       const validators = await this.fetchValidators();
+      const activeValidators = Array.isArray(validators) ? validators.filter((validator) => !validator.jailed) : [];
+      App.rewardDestinationValidators = activeValidators.map((validator) => ({
+        address: validator.address,
+        moniker: validator.moniker
+      }));
       
       // Clear loading state and populate dropdown with network indicator
       const networkName = App.cosmosChainId === 'tellor-1' ? 'Mainnet' : 'Testnet';
@@ -6288,19 +7092,21 @@ const App = {
                         
                         const option = document.createElement('option');
                         option.value = validator.address;
-                        const networkName = App.cosmosChainId === 'tellor-1' ? 'MN' : 'TN';
-                        option.textContent = `${displayMoniker} (${votingPower} TRB, ${commission}%) [${networkName}]`;
-                        option.title = `${validator.moniker} (${votingPower} TRB, ${commission}% commission) - ${networkName === 'MN' ? 'Mainnet' : 'Testnet'}`; // Full name in tooltip
+                        option.textContent = `${displayMoniker} (${votingPower} TRB, ${commission}% COMMSN)`;
+                        option.title = `Address: ${validator.address}`;
                         dropdown.appendChild(option);
                     }
                 });
       
       dropdown.disabled = false;
+      App.updateSelectorTipActionButton();
       
 
       
     } catch (error) {
       console.error('Error populating validator dropdown:', error);
+      App.rewardDestinationValidators = [];
+      App.updateSelectorTipActionButton();
       const dropdown = document.getElementById('delegateValidatorDropdown');
       if (dropdown) {
         dropdown.innerHTML = '<option value="">Error loading validators</option>';
@@ -6343,15 +7149,14 @@ const App = {
           
           const option = document.createElement('option');
           option.value = reporter.address;
-          const networkName = App.cosmosChainId === 'tellor-1' ? 'MN' : 'TN';
           // Extract power and commission from description
           const powerMatch = reporter.description.match(/Power: (\d+)/);
           const commissionMatch = reporter.description.match(/Commission: ([\d.]+)%/);
           const power = powerMatch ? powerMatch[1] : '0';
           const commission = commissionMatch ? commissionMatch[1] : '0';
           
-          option.textContent = `${displayName} (${power} power, ${commission}%) [${networkName}]`;
-          option.title = `${reporter.name} - ${reporter.description} - ${networkName === 'MN' ? 'Mainnet' : 'Testnet'}`;
+          option.textContent = `${displayName} (${power} POWER, ${commission}% COMMSN)`;
+          option.title = `Address: ${reporter.address}`;
           dropdown.appendChild(option);
         }
       });
@@ -6478,12 +7283,14 @@ const App = {
       }, 500);
     }
     
-    // Always check voting power when wallet connects
-    setTimeout(() => {
-      if (window.App && window.App.checkVotingPower) {
-        window.App.checkVotingPower();
-      }
-    }, 600);
+    // Only check voting power when the vote tab is active.
+    if (voteDisputeTab && voteDisputeTab.classList.contains('active')) {
+      setTimeout(() => {
+        if (window.App && window.App.checkVotingPower) {
+          window.App.checkVotingPower();
+        }
+      }, 600);
+    }
   },
 
       // Check and display voting power status
@@ -6674,18 +7481,18 @@ const App = {
 
             for (let i = 0; i < urls.length; i++) {
                 const url = urls[i];
-                console.log('Fetching claimable rewards from:', url);
+                App.debugLog('Fetching claimable rewards from:', url);
                 const response = await fetch(url);
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('Claimable rewards data:', data);
+                    App.debugLog('Claimable rewards data:', data);
                     return App.normalizeClaimableDisputeRewardsPayload(data);
                 }
                 if (response.status !== 404 && response.status !== 500) {
                     throw new Error(`Failed to fetch claimable rewards: ${response.status} ${response.statusText}`);
                 }
                 if (i === urls.length - 1) {
-                    console.log('Claimable rewards endpoint not active or no data, returning defaults');
+                    App.debugLog('Claimable rewards endpoint not active or no data, returning defaults');
                     return zeros;
                 }
             }
@@ -6824,7 +7631,7 @@ const App = {
     // Navigate to add fee tab with dispute pre-selected
     navigateToAddFee: function(disputeId) {
         try {
-            console.log('Navigating to add fee tab for dispute:', disputeId);
+            App.debugLog('Navigating to add fee tab for dispute:', disputeId);
             
             // Switch to the add fee tab
             if (window.switchDisputeTab) {
@@ -6836,7 +7643,7 @@ const App = {
                 const disputeIdInput = document.getElementById('addFeeDisputeId');
                 if (disputeIdInput) {
                     disputeIdInput.value = disputeId;
-                    console.log(`Dispute ID #${disputeId} populated in add fee tab`);
+                    App.debugLog(`Dispute ID #${disputeId} populated in add fee tab`);
                     
                     // Optional: Focus on the amount field for user convenience
                     const amountInput = document.getElementById('addFeeAmount');
@@ -6857,7 +7664,7 @@ const App = {
     // Navigate to voting tab with dispute pre-selected
     navigateToVoting: function(disputeId) {
         try {
-            console.log('Navigating to voting tab for dispute:', disputeId);
+            App.debugLog('Navigating to voting tab for dispute:', disputeId);
             
             // Switch to the voting tab
             if (window.switchDisputeTab) {
@@ -6872,10 +7679,10 @@ const App = {
                     const option = disputeSelect.querySelector(`option[value="${disputeId}"]`);
                     if (option) {
                         disputeSelect.value = disputeId;
-                        console.log(`Dispute #${disputeId} selected in voting tab`);
+                        App.debugLog(`Dispute #${disputeId} selected in voting tab`);
                     } else {
                         // If dispute not in dropdown, try to refresh the list first
-                        console.log(`Dispute #${disputeId} not found in dropdown, refreshing list...`);
+                        App.debugLog(`Dispute #${disputeId} not found in dropdown, refreshing list...`);
                         if (window.App && window.App.loadOpenDisputes) {
                             await window.App.loadOpenDisputes();
                             
@@ -6884,7 +7691,7 @@ const App = {
                                 const refreshedOption = disputeSelect.querySelector(`option[value="${disputeId}"]`);
                                 if (refreshedOption) {
                                     disputeSelect.value = disputeId;
-                                    console.log(`Dispute #${disputeId} selected after refresh`);
+                                    App.debugLog(`Dispute #${disputeId} selected after refresh`);
                                 } else {
                                     console.warn(`Dispute #${disputeId} not available for voting (may not be in voting state)`);
                                     // Still switch to the tab but show a message
@@ -6954,7 +7761,7 @@ const App = {
                 }
             };
 
-            console.log('Claiming dispute rewards:', {
+            App.debugLog('Claiming dispute rewards:', {
                 creator: msg.value.creator,
                 disputeId: msg.value.disputeId
             });
@@ -7043,7 +7850,7 @@ const App = {
                 }
             };
 
-            console.log('Withdrawing fee refund:', {
+            App.debugLog('Withdrawing fee refund:', {
                 creator: msg.value.creator,
                 disputeId: msg.value.disputeId
             });
@@ -7386,6 +8193,9 @@ export default App;
 function checkWalletConnection() {
     if (!App.isConnected) {
         alert("Please connect your wallet first");
+        return false;
+    }
+    if (!App.ensureSupportedEthereumNetwork()) {
         return false;
     }
     return true;
