@@ -4,13 +4,22 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdn.ethers.io https://cdn.tailwindcss.com 'sha256-tPSqgOKRnJ/WEHfggnPInj/c+HOKaO+h49SR8r7YF1s=' 'sha256-SQqHoLh6BkeSdXNPEVzfkPKf+vM0fl4VaDjViheLkuY=' 'sha256-2htPfnJDN8rJzOaosKYVFFpD1K2kwsjZJL/Rh8nukeQ=' 'sha256-4nqzWaR+MoUtjlfZZVdqZSTEUjLVwV5QuxTKhUmvniU='; connect-src 'self' https://mainnet.tellorlayer.com https://node-palmito.tellorlayer.com https://mainnet.infura.io https://sepolia.infura.io; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data: https:; upgrade-insecure-requests"
+    />
     <title>Tellor Hub</title>
     <link rel="stylesheet" href="main.css" />
     <link rel="stylesheet" href="space-station.css?v=25" />
     <link rel="icon" type="image/x-icon" href="/drkgrnswsh.png">
 
     <!-- Load protobuf.js first -->
-    <script src="https://cdn.jsdelivr.net/npm/protobufjs@7.2.4/dist/protobuf.min.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/protobufjs@7.2.4/dist/protobuf.min.js"
+      integrity="sha384-zIRSXJWnjIYe3XxPl3Yf5uEnVhfZp4gIboAppScWjRUjf47p0ZoIhCl7Eb6l9574"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
 
     <script>
       if (typeof crypto.randomUUID !== 'function') {
@@ -22,10 +31,17 @@
       }
     </script>
 
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CDN runtime is intentionally kept non-SRI because it is not a static pinned asset. -->
+    <script src="https://cdn.tailwindcss.com" referrerpolicy="no-referrer"></script>
     <!-- Removed CryptoJS to avoid hosting security flags -->
     <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script> -->
-    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js" type="application/javascript"></script>
+    <script
+      src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"
+      type="application/javascript"
+      integrity="sha384-OLBgp1GsljhM2TJ+sbHjaiH9txEUvgdDTAzHv2P24donTt6/529l+9Ua0vFImLlb"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
   </head>
 
   <body>
@@ -616,32 +632,56 @@
     
 
     <script src="./extensions/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.10.0/web3.min.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js"
+      integrity="sha384-uDUzAob8VRybYi68YL5W/y5Uel6PtqYSI0YHiTQB400WGPc/TVqL2dHYDkGKdBnw"
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    ></script>
     <!-- Load app.js as a module only once -->
     <script type="module">
       // Define a global variable to track CosmJS loading
       window.cosmjsLoaded = false;
+      const SAFE_LOCAL_SCRIPTS = new Set([
+        './extensions/cosmjs/encoding.js',
+        './extensions/cosmjs/math.js',
+        './extensions/cosmjs/proto.js',
+        './extensions/cosmjs/proto-signing.js',
+        './extensions/cosmjs/stargate.js',
+        './js/walletAdapter.js',
+        './js/walletModal.js',
+        './js/ethereumWalletAdapter.js',
+        './js/ethereumWalletModal.js',
+        'app.js'
+      ]);
       
       // Function to load a single script
       function loadScript(src, type = 'text/javascript') {
         return new Promise((resolve, reject) => {
+          const normalizedSrc = String(src || '').trim();
+          if (!SAFE_LOCAL_SCRIPTS.has(normalizedSrc)) {
+            reject(new Error(`Blocked script load for untrusted source: ${normalizedSrc}`));
+            return;
+          }
+
           // Skip if app.js is already loaded
-          if (src === 'app.js' && document.querySelector('script[src="app.js"]')) {
+          if (normalizedSrc === 'app.js' && document.querySelector('script[src="app.js"]')) {
             resolve();
             return;
           }
           const script = document.createElement('script');
-          script.src = src;
+          script.src = normalizedSrc;
           script.type = type;
+          script.referrerPolicy = 'no-referrer';
           script.onload = () => {
             // For app.js, wait a tick to ensure App is defined
-            if (src === 'app.js') {
+            if (normalizedSrc === 'app.js') {
               setTimeout(resolve, 0);
             } else {
               resolve();
             }
           };
-          script.onerror = () => reject(new Error(`Failed to load ${src}`));
+          script.onerror = () => reject(new Error(`Failed to load ${normalizedSrc}`));
           document.head.appendChild(script);
         });
       }
@@ -1411,6 +1451,7 @@
         }
       };
     </script>
+    <script src="./js/inlineHandlerBridge.js"></script>
     <script src="./js/dispute.js"></script>
   </body>
 </html>
