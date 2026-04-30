@@ -304,6 +304,19 @@
                             }
                         };
                         encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
+                    } else if (message.typeUrl === '/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward') {
+                        // Encode delegator staking reward withdrawal message
+                        const MsgWithdrawDelegatorReward = new protobuf.Type("MsgWithdrawDelegatorReward")
+                            .add(new protobuf.Field("delegatorAddress", 1, "string"))
+                            .add(new protobuf.Field("validatorAddress", 2, "string"));
+
+                        root.add(MsgWithdrawDelegatorReward);
+                        const MsgType = root.lookupType("MsgWithdrawDelegatorReward");
+                        const msgValue = {
+                            delegatorAddress: message.value.delegatorAddress,
+                            validatorAddress: message.value.validatorAddress
+                        };
+                        encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else if (message.typeUrl === '/layer.dispute.MsgProposeDispute') {
                         // Encode dispute proposal message
                         const MsgProposeDispute = new protobuf.Type("MsgProposeDispute")
@@ -432,6 +445,22 @@
                         };
 
                         console.log('Encoding MsgSwitchReporter:', msgValue);
+                        encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
+                    } else if (message.typeUrl === '/layer.reporter.MsgWithdrawTip') {
+                        // Encode selector tip withdrawal message
+                        const MsgWithdrawTip = new protobuf.Type("MsgWithdrawTip")
+                            .add(new protobuf.Field("selectorAddress", 1, "string"))
+                            .add(new protobuf.Field("validatorAddress", 2, "string"));
+
+                        root.add(MsgWithdrawTip);
+                        const MsgType = root.lookupType("MsgWithdrawTip");
+
+                        const msgValue = {
+                            selectorAddress: message.value.selectorAddress,
+                            validatorAddress: message.value.validatorAddress
+                        };
+
+                        console.log('Encoding MsgWithdrawTip:', msgValue);
                         encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else {
                         throw new Error(`Unsupported message type: ${message.typeUrl}`);

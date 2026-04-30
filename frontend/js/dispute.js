@@ -6,6 +6,15 @@ class DisputeProposer {
         this.isConnected = false;
         this.currentAddress = null;
         this.currentNetwork = null;
+        this.debug = typeof window !== 'undefined' &&
+            window.localStorage &&
+            window.localStorage.getItem('tellor_debug') === '1';
+    }
+
+    debugLog(...args) {
+        if (this.debug) {
+            console.log(...args);
+        }
     }
 
     // Initialize the dispute proposer
@@ -74,7 +83,7 @@ class DisputeProposer {
     disconnectWallet() {
         this.isConnected = false;
         this.currentAddress = null;
-        console.log('DisputeProposer disconnected from wallet');
+        this.debugLog('DisputeProposer disconnected from wallet');
     }
 
     // Submit a dispute proposal
@@ -179,7 +188,7 @@ class DisputeProposer {
                 payFromBond
             );
 
-            console.log('Submitting dispute proposal:', {
+            this.debugLog('Submitting dispute proposal:', {
                 creator: msg.value.creator,
                 disputedReporter: msg.value.disputedReporter,
                 reportMetaId: msg.value.reportMetaId,
@@ -196,10 +205,10 @@ class DisputeProposer {
                 disputeCategoryEnum: disputeCategoryEnum
             });
 
-            console.log('Full message object:', msg);
-            console.log('Message typeUrl:', msg.typeUrl);
-            console.log('Message value:', msg.value);
-            console.log('Field types check:', {
+            this.debugLog('Full message object:', msg);
+            this.debugLog('Message typeUrl:', msg.typeUrl);
+            this.debugLog('Message value:', msg.value);
+            this.debugLog('Field types check:', {
                 creator: typeof msg.value.creator,
                 disputedReporter: typeof msg.value.disputedReporter,
                 reportMetaId: typeof msg.value.reportMetaId,
@@ -208,7 +217,7 @@ class DisputeProposer {
                 fee: typeof msg.value.fee,
                 payFromBond: typeof msg.value.payFromBond
             });
-            console.log('Raw input values:', {
+            this.debugLog('Raw input values:', {
                 disputedReporter,
                 reportMetaId,
                 reportQueryId,
@@ -216,13 +225,13 @@ class DisputeProposer {
                 fee,
                 payFromBond
             });
-            console.log('Processed values:', {
+            this.debugLog('Processed values:', {
                 numericReportMetaId,
                 disputeCategoryEnum,
                 cleanFee
             });
 
-            console.log('Using gas limit:', '1000000', 'and fee:', '15000 loya');
+            this.debugLog('Using gas limit:', '1000000', 'and fee:', '15000 loya');
 
             // Sign and broadcast the transaction
             const result = await client.signAndBroadcastDirect(
@@ -236,7 +245,7 @@ class DisputeProposer {
             );
 
             if (result && result.code === 0) {
-                console.log('Transaction result:', result);
+                this.debugLog('Transaction result:', result);
                 
                 // Extract transaction hash
                 const txHash = result.transactionHash || 
@@ -245,7 +254,7 @@ class DisputeProposer {
                               result.tx_response?.txhash ||
                               result.tx_response?.hash;
                 
-                console.log('Extracted transaction hash:', txHash);
+                this.debugLog('Extracted transaction hash:', txHash);
                 
                 return {
                     success: true,
@@ -354,18 +363,18 @@ class DisputeProposer {
             }
 
             // Check voting power before attempting to vote
-            console.log('Checking voting power before voting...');
+            this.debugLog('Checking voting power before voting...');
             const votingPowerCheck = await this.checkVotingPower();
             
             if (!votingPowerCheck.hasVotingPower) {
                 throw new Error(`Cannot vote: ${votingPowerCheck.details}`);
             }
 
-            console.log('Voting power check passed:', votingPowerCheck);
+            this.debugLog('Voting power check passed:', votingPowerCheck);
 
             // Get dispute info to check status
             const disputeInfo = await this.getDisputeInfo(disputeId);
-            console.log('Dispute info for voting:', disputeInfo);
+            this.debugLog('Dispute info for voting:', disputeInfo);
 
             if (disputeInfo.disputeStatus !== 'DISPUTE_STATUS_VOTING') {
                 const feeRequired = disputeInfo.slashAmount || 'unknown';
@@ -417,7 +426,7 @@ class DisputeProposer {
                 voteChoice
             );
 
-            console.log('Submitting vote on dispute:', {
+            this.debugLog('Submitting vote on dispute:', {
                 voter: msg.value.voter,
                 disputeId: msg.value.id,
                 vote: msg.value.vote,
@@ -425,11 +434,11 @@ class DisputeProposer {
                 voteEnum: window.layerProto.convertVoteChoiceToEnum(voteChoice)
             });
 
-            console.log('Full vote message object:', msg);
-            console.log('Vote message typeUrl:', msg.typeUrl);
-            console.log('Vote message value:', msg.value);
+            this.debugLog('Full vote message object:', msg);
+            this.debugLog('Vote message typeUrl:', msg.typeUrl);
+            this.debugLog('Vote message value:', msg.value);
 
-            console.log('Using gas limit:', '1000000', 'and fee:', '15000 loya');
+            this.debugLog('Using gas limit:', '1000000', 'and fee:', '15000 loya');
 
             // Sign and broadcast the transaction
             const result = await client.signAndBroadcastDirect(
@@ -443,7 +452,7 @@ class DisputeProposer {
             );
 
             if (result && result.code === 0) {
-                console.log('Transaction result:', result);
+                this.debugLog('Transaction result:', result);
                 
                 // Extract transaction hash
                 const txHash = result.transactionHash || 
@@ -452,7 +461,7 @@ class DisputeProposer {
                               result.tx_response?.txhash ||
                               result.tx_response?.hash;
                 
-                console.log('Extracted transaction hash:', txHash);
+                this.debugLog('Extracted transaction hash:', txHash);
                 
                 return {
                     success: true,
@@ -580,7 +589,7 @@ class DisputeProposer {
                 payFromBond
             );
 
-            console.log('Adding fee to dispute:', {
+            this.debugLog('Adding fee to dispute:', {
                 creator: msg.value.creator,
                 disputeId: msg.value.disputeId,
                 amount: msg.value.amount,
@@ -590,7 +599,7 @@ class DisputeProposer {
                 amountInMicroUnits: amountInMicroUnits
             });
 
-            console.log('Using gas limit:', '1000000', 'and fee:', '15000 loya');
+            this.debugLog('Using gas limit:', '1000000', 'and fee:', '15000 loya');
 
             // Sign and broadcast the transaction
             const result = await client.signAndBroadcastDirect(
@@ -604,7 +613,7 @@ class DisputeProposer {
             );
 
             if (result && result.code === 0) {
-                console.log('Transaction result:', result);
+                this.debugLog('Transaction result:', result);
                 
                 // Extract transaction hash
                 const txHash = result.transactionHash || 
@@ -613,7 +622,7 @@ class DisputeProposer {
                               result.tx_response?.txhash ||
                               result.tx_response?.hash;
                 
-                console.log('Extracted transaction hash:', txHash);
+                this.debugLog('Extracted transaction hash:', txHash);
                 
                 return {
                     success: true,
@@ -793,7 +802,7 @@ class DisputeProposer {
                 rpcEndpoint = 'https://node-palmito.tellorlayer.com';
             }
 
-            console.log('Checking voting power for address:', this.currentAddress);
+            this.debugLog('Checking voting power for address:', this.currentAddress);
 
             // Check condition 1: Is selector address (check if connected wallet is a selector)
             try {
@@ -803,7 +812,7 @@ class DisputeProposer {
                     if (selectorData.code === 0 && selectorData.message) {
                         // Selector found, now check if the returned reporter address has voting power
                         const reporterAddress = selectorData.message;
-                        console.log('User is selector, checking reporter address:', reporterAddress);
+                        this.debugLog('User is selector, checking reporter address:', reporterAddress);
                         
                         // Query the reporters endpoint with the returned address
                         const reportersResponse = await fetch(`${rpcEndpoint}/tellor-io/layer/reporter/reporters`);
@@ -816,19 +825,19 @@ class DisputeProposer {
                                 const isJailed = reporter.metadata?.jailed === true;
                                 
                                 if (!isJailed && power >= 1) {
-                                    console.log('Selector\'s reporter is unjailed with sufficient power - has voting power:', power);
+                                    this.debugLog('Selector\'s reporter is unjailed with sufficient power - has voting power:', power);
                                     return {
                                         hasVotingPower: true,
                                         reason: 'selector_reporter_power',
                                         details: `Selector for unjailed reporter ${reporterAddress} with power: ${power}`
                                     };
                                 } else if (isJailed) {
-                                    console.log('Selector\'s reporter is jailed - no voting power');
+                                    this.debugLog('Selector\'s reporter is jailed - no voting power');
                                 } else {
-                                    console.log('Selector\'s reporter has insufficient power:', power);
+                                    this.debugLog('Selector\'s reporter has insufficient power:', power);
                                 }
                             } else {
-                                console.log('Selector\'s reporter address not found in reporters list');
+                                this.debugLog('Selector\'s reporter address not found in reporters list');
                             }
                         }
                     }
@@ -837,7 +846,7 @@ class DisputeProposer {
                     try {
                         const errorData = await selectorResponse.json();
                         if (errorData.code === 2 && errorData.message && errorData.message.includes('not found')) {
-                            console.log('Address is not a selector (not found in selector registry)');
+                            this.debugLog('Address is not a selector (not found in selector registry)');
                             // Continue to other checks
                         } else {
                             console.warn('Unexpected selector query error:', errorData);
@@ -858,7 +867,7 @@ class DisputeProposer {
                 if (teamResponse.ok) {
                     const teamData = await teamResponse.json();
                     if (teamData.team_address === this.currentAddress) {
-                        console.log('User is team address - has voting power');
+                        this.debugLog('User is team address - has voting power');
                         return {
                             hasVotingPower: true,
                             reason: 'team_address',
@@ -877,7 +886,7 @@ class DisputeProposer {
                     const tipsData = await tipsResponse.json();
                     const totalTips = parseInt(tipsData.total_tips || '0');
                     if (totalTips >= 10000) {
-                        console.log('User has sufficient tips - has voting power:', totalTips);
+                        this.debugLog('User has sufficient tips - has voting power:', totalTips);
                         return {
                             hasVotingPower: true,
                             reason: 'sufficient_tips',
@@ -901,21 +910,21 @@ class DisputeProposer {
                         const isJailed = reporter.metadata?.jailed === true;
                         
                         if (!isJailed && power >= 1) {
-                            console.log('User is unjailed reporter with sufficient power - has voting power:', power);
+                            this.debugLog('User is unjailed reporter with sufficient power - has voting power:', power);
                             return {
                                 hasVotingPower: true,
                                 reason: 'reporter_power',
                                 details: `Unjailed reporter with power: ${power}`
                             };
                         } else if (isJailed) {
-                            console.log('User is jailed reporter - no voting power');
+                            this.debugLog('User is jailed reporter - no voting power');
                             return {
                                 hasVotingPower: false,
                                 reason: 'jailed_reporter',
                                 details: 'Reporter is jailed and cannot vote'
                             };
                         } else {
-                            console.log('User is reporter but insufficient power:', power);
+                            this.debugLog('User is reporter but insufficient power:', power);
                             return {
                                 hasVotingPower: false,
                                 reason: 'insufficient_reporter_power',
@@ -929,7 +938,7 @@ class DisputeProposer {
             }
 
             // No voting power found
-            console.log('User has no voting power');
+            this.debugLog('User has no voting power');
             return {
                 hasVotingPower: false,
                 reason: 'no_voting_power',
@@ -957,7 +966,7 @@ class DisputeProposer {
                 rpcEndpoint = 'https://node-palmito.tellorlayer.com';
             }
 
-            console.log('Fetching all disputes from:', `${rpcEndpoint}/tellor-io/layer/dispute/disputes`);
+            this.debugLog('Fetching all disputes from:', `${rpcEndpoint}/tellor-io/layer/dispute/disputes`);
 
             const response = await fetch(`${rpcEndpoint}/tellor-io/layer/dispute/disputes`);
             
@@ -966,7 +975,7 @@ class DisputeProposer {
             }
 
             const data = await response.json();
-            console.log('All disputes data:', data);
+            this.debugLog('All disputes data:', data);
 
             if (!data.disputes || !Array.isArray(data.disputes)) {
                 console.warn('No disputes found in response');

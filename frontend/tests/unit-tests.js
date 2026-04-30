@@ -242,6 +242,26 @@ export class UnitTests extends TestSuite {
         name: 'Claimable dispute rewards fetch URL and fallback',
         run: () => this.testClaimableDisputeRewardsFetchUrlAndFallback()
       },
+      {
+        name: 'Delegator rewards parsing from distribution response',
+        run: () => this.testDelegatorRewardsParsing()
+      },
+      {
+        name: 'Selector tips extraction normalization',
+        run: () => this.testSelectorTipsExtraction()
+      },
+      {
+        name: 'Delegator and selector reward fetch endpoints',
+        run: () => this.testDelegatorSelectorRewardFetchEndpoints()
+      },
+      {
+        name: 'Selector tips claim uses Cosmos tx hash success flow',
+        run: () => this.testSelectorTipsClaimSuccessFlow()
+      },
+      {
+        name: 'Claim modals show moniker with validator address',
+        run: () => this.testClaimModalValidatorOptionLabels()
+      },
 
       // Input Validation Tests
       {
@@ -1296,6 +1316,238 @@ export class UnitTests extends TestSuite {
     } finally {
       window.fetch = prevFetch;
       window.App.cosmosChainId = prevChain;
+    }
+  }
+
+  async testDelegatorRewardsParsing() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined' && window.App.fetchDelegatorRewards, 10000);
+    const prevFetch = window.fetch;
+    try {
+      window.fetch = async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          rewards: [
+            {
+              validator_address: 'tellorvaloper1alpha',
+              reward: [
+                { denom: 'loya', amount: '1234500.000000000000000000' }
+              ]
+            },
+            {
+              validator_address: 'tellorvaloper1beta',
+              reward: [
+                { denom: 'loya', amount: '500000.000000000000000000' }
+              ]
+            }
+          ],
+          total: [
+            { denom: 'loya', amount: '1734500.000000000000000000' }
+          ]
+        })
+      });
+      const result = await window.App.fetchDelegatorRewards('tellor1delegator');
+      this.assertEqual(result.rewards.length, 2, 'Should parse two validator reward rows');
+      this.assertEqual(result.rewards[0].validatorAddress, 'tellorvaloper1alpha');
+      this.assertEqual(result.rewards[0].loyaAmount, 1234500);
+      this.assertEqual(result.totalLoya, 1734500);
+    } finally {
+      window.fetch = prevFetch;
+    }
+  }
+
+  async testSelectorTipsExtraction() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined' && window.App.extractSelectorTipsLoya, 10000);
+    const f = window.App.extractSelectorTipsLoya.bind(window.App);
+    this.assertEqual(f({ available_tips: '750000.000000000000000000' }), 750000);
+    this.assertEqual(f({ availableTips: { amount: [{ denom: 'loya', amount: '250000.0' }] } }), 250000);
+    this.assertEqual(f([{ denom: 'loya', amount: '90000.0' }]), 90000);
+    this.assertEqual(f(null), 0);
+  }
+
+  async testDelegatorSelectorRewardFetchEndpoints() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined' && window.App.fetchDelegatorRewards && window.App.fetchSelectorAvailableTips, 10000);
+    const prevFetch = window.fetch;
+    const prevChain = window.App.cosmosChainId;
+    try {
+      window.App.cosmosChainId = 'layertest-5';
+      const urls = [];
+      window.fetch = async (url) => {
+        urls.push(String(url));
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ rewards: [], total: [] })
+        };
+      };
+      await window.App.fetchDelegatorRewards('tellor1abc');
+      window.fetch = async (url) => {
+        urls.push(String(url));
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ available_tips: '0' })
+        };
+      };
+      await window.App.fetchSelectorAvailableTips('tellor1abc');
+      this.assertTrue(urls[0].includes('/cosmos/distribution/v1beta1/delegators/tellor1abc/rewards'), 'Delegator rewards endpoint should use distribution rewards route');
+      this.assertTrue(urls[1].includes('/tellor-io/layer/reporter/available-tips/tellor1abc'), 'Selector tips endpoint should use reporter available-tips route');
+      this.assertTrue(urls[0].includes('node-palmito.tellorlayer.com'), 'Testnet should use Palmito LCD host');
+    } finally {
+      window.fetch = prevFetch;
+      window.App.cosmosChainId = prevChain;
+    }
+  }
+
+  async testSelectorTipsClaimSuccessFlow() {
+    await this.waitForCondition(() => typeof window.App !== 'undefined' && window.App.claimSelectorTips, 10000);
+
+    const original = {
+      selectorAvailableTipsRaw: window.App.selectorAvailableTipsRaw,
+      showPendingPopup: window.App.showPendingPopup,
+      hidePendingPopup: window.App.hidePendingPopup,
+      showSuccessPopup: window.App.showSuccessPopup,
+      showErrorPopup: window.App.showErrorPopup,
+      getCosmosSignerAndAddress: window.App.getCosmosSignerAndAddress,
+      broadcastCosmosMessages: window.App.broadcastCosmosMessages,
+      refreshCurrentStatus: window.App.refreshCurrentStatus,
+      closeActiveModal: window.App._closeActiveRewardClaimModal
+    };
+
+    let closeCount = 0;
+    let pendingShown = '';
+    let pendingHiddenCount = 0;
+    let successCall = null;
+    let errorCall = null;
+    let refreshCount = 0;
+    let broadcastMemo = '';
+
+    try {
+      window.App.selectorAvailableTipsRaw = '1500000';
+      window.App._closeActiveRewardClaimModal = () => {
+        closeCount += 1;
+      };
+      window.App.showPendingPopup = (message) => {
+        pendingShown = message;
+      };
+      window.App.hidePendingPopup = () => {
+        pendingHiddenCount += 1;
+      };
+      window.App.showSuccessPopup = (message, txHash, chainType) => {
+        successCall = { message, txHash, chainType };
+      };
+      window.App.showErrorPopup = (message) => {
+        errorCall = message;
+      };
+      window.App.getCosmosSignerAndAddress = async () => ({
+        signerAddress: 'tellor1selector000000000000000000000000000000'
+      });
+      window.App.broadcastCosmosMessages = async (messages, memo) => {
+        this.assertEqual(messages.length, 1, 'Selector tip claim should broadcast one message');
+        this.assertEqual(messages[0].typeUrl, '/layer.reporter.MsgWithdrawTip', 'Claim should use MsgWithdrawTip');
+        this.assertEqual(
+          messages[0].value.selectorAddress,
+          'tellor1selector000000000000000000000000000000',
+          'Claim message should use signer address as selector'
+        );
+        this.assertEqual(
+          messages[0].value.validatorAddress,
+          'tellorvaloper1destination000000000000000000000000',
+          'Claim message should use chosen validator destination'
+        );
+        broadcastMemo = memo;
+        return {
+          code: 0,
+          txhash: 'BFC62C08B6E27043FAFD34BBF38B2299000873A917637CF56775F0446FFC00A0'
+        };
+      };
+      window.App.refreshCurrentStatus = async () => {
+        refreshCount += 1;
+      };
+
+      await window.App.claimSelectorTips('tellorvaloper1destination000000000000000000000000');
+
+      this.assertEqual(closeCount, 1, 'Active claim modal should close before showing pending popup');
+      this.assertEqual(pendingShown, 'Claiming selector tips...', 'Should show selector claim pending message');
+      this.assertEqual(pendingHiddenCount, 1, 'Pending popup should close after successful broadcast');
+      this.assertEqual(broadcastMemo, 'Claim Selector Tips', 'Should set selector claim memo');
+      this.assertNotNull(successCall, 'Success popup should be shown');
+      this.assertEqual(successCall.chainType, 'cosmos', 'Selector claim success should use Cosmos explorer path');
+      this.assertEqual(
+        successCall.txHash,
+        'BFC62C08B6E27043FAFD34BBF38B2299000873A917637CF56775F0446FFC00A0',
+        'Success popup should receive tx hash for explorer link'
+      );
+      this.assertContains(successCall.message, 'Selector tips claimed successfully', 'Should show selector claim success message');
+      this.assertEqual(refreshCount, 1, 'Successful claim should refresh status');
+      this.assertEqual(errorCall, null, 'No error popup expected on successful selector claim');
+    } finally {
+      window.App.selectorAvailableTipsRaw = original.selectorAvailableTipsRaw;
+      window.App.showPendingPopup = original.showPendingPopup;
+      window.App.hidePendingPopup = original.hidePendingPopup;
+      window.App.showSuccessPopup = original.showSuccessPopup;
+      window.App.showErrorPopup = original.showErrorPopup;
+      window.App.getCosmosSignerAndAddress = original.getCosmosSignerAndAddress;
+      window.App.broadcastCosmosMessages = original.broadcastCosmosMessages;
+      window.App.refreshCurrentStatus = original.refreshCurrentStatus;
+      window.App._closeActiveRewardClaimModal = original.closeActiveModal;
+    }
+  }
+
+  async testClaimModalValidatorOptionLabels() {
+    await this.waitForCondition(
+      () => typeof window.App !== 'undefined' && window.App.openDelegatorRewardsClaimModal && window.App.openSelectorTipClaimModal,
+      10000
+    );
+
+    const original = {
+      delegatorRewardRows: window.App.delegatorRewardRows,
+      rewardDestinationValidators: window.App.rewardDestinationValidators,
+      selectorAvailableTipsRaw: window.App.selectorAvailableTipsRaw
+    };
+
+    const validatorAddress = 'tellorvaloper1abcdefghijabcdefghijabcdefghij';
+    const shortAddress = `${validatorAddress.substring(0, 17)}...`;
+
+    try {
+      window.App.delegatorRewardRows = [{
+        validatorAddress,
+        loyaAmount: 1234500
+      }];
+      window.App.rewardDestinationValidators = [{
+        address: validatorAddress,
+        moniker: 'Alpha Validator'
+      }];
+      window.App.selectorAvailableTipsRaw = '2500000';
+
+      window.App.openDelegatorRewardsClaimModal();
+      const delegatorSelect = document.getElementById('delegatorClaimModalValidator');
+      this.assertNotNull(delegatorSelect, 'Delegator claim modal validator select should exist');
+      this.assertTrue(delegatorSelect.options.length >= 2, 'Delegator claim select should include validator options');
+      const delegatorOption = delegatorSelect.options[1].textContent;
+      this.assertContains(delegatorOption, 'Alpha Validator', 'Delegator option should include validator moniker');
+      this.assertContains(delegatorOption, `(${shortAddress})`, 'Delegator option should include short validator address');
+      if (typeof window.App._closeActiveRewardClaimModal === 'function') {
+        window.App._closeActiveRewardClaimModal();
+      }
+
+      await window.App.openSelectorTipClaimModal();
+      const selectorSelect = document.getElementById('selectorClaimModalValidator');
+      this.assertNotNull(selectorSelect, 'Selector claim modal validator select should exist');
+      this.assertTrue(selectorSelect.options.length >= 2, 'Selector claim select should include validator options');
+      const selectorOption = selectorSelect.options[1].textContent;
+      this.assertContains(selectorOption, 'Alpha Validator', 'Selector option should include validator moniker');
+      this.assertContains(selectorOption, `(${shortAddress})`, 'Selector option should include short validator address');
+      if (typeof window.App._closeActiveRewardClaimModal === 'function') {
+        window.App._closeActiveRewardClaimModal();
+      }
+    } finally {
+      window.App.delegatorRewardRows = original.delegatorRewardRows;
+      window.App.rewardDestinationValidators = original.rewardDestinationValidators;
+      window.App.selectorAvailableTipsRaw = original.selectorAvailableTipsRaw;
+      if (typeof window.App._closeActiveRewardClaimModal === 'function') {
+        window.App._closeActiveRewardClaimModal();
+      }
     }
   }
 

@@ -2718,6 +2718,13 @@ header {
     color: #003434;
 }
 
+.status-title-with-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
 .status-header-controls {
     display: flex;
     align-items: center;
@@ -2762,6 +2769,106 @@ header {
     gap: 0.1rem;
 }
 
+#delegateSection .status-content-align {
+    height: 72px;
+    min-height: 72px;
+    max-height: 72px;
+    justify-content: center;
+    overflow: hidden;
+}
+
+#delegateSection .reward-status-content {
+    height: 30px;
+    min-height: 30px;
+    max-height: 30px;
+    justify-content: center;
+}
+
+#delegateSection .reward-summary-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.35rem 0.5rem 0.5rem 0.5rem;
+}
+
+#delegateSection .delegate-input-row {
+    display: grid;
+    grid-template-columns: minmax(110px, 140px) minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: center;
+}
+
+#delegateSection .reporter-input-row {
+    display: block;
+}
+
+#delegateSection .trb-input-compact {
+    max-width: 140px;
+}
+
+#delegateSection .trb-input-compact .input-with-label {
+    min-width: 0;
+}
+
+#delegateSection .trb-input-compact .input {
+    min-width: 0;
+    width: 100%;
+}
+
+#delegateSection .primary-action-button-row {
+    margin-top: 0.65rem;
+    min-height: 38px;
+    align-items: center;
+}
+
+#delegateSection .action-container {
+    padding-bottom: 0.75rem;
+}
+
+#delegateSection .delegate-primary-section,
+#delegateSection .reporter-primary-section {
+    padding: 0.35rem 1rem 0.75rem 1rem;
+    margin-bottom: 0;
+}
+
+#delegateSection .action-container .action-section:last-child {
+    margin-bottom: 0;
+}
+
+#delegateSection .delegate-primary-section .bridge-direction,
+#delegateSection .reporter-primary-section .bridge-direction {
+    margin: 0.3rem auto 0;
+}
+
+#delegateSection .claim-pill.btn-small {
+    border-radius: 999px !important;
+    padding: 5px 12px !important;
+    border: 1px solid #0f5a5a !important;
+    background: #0d6f6f !important;
+    color: #e8fffb !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    line-height: 1 !important;
+}
+
+#delegateSection .claim-pill.btn-small:hover {
+    background: #0a5d5d !important;
+    border-color: #0a5d5d !important;
+}
+
+#delegateSection .claim-pill.btn-small:disabled {
+    background: #9aa8a8 !important;
+    border-color: #9aa8a8 !important;
+    color: #f1f5f5 !important;
+}
+
+#delegateSection .reward-status-content .status-item {
+    padding: 0;
+    justify-content: flex-start;
+    gap: 0.25rem;
+}
+
 .status-loading {
     color: #666;
     font-style: italic;
@@ -2774,8 +2881,10 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    min-width: 0;
     padding: 0.1rem 0;
     font-size: 0.8rem;
+    gap: 0.35rem;
 }
 
 .status-item:last-child {
@@ -2806,6 +2915,7 @@ header {
     align-items: center;
     flex: 1;
     gap: 0.35rem;
+    min-width: 0;
 }
 
 .status-total {
@@ -2835,7 +2945,27 @@ header {
     font-family: monospace;
     font-size: 0.7rem;
     color: #123f23;
-    word-break: break-all;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.status-top-validator {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.25rem;
+}
+
+.status-top-validator .status-label,
+.status-top-validator .status-amount {
+    white-space: nowrap;
+}
+
+.status-top-validator .status-address {
+    max-width: 100%;
 }
 
 .status-badge {
@@ -2977,6 +3107,60 @@ header {
     
     .status-section {
         padding: 0.5rem;
+    }
+
+    #delegateSection .delegate-input-row {
+        grid-template-columns: 1fr;
+    }
+
+    #delegateSection .trb-input-compact {
+        max-width: none;
+    }
+}
+
+@media (max-height: 900px) {
+    #delegateSection .action-sections {
+        gap: 1rem;
+        margin-bottom: 0.75rem;
+    }
+
+    #delegateSection .action-container {
+        padding: 1rem;
+    }
+
+    #delegateSection .action-section {
+        padding: 0.5rem 1rem 1rem 1rem;
+    }
+
+    #delegateSection .section-header {
+        margin-bottom: 0.35rem;
+        padding-bottom: 0.35rem;
+    }
+
+    #delegateSection .section-header h3 {
+        margin-bottom: 0.2rem;
+        font-size: 1rem;
+    }
+
+    #delegateSection .section-header .section-description {
+        font-size: 0.78rem;
+    }
+
+    #delegateSection .status-content-align {
+        height: 60px;
+        min-height: 60px;
+        max-height: 60px;
+    }
+
+    #delegateSection .reward-status-content {
+        height: 26px;
+        min-height: 26px;
+        max-height: 26px;
+    }
+
+    #delegateSection .primary-action-button-row {
+        margin-top: 0.35rem;
+        min-height: 34px;
     }
 }
 
