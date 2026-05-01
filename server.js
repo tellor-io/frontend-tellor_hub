@@ -20,14 +20,12 @@ app.use(
         formAction: ["'self'"],
         scriptSrc: [
           "'self'",
+          // Allow inline scripts in this local dev server (app bootstrap + tests/test-suite.html harness).
+          "'unsafe-inline'",
           "'unsafe-eval'",
           'https://cdn.jsdelivr.net',
           'https://cdn.ethers.io',
-          'https://cdn.tailwindcss.com',
-          "'sha256-tPSqgOKRnJ/WEHfggnPInj/c+HOKaO+h49SR8r7YF1s='",
-          "'sha256-SQqHoLh6BkeSdXNPEVzfkPKf+vM0fl4VaDjViheLkuY='",
-          "'sha256-2htPfnJDN8rJzOaosKYVFFpD1K2kwsjZJL/Rh8nukeQ='",
-          "'sha256-4nqzWaR+MoUtjlfZZVdqZSTEUjLVwV5QuxTKhUmvniU='"
+          'https://cdn.tailwindcss.com'
         ],
         connectSrc: [
           "'self'",

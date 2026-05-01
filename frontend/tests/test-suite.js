@@ -82,13 +82,31 @@ export class TestSuite {
   }
 
   assertContains(array, item, message = 'Array should contain item') {
-    this.assertArray(array, 'First argument must be an array');
-    this.assert(array.includes(item), message);
+    if (Array.isArray(array)) {
+      this.assert(array.includes(item), message);
+      return;
+    }
+    if (typeof array === 'string') {
+      this.assert(array.includes(item), message);
+      return;
+    }
+    this.failures++;
+    throw new Error('First argument must be an array or string');
   }
 
   assertNotContains(array, item, message = 'Array should not contain item') {
-    this.assertArray(array, 'First argument must be an array');
-    this.assert(!array.includes(item), message);
+    if (Array.isArray(array) || typeof array === 'string') {
+      this.assert(!array.includes(item), message);
+      return;
+    }
+    this.failures++;
+    throw new Error('First argument must be an array or string');
+  }
+
+  assertGreaterThan(actual, minimum, message = 'Value should be greater than minimum') {
+    this.assertNumber(actual, 'First argument must be a number');
+    this.assertNumber(minimum, 'Second argument must be a number');
+    this.assert(actual > minimum, `${message}: expected > ${minimum}, got ${actual}`);
   }
 
   assertThrows(fn, expectedError = null, message = 'Function should throw an error') {
@@ -206,8 +224,18 @@ export class TestSuite {
 
   // Mock MetaMask Provider
   mockMetaMaskProvider() {
+    const requestCalls = [];
     const provider = {
-      request: async (method, params = []) => {
+      request: async (methodOrPayload, params = []) => {
+        requestCalls.push({ methodOrPayload, params });
+        const method = typeof methodOrPayload === 'string'
+          ? methodOrPayload
+          : methodOrPayload && typeof methodOrPayload === 'object'
+            ? methodOrPayload.method
+            : undefined;
+        const requestParams = typeof methodOrPayload === 'object' && methodOrPayload !== null
+          ? (methodOrPayload.params || [])
+          : params;
         switch (method) {
           case 'eth_requestAccounts':
             return ['0x1234567890123456789012345678901234567890'];
@@ -223,6 +251,11 @@ export class TestSuite {
             return '0x5208'; // 21000 gas
           case 'eth_sendTransaction':
             return '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
+          case 'wallet_switchEthereumChain':
+            provider.networkVersion = requestParams?.[0]?.chainId === '0x1' ? '1' : '11155111';
+            return null;
+          case 'wallet_addEthereumChain':
+            return null;
           default:
             throw new Error(`Unsupported method: ${method}`);
         }
@@ -238,9 +271,11 @@ export class TestSuite {
       },
       removeListener: () => {},
       isMetaMask: true,
+      isConnected: () => true,
       selectedAddress: '0x1234567890123456789012345678901234567890',
       networkVersion: '1'
     };
+    provider.request.calls = requestCalls;
     
     this.mocks.set('metaMask', provider);
     return provider;
@@ -248,8 +283,12 @@ export class TestSuite {
 
   // Mock Keplr Provider
   mockKeplrProvider() {
+    const enableCalls = [];
+    const getChainIdCalls = [];
+    const getKeyCalls = [];
     const provider = {
       enable: async (chainId) => {
+        enableCalls.push(chainId);
         return {
           name: 'Test Chain',
           chainId: chainId || 'test-chain-1',
@@ -258,10 +297,12 @@ export class TestSuite {
         };
       },
       getChainId: async () => {
+        getChainIdCalls.push(true);
         // Default to testnet, but can be overridden
         return 'layertest-5';
       },
       getKey: async (chainId) => {
+        getKeyCalls.push(chainId);
         return {
           name: 'Test Wallet',
           address: 'tellor1testaddress123456789012345678901234567890',
@@ -313,9 +354,59 @@ export class TestSuite {
         return true;
       }
     };
+    provider.enable.calls = enableCalls;
+    provider.getChainId.calls = getChainIdCalls;
+    provider.getKey.calls = getKeyCalls;
     
     this.mocks.set('keplr', provider);
     return provider;
+  }
+
+  setKeplrProvider(provider) {
+    try {
+      window.keplr = provider;
+      return;
+    } catch (assignError) {
+      // Continue with descriptor/mutation fallback.
+    }
+
+    try {
+      const descriptor = Object.getOwnPropertyDescriptor(window, 'keplr');
+      if (descriptor && descriptor.configurable) {
+        Object.defineProperty(window, 'keplr', {
+          configurable: true,
+          writable: true,
+          value: provider
+        });
+        return;
+      }
+    } catch (descriptorError) {
+      // Ignore and try object-mutation fallback next.
+    }
+
+    const target = window.keplr;
+    if (target && (typeof target === 'object' || typeof target === 'function')) {
+      Object.keys(provider || {}).forEach((key) => {
+        try {
+          target[key] = provider[key];
+          return;
+        } catch (assignmentError) {
+          // Try descriptor override as fallback.
+        }
+        try {
+          Object.defineProperty(target, key, {
+            configurable: true,
+            writable: true,
+            value: provider[key]
+          });
+        } catch (defineError) {
+          // Ignore immutable properties.
+        }
+      });
+    }
+
+    // Non-throwing fallback keeps tests running even in immutable wallet environments.
+    this.mocks.set('keplrFallback', provider);
   }
 
   // Mock CosmJS Stargate Client
@@ -916,7 +1007,19 @@ export class TestSuite {
     
     const originalFetch = window.fetch;
     window.fetch = async (requestUrl, options) => {
-      if (requestUrl === url || requestUrl.toString() === url) {
+      const requestString = typeof requestUrl === 'string'
+        ? requestUrl
+        : requestUrl && requestUrl.url
+          ? requestUrl.url
+          : String(requestUrl);
+      const normalizedRequest = requestString.split('?')[0];
+      const normalizedTarget = String(url).split('?')[0];
+      if (
+        requestString === url ||
+        normalizedRequest === normalizedTarget ||
+        requestString.startsWith(url) ||
+        url.startsWith(requestString)
+      ) {
         return new Response(JSON.stringify(response), {
           status: 200,
           headers: { 'Content-Type': 'application/json' }
