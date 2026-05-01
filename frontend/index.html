@@ -315,12 +315,13 @@
 
                   <!-- Validator Status Section -->
                   <div class="status-section">
-                    <div class="status-header" onclick="App.toggleDelegationsDropdown()">
+                    <div class="status-header">
                       <div class="status-title-with-badge">
                         <span>Current Delegations</span>
                         <span id="currentDelegationsCountBadge" class="status-badge" style="display:none;"></span>
                       </div>
                       <div class="status-header-controls">
+                        <span id="currentDelegationsTotal" class="status-header-total">Total: --</span>
                         <button type="button" id="refreshDelegationsBtn" class="refresh-btn-small" title="Refresh delegations" onclick="event.stopPropagation()">↻</button>
                       </div>
                     </div>

@@ -56,6 +56,9 @@
           <button id="run-dispute-tests" class="w-full bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">
             Run Dispute Tests Only
           </button>
+          <button id="run-full-runtime-tests" class="w-full bg-amber-600 text-white px-4 py-2 rounded hover:bg-amber-700">
+            Run Full Runtime Suite (Slow)
+          </button>
           <button id="clear-results" class="w-full bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">
             Clear Results
           </button>
@@ -115,6 +118,7 @@
         <option value="validator1">Validator 1</option>
         <option value="validator2">Validator 2</option>
       </select>
+      <input id="delegateValidatorAddress" type="text" placeholder="Validator address" />
       <button id="delegateButton">Delegate Tokens</button>
     </div>
 
@@ -168,6 +172,26 @@
     <button id="bridgeToLayerBtn">Bridge to Tellor</button>
     <button id="bridgeToEthBtn">Bridge to Ethereum</button>
     <button id="delegateBtn">Delegate Tokens</button>
+
+    <!-- Bridge inner content containers used by runtime bridge-nav tests -->
+    <div id="bridgeToTellorContent" style="display:block;"></div>
+    <div id="bridgeToEthereumContent" style="display:none;"></div>
+
+    <!-- Delegations / reporter status containers -->
+    <div id="currentDelegationsStatus"></div>
+    <div id="currentDelegationsTotal">Total: --</div>
+    <span id="currentDelegationsCountBadge" style="display:none;"></span>
+    <div id="delegationsDropdown" style="display:none;">
+      <div id="delegationsDropdownContent"></div>
+    </div>
+    <span id="delegationsDropdownArrow"></span>
+    <div id="currentReporterStatus"></div>
+    <select id="reporterDropdown">
+      <option value="">Select a reporter...</option>
+    </select>
+
+    <!-- Tooltip fixture -->
+    <button class="info-icon" data-tooltip="Fixture tooltip">i</button>
 
     <!-- Mock network displays -->
     <div id="network-display">Testnet</div>
@@ -340,6 +364,14 @@
           {
             name: 'Dispute utility functions',
             run: () => this.testDisputeUtilityFunctions()
+          },
+          {
+            name: 'Delegations dropdown closes on outside click',
+            run: () => this.testDelegationsDropdownOutsideClickClose()
+          },
+          {
+            name: 'Remaining delegation unstake action wiring',
+            run: () => this.testRemainingDelegationUnstakeActionWiring()
           }
         ];
       }
@@ -426,6 +458,117 @@
         
         // Test initial state
         this.assert(!walletManagerContent.classList.contains('active'), 'Wallet manager should be closed initially');
+      }
+
+      async testDelegationsDropdownOutsideClickClose() {
+        // Build lightweight mock elements mirroring delegation dropdown controls
+        const host = document.createElement('div');
+        host.innerHTML = `
+          <button type="button" class="delegation-remaining-toggle">Remaining Delegations</button>
+          <div id="delegationsDropdown" style="display:none;">
+            <div id="delegationsDropdownContent"></div>
+          </div>
+          <span id="delegationsDropdownArrow"></span>
+        `;
+        document.body.appendChild(host);
+
+        // Minimal mock of current App behavior
+        const app = window.App || {};
+        app.toggleDelegationsDropdown = function() {
+          const dropdown = document.getElementById('delegationsDropdown');
+          const arrow = document.getElementById('delegationsDropdownArrow');
+          if (dropdown.style.display === 'none' || dropdown.style.display === '') {
+            dropdown.style.display = 'block';
+            if (arrow) arrow.classList.add('rotated');
+          } else {
+            dropdown.style.display = 'none';
+            if (arrow) arrow.classList.remove('rotated');
+          }
+        };
+        app.closeDelegationsDropdown = function() {
+          const dropdown = document.getElementById('delegationsDropdown');
+          const arrow = document.getElementById('delegationsDropdownArrow');
+          if (dropdown) dropdown.style.display = 'none';
+          if (arrow) arrow.classList.remove('rotated');
+        };
+        window.App = app;
+
+        const outsideClickHandler = (event) => {
+          const dropdown = document.getElementById('delegationsDropdown');
+          if (!dropdown || dropdown.style.display === 'none' || dropdown.style.display === '') return;
+          if (event.target.closest('#delegationsDropdown') || event.target.closest('.delegation-remaining-toggle')) return;
+          window.App.closeDelegationsDropdown();
+        };
+        document.addEventListener('click', outsideClickHandler);
+
+        try {
+          const dropdown = document.getElementById('delegationsDropdown');
+          const arrow = document.getElementById('delegationsDropdownArrow');
+          this.assertNotNull(dropdown, 'Delegations dropdown should exist');
+          this.assertNotNull(arrow, 'Delegations arrow should exist');
+
+          window.App.toggleDelegationsDropdown();
+          this.assertEqual(dropdown.style.display, 'block', 'Dropdown should open before outside click');
+          this.assertTrue(arrow.classList.contains('rotated'), 'Arrow should rotate when dropdown opens');
+
+          document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+          this.assertEqual(dropdown.style.display, 'none', 'Dropdown should close on outside click');
+          this.assertFalse(arrow.classList.contains('rotated'), 'Arrow should reset when dropdown closes');
+        } finally {
+          document.removeEventListener('click', outsideClickHandler);
+          if (host.parentNode) host.parentNode.removeChild(host);
+        }
+      }
+
+      async testRemainingDelegationUnstakeActionWiring() {
+        const input = document.createElement('input');
+        input.id = 'remainingDelegationUnstakeAmount_test';
+        input.value = '1.250000';
+        document.body.appendChild(input);
+
+        const button = document.createElement('button');
+        button.id = 'remainingDelegationUnstakeButton_test';
+        button.textContent = 'Unstake';
+        document.body.appendChild(button);
+
+        const captured = [];
+        const app = window.App || {};
+        app.executeUndelegation = async (payload) => {
+          captured.push(payload);
+          return { code: 0 };
+        };
+        app.triggerDelegationRowUnstake = async function(validatorAddress, inputId, buttonId) {
+          const amountInput = document.getElementById(inputId);
+          const triggerButton = document.getElementById(buttonId);
+          const amount = amountInput ? amountInput.value : '';
+          await window.App.executeUndelegation({
+            amount,
+            validatorAddress,
+            triggerButton,
+            buttonLabel: 'Unstake'
+          });
+          if (amountInput) amountInput.value = '';
+        };
+        window.App = app;
+
+        try {
+          const validatorAddress = 'tellorvaloper1testvalidator123456789012345678901234567890';
+          await window.App.triggerDelegationRowUnstake(
+            validatorAddress,
+            'remainingDelegationUnstakeAmount_test',
+            'remainingDelegationUnstakeButton_test'
+          );
+
+          this.assertEqual(captured.length, 1, 'Should call executeUndelegation once');
+          this.assertEqual(captured[0].validatorAddress, validatorAddress, 'Should pass validator address');
+          this.assertEqual(captured[0].amount, '1.250000', 'Should pass unstake amount');
+          this.assertEqual(captured[0].triggerButton, button, 'Should pass row button reference');
+          this.assertEqual(captured[0].buttonLabel, 'Unstake', 'Should pass row button label');
+          this.assertEqual(input.value, '', 'Should clear row input after successful action');
+        } finally {
+          if (input.parentNode) input.parentNode.removeChild(input);
+          if (button.parentNode) button.parentNode.removeChild(button);
+        }
       }
 
       // Dispute Module Tests
@@ -914,15 +1057,203 @@
 
     class TestRunner {
       constructor() {
-        this.unitTests = new UnitTests();
-        this.integrationTests = new IntegrationTests();
+        this.inlineUnitTests = new UnitTests();
+        this.inlineIntegrationTests = new IntegrationTests();
+        this.unitTests = this.inlineUnitTests;
+        this.integrationTests = this.inlineIntegrationTests;
+        this.testTimeoutMs = 4000;
+        this.fullRuntimeMode = false;
+        this.moduleSuitesLoaded = false;
         this.results = [];
         this.totalTests = 0;
         this.passedTests = 0;
         this.failedTests = 0;
         this.skippedTests = 0;
+        this.isRunning = false;
         
         this.initializeEventListeners();
+      }
+
+      async loadExternalSuites() {
+        try {
+          const [{ UnitTests: ExternalUnitTests }, { IntegrationTests: ExternalIntegrationTests }] = await Promise.all([
+            import('./unit-tests.js'),
+            import('./integration-tests.js')
+          ]);
+          this.unitTests = new ExternalUnitTests();
+          this.integrationTests = new ExternalIntegrationTests();
+          this.moduleSuitesLoaded = true;
+          console.log('Loaded external module test suites (unit-tests.js / integration-tests.js).');
+        } catch (error) {
+          this.moduleSuitesLoaded = false;
+          this.unitTests = this.inlineUnitTests;
+          this.integrationTests = this.inlineIntegrationTests;
+          throw error;
+        }
+      }
+
+      async bootstrapFullRuntimeContext() {
+        if (window.App && typeof window.App === 'object') {
+          return;
+        }
+        this.installRuntimeFetchShim();
+        await this.loadClassicScript('../extensions/jquery.min.js');
+        await this.loadClassicScript('https://cdn.jsdelivr.net/npm/web3@1.10.0/dist/web3.min.js');
+        await this.loadClassicScript('../proto/layer_proto_browser.js');
+        await this.loadClassicScript('../js/dispute.js');
+        await import('../app.js');
+        const timeoutMs = 5000;
+        const start = Date.now();
+        while ((!window.App || typeof window.App !== 'object') && (Date.now() - start < timeoutMs)) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        if (!window.App || typeof window.App !== 'object') {
+          throw new Error('Full runtime boot failed: App object unavailable');
+        }
+      }
+
+      installRuntimeFetchShim() {
+        if (this._runtimeFetchShimInstalled || !window.fetch) {
+          return;
+        }
+        this._runtimeFetchShimInstalled = true;
+        const originalFetch = window.fetch.bind(window);
+        window.fetch = async (input, init) => {
+          const rawUrl = typeof input === 'string' ? input : input && input.url ? input.url : '';
+          if (typeof rawUrl === 'string' && rawUrl.startsWith('./abis/')) {
+            return originalFetch(`../${rawUrl.slice(2)}`, init);
+          }
+          return originalFetch(input, init);
+        };
+      }
+
+      loadClassicScript(src) {
+        return new Promise((resolve, reject) => {
+          if (!src) {
+            reject(new Error('Missing script source'));
+            return;
+          }
+          const existing = Array.from(document.querySelectorAll('script[src]'))
+            .find((script) => script.getAttribute('src') === src);
+          if (existing) {
+            resolve();
+            return;
+          }
+          const script = document.createElement('script');
+          script.src = src;
+          script.referrerPolicy = 'no-referrer';
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
+          document.head.appendChild(script);
+        });
+      }
+
+      async activateFullRuntimeMode() {
+        await this.bootstrapFullRuntimeContext();
+        if (!this.moduleSuitesLoaded) {
+          await this.loadExternalSuites();
+        }
+        this.fullRuntimeMode = true;
+        this.testTimeoutMs = 10000;
+      }
+
+      useInlineMode() {
+        this.fullRuntimeMode = false;
+        this.testTimeoutMs = 4000;
+        this.unitTests = this.inlineUnitTests;
+        this.integrationTests = this.inlineIntegrationTests;
+      }
+
+      getUnitTests() {
+        return this.unitTests.getTests().map((test) => ({ ...test, _suite: this.unitTests }));
+      }
+
+      getIntegrationTests() {
+        return this.integrationTests.getTests().map((test) => ({ ...test, _suite: this.integrationTests }));
+      }
+
+      prepareTestState() {
+        this.installAlertShim();
+        if (window.App && typeof window.App === 'object') {
+          if (typeof window.App.isConnected === 'undefined') window.App.isConnected = false;
+          if (typeof window.App.account === 'undefined') window.App.account = '0x0';
+          if (typeof window.App.isKeplrConnected === 'undefined') window.App.isKeplrConnected = false;
+          if (typeof window.App.keplrAddress === 'undefined') window.App.keplrAddress = null;
+          if (typeof window.App.isNetworkSwitching === 'undefined') window.App.isNetworkSwitching = false;
+          if (typeof window.App.currentBridgeDirection === 'undefined') window.App.currentBridgeDirection = 'layer';
+        }
+
+        try {
+          if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+            Object.defineProperty(navigator, 'clipboard', {
+              configurable: true,
+              writable: true,
+              value: { writeText: async () => {} }
+            });
+          }
+        } catch (error) {
+          // Ignore immutable navigator environments.
+        }
+
+        if (!window.layerProto) {
+          window.layerProto = {};
+        }
+        if (typeof window.layerProto.convertVoteChoiceToEnum !== 'function') {
+          window.layerProto.convertVoteChoiceToEnum = (voteChoice) => {
+            switch (voteChoice) {
+              case 'vote-support': return 1;
+              case 'vote-against': return 2;
+              case 'vote-invalid': return 3;
+              default: return 0;
+            }
+          };
+        }
+        if (typeof window.layerProto.createMsgProposeDispute !== 'function') {
+          window.layerProto.createMsgProposeDispute = (creator, disputedReporter, reportMetaId, reportQueryId, disputeCategory, fee, payFromBond) => ({
+            typeUrl: '/layer.dispute.MsgProposeDispute',
+            value: {
+              creator,
+              disputedReporter,
+              reportMetaId: Number(reportMetaId),
+              reportQueryId,
+              disputeCategory,
+              fee,
+              payFromBond: !!payFromBond
+            }
+          });
+        }
+        if (typeof window.layerProto.createMsgVote !== 'function') {
+          window.layerProto.createMsgVote = (voter, disputeId, voteChoice) => ({
+            typeUrl: '/layer.dispute.MsgVote',
+            value: {
+              voter,
+              id: Number(disputeId),
+              vote: window.layerProto.convertVoteChoiceToEnum(voteChoice)
+            }
+          });
+        }
+        if (typeof window.layerProto.createMsgAddFeeToDispute !== 'function') {
+          window.layerProto.createMsgAddFeeToDispute = (creator, disputeId, amount, payFromBond) => ({
+            typeUrl: '/layer.dispute.MsgAddFeeToDispute',
+            value: {
+              creator,
+              disputeId: Number(disputeId),
+              amount,
+              payFromBond: !!payFromBond
+            }
+          });
+        }
+      }
+
+      installAlertShim() {
+        if (this._alertShimInstalled || typeof window.alert !== 'function') {
+          return;
+        }
+        this._alertShimInstalled = true;
+        this._originalAlert = window.alert.bind(window);
+        window.alert = (...args) => {
+          console.warn('[test-suite alert suppressed]', ...args);
+        };
       }
 
       initializeEventListeners() {
@@ -930,25 +1261,30 @@
         document.getElementById('run-unit-tests').addEventListener('click', () => this.runUnitTests());
         document.getElementById('run-integration-tests').addEventListener('click', () => this.runIntegrationTests());
         document.getElementById('run-dispute-tests').addEventListener('click', () => this.runDisputeTests());
+        document.getElementById('run-full-runtime-tests').addEventListener('click', () => this.runFullRuntimeTests());
         document.getElementById('clear-results').addEventListener('click', () => this.clearResults());
       }
 
       async runAllTests() {
+        this.useInlineMode();
         await this.runTests([
-          ...this.unitTests.getTests(),
-          ...this.integrationTests.getTests()
+          ...this.getUnitTests(),
+          ...this.getIntegrationTests()
         ]);
       }
 
       async runUnitTests() {
-        await this.runTests(this.unitTests.getTests());
+        this.useInlineMode();
+        await this.runTests(this.getUnitTests());
       }
 
       async runIntegrationTests() {
-        await this.runTests(this.integrationTests.getTests());
+        this.useInlineMode();
+        await this.runTests(this.getIntegrationTests());
       }
 
       async runDisputeTests() {
+        this.useInlineMode();
         const disputeUnitTests = this.unitTests.getTests().filter(test => 
           test.name.toLowerCase().includes('dispute')
         );
@@ -962,7 +1298,38 @@
         ]);
       }
 
+      async runFullRuntimeTests() {
+        try {
+          await this.activateFullRuntimeMode();
+          await this.runTests([
+            ...this.getUnitTests(),
+            ...this.getIntegrationTests()
+          ]);
+        } catch (error) {
+          console.error('Unable to start full runtime suite:', error);
+          this.useInlineMode();
+          this.clearResults();
+          this.results.push({
+            name: 'Full runtime bootstrap',
+            status: 'fail',
+            error: error.message || 'Unknown full runtime bootstrap error',
+            duration: 0
+          });
+          this.totalTests = 1;
+          this.failedTests = 1;
+          this.passedTests = 0;
+          this.skippedTests = 0;
+          this.updateProgress();
+          this.displayResults();
+        }
+      }
+
       async runTests(tests) {
+        if (this.isRunning) {
+          return;
+        }
+        this.isRunning = true;
+        this.setControlsDisabled(true);
         this.clearResults();
         this.totalTests = tests.length;
         this.passedTests = 0;
@@ -985,6 +1352,7 @@
               this.passedTests++;
             } else if (result.status === 'fail') {
               this.failedTests++;
+              console.error(`Failed test: ${result.name} :: ${result.error || 'Unknown error'}`);
             } else {
               this.skippedTests++;
             }
@@ -1010,13 +1378,44 @@
         }
 
         console.log(`Test run completed. Passed: ${this.passedTests}, Failed: ${this.failedTests}, Skipped: ${this.skippedTests}`);
+        if (this.failedTests > 0) {
+          const failures = this.results
+            .filter((item) => item.status === 'fail')
+            .map((item) => `${item.name} :: ${item.error || 'Unknown error'}`);
+          console.error('Failed tests summary:\n' + failures.join('\n'));
+        }
+        this.setControlsDisabled(false);
+        this.isRunning = false;
+      }
+
+      setControlsDisabled(disabled) {
+        [
+          'run-all-tests',
+          'run-unit-tests',
+          'run-integration-tests',
+          'run-dispute-tests',
+          'run-full-runtime-tests',
+          'clear-results'
+        ].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) {
+            el.disabled = disabled;
+          }
+        });
       }
 
       async runSingleTest(test) {
         const startTime = performance.now();
         
         try {
-          await test.run();
+          this.prepareTestState();
+          await Promise.race([
+            test.run(),
+            new Promise((_, reject) => setTimeout(
+              () => reject(new Error(`Timeout after ${this.testTimeoutMs}ms`)),
+              this.testTimeoutMs
+            ))
+          ]);
           
           const duration = performance.now() - startTime;
           return {

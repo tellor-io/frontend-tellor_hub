@@ -9,7 +9,16 @@ Comprehensive test suite for the Layer Bridge frontend application, covering bot
 2. In your browser, open **http://localhost:8000/tests/test-suite.html** (same origin as the app so paths resolve correctly).
 3. Use **Run All Tests**, or **Run Unit Tests Only** / **Run Integration Tests Only**. Leave **Mock wallet connections** and **Mock network calls** checked unless you intentionally want real wallets or network.
 
-The in-page suite in `test-suite.html` is self-contained. The larger ES-module suites (`unit-tests.js`, `integration-tests.js`, `test-runner.js`) are meant to be driven from a full app context if you wire them up later; they are not loaded by `test-suite.html` today.
+`test-suite.html` attempts to use the ES-module suites (`unit-tests.js`, `integration-tests.js`) only when a full `window.App` runtime is present; otherwise it falls back to inline smoke tests so the standalone page stays fast and stable.
+
+### Full runtime mode (slow, comprehensive)
+- Click **Run Full Runtime Suite (Slow)** to explicitly bootstrap `app.js` and run the module suites (`unit-tests.js` + `integration-tests.js`) from the same UI.
+- This mode is intentionally slower and may expose more failures because it executes broader app/runtime logic.
+- The other run buttons stay in fast inline smoke mode by default.
+
+### Current full-runtime status
+- Latest validation run: **111 passed / 0 failed / 0 skipped** using **Run Full Runtime Suite (Slow)**.
+- If this regresses, copy the **Failed tests summary** block from the browser console and debug from that list.
 
 Optional: `frontend/tests/run-tests.js` can automate the same HTML via Puppeteer from the command line if you install `puppeteer`; that path is optional, not required.
 

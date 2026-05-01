@@ -304,6 +304,24 @@
                             }
                         };
                         encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
+                    } else if (message.typeUrl === '/cosmos.staking.v1beta1.MsgUndelegate') {
+                        // Encode undelegation message
+                        const MsgUndelegate = new protobuf.Type("MsgUndelegate")
+                            .add(new protobuf.Field("delegatorAddress", 1, "string"))
+                            .add(new protobuf.Field("validatorAddress", 2, "string"))
+                            .add(new protobuf.Field("amount", 3, "Coin"));
+
+                        root.add(MsgUndelegate);
+                        const MsgType = root.lookupType("MsgUndelegate");
+                        const msgValue = {
+                            delegatorAddress: message.value.delegatorAddress,
+                            validatorAddress: message.value.validatorAddress,
+                            amount: {
+                                denom: message.value.amount.denom,
+                                amount: message.value.amount.amount.toString()
+                            }
+                        };
+                        encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else if (message.typeUrl === '/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward') {
                         // Encode delegator staking reward withdrawal message
                         const MsgWithdrawDelegatorReward = new protobuf.Type("MsgWithdrawDelegatorReward")
@@ -849,6 +867,62 @@
         }
     }
 
+    async function undelegateTokens(account, validatorAddress, amount) {
+        try {
+            // Get offline signer from wallet adapter or fallback to legacy method
+            let offlineSigner;
+            if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+                offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+            } else if (window.getOfflineSigner) {
+                // Use the current chain ID from the app
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
+                offlineSigner = window.getOfflineSigner(chainId);
+            } else {
+                throw new Error('No offline signer available');
+            }
+
+            // Use the current RPC endpoint from the app
+            const rpcEndpoint = window.App && window.App.getCosmosRpcEndpoint ? window.App.getCosmosRpcEndpoint() : 'https://node-palmito.tellorlayer.com/rpc';
+            const client = await SigningStargateClient.connectWithSigner(
+                rpcEndpoint,
+                offlineSigner
+            );
+
+            // Convert amount to micro units (1 TRB = 1,000,000 micro units)
+            const amountInMicroUnits = Math.floor(parseFloat(amount) * 1000000).toString();
+
+            // Create the message
+            const msg = {
+                typeUrl: '/cosmos.staking.v1beta1.MsgUndelegate',
+                value: {
+                    delegatorAddress: account,
+                    validatorAddress: validatorAddress,
+                    amount: {
+                        denom: 'loya',
+                        amount: amountInMicroUnits
+                    }
+                }
+            };
+
+            // Sign and broadcast using direct signing
+            const result = await client.signAndBroadcastDirect(
+                account,
+                [msg],
+                {
+                    // Keep gas price near prior effective level (0.025 loya/gas) with a higher gas limit.
+                    amount: [{ denom: 'loya', amount: '7500' }],
+                    gas: '300000'
+                },
+                'Undelegate tokens from validator'
+            );
+
+            return result;
+        } catch (error) {
+            console.error('Undelegation error:', error);
+            throw error;
+        }
+    }
+
     // Function to select a reporter
     async function selectReporter(account, reporterAddress) {
         try {
@@ -951,6 +1025,7 @@
     exports.withdrawFromLayer = withdrawFromLayer;
     exports.requestAttestations = requestAttestations;
     exports.delegateTokens = delegateTokens;
+    exports.undelegateTokens = undelegateTokens;
     exports.selectReporter = selectReporter;
     exports.switchReporter = switchReporter;
     exports.pollTransactionStatus = pollTransactionStatus;
@@ -964,6 +1039,7 @@
     window.cosmjs.stargate.withdrawFromLayer = withdrawFromLayer;
     window.cosmjs.stargate.requestAttestations = requestAttestations;
     window.cosmjs.stargate.delegateTokens = delegateTokens;
+    window.cosmjs.stargate.undelegateTokens = undelegateTokens;
     window.cosmjs.stargate.selectReporter = selectReporter;
     window.cosmjs.stargate.switchReporter = switchReporter;
     window.cosmjs.stargate.pollTransactionStatus = pollTransactionStatus;
@@ -973,6 +1049,7 @@
         withdrawFromLayer: withdrawFromLayer,
         requestAttestations: requestAttestations,
         delegateTokens: delegateTokens,
+        undelegateTokens: undelegateTokens,
         selectReporter: selectReporter,
         switchReporter: switchReporter,
         pollTransactionStatus: pollTransactionStatus

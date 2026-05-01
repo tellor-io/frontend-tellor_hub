@@ -2731,6 +2731,13 @@ header {
     gap: 0.5rem;
 }
 
+.status-header-total {
+    font-size: 0.74rem !important;
+    color: #0a7f5e !important;
+    font-weight: 600 !important;
+    white-space: nowrap;
+}
+
 .dropdown-arrow {
     font-size: 0.7rem;
     color: #0b381b; /* Green */
@@ -2754,6 +2761,7 @@ header {
     margin-top: 0.25rem;
     padding: 0.5rem;
     backdrop-filter: blur(10px);
+    overflow-x: hidden;
 }
 
 .status-dropdown-content {
@@ -2776,6 +2784,7 @@ header {
     justify-content: center;
     overflow: hidden;
 }
+
 
 #delegateSection .reward-status-content {
     height: 30px;
@@ -2820,6 +2829,32 @@ header {
     margin-top: 0.65rem;
     min-height: 38px;
     align-items: center;
+}
+
+#delegateSection .delegate-primary-section .primary-action-button-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+#delegateSection .delegate-primary-section .primary-action-button-row .button-style-3 {
+    width: auto;
+    min-width: 150px;
+    margin: 0;
+    padding: 10px 18px;
+    font-size: 16px;
+}
+
+#delegateSection .delegate-primary-section .primary-action-button-row .info-icon {
+    position: static;
+    right: auto;
+    top: auto;
+    transform: none;
+    margin-top: 0;
+    margin-left: 2px;
 }
 
 #delegateSection .action-container {
@@ -3058,6 +3093,169 @@ header {
     color: #0ca277;
     font-weight: 600;
     font-size: 0.75rem;
+}
+
+#delegateSection .delegation-unstake-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0;
+    width: auto;
+    flex-wrap: nowrap;
+}
+
+#delegateSection .delegation-unstake-controls-row {
+    justify-content: flex-end;
+}
+
+#delegateSection .delegation-unstake-input {
+    min-width: 98px;
+    max-width: 120px;
+    width: 100%;
+    border: 1px solid #97b0a5;
+    border-radius: 6px;
+    padding: 4px 6px;
+    font-size: 0.68rem;
+    line-height: 1.2;
+    background: #f7fbf9;
+    color: #123f23;
+}
+
+#delegateSection .delegation-unstake-input::placeholder {
+    font-size: .75rem;
+}
+
+#delegateSection .delegation-unstake-btn {
+    border: 1px solid #0f5a5a;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #0b4a4a;
+    font-size: 0.68rem;
+    font-weight: 600;
+    line-height: 1;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#delegateSection .delegation-unstake-btn:hover {
+    background: #eef9f7;
+}
+
+#delegateSection .delegation-unstake-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+#delegateSection .delegation-unstake-btn-primary {
+    background: #0d6f6f;
+    color: #e8fffb;
+}
+
+#delegateSection .delegation-unstake-btn-primary:hover {
+    background: #0a5d5d;
+}
+
+#delegateSection .delegation-summary-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+#delegateSection .delegation-summary-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+#delegateSection .delegation-summary-row-top {
+    font-size: 0.72rem;
+}
+
+#delegateSection .delegation-summary-title {
+    color: #345149;
+    font-weight: 600;
+}
+
+#delegateSection .delegation-summary-count {
+    color: #3d6459;
+    font-size: 0.7rem;
+}
+
+#delegateSection .delegation-summary-total {
+    color: #0a7f5e;
+    font-weight: 600;
+    font-size: 0.74rem;
+    white-space: nowrap;
+}
+
+#delegateSection .delegation-summary-row-middle {
+    gap: 0.5rem;
+}
+
+#delegateSection .delegation-top-display {
+    font-size: 0.72rem;
+    color: #1b4f40;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#delegateSection .delegation-remaining-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    border: 1px solid #8db3a4;
+    border-radius: 999px;
+    background: #f4f9f7;
+    color: #214d43;
+    font-size: 0.68rem;
+    font-weight: 600;
+    line-height: 1;
+    padding: 5px 9px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+#delegateSection .delegation-remaining-toggle:hover {
+    background: #e8f4ef;
+}
+
+#delegateSection .delegation-summary-row-bottom {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+#delegateSection #delegationsDropdown .status-dropdown-content {
+    gap: 0.4rem;
+}
+
+#delegateSection #delegationsDropdown .status-delegation {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+    padding: 0.2rem 0;
+}
+
+#delegateSection #delegationsDropdown .address-with-copy {
+    width: 100%;
+    justify-content: space-between;
+}
+
+#delegateSection #delegationsDropdown .delegation-unstake-controls {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    margin-top: 0.1rem;
+}
+
+#delegateSection #delegationsDropdown .delegation-unstake-controls-row {
+    justify-content: flex-start;
 }
 
 .status-empty {
