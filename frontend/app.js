@@ -1881,6 +1881,39 @@ const App = {
   },
 
   /**
+   * Opens or closes the static reporter-selection education modal (HTML in index.html).
+   * @param {boolean} open
+   */
+  setReporterSelectionInfoModalOpen: function (open) {
+    const overlay = document.getElementById('reporterSelectionInfoModal');
+    const trigger = document.getElementById('openReporterSelectionInfoBtn');
+    if (!overlay) return;
+
+    const onEsc = function (e) {
+      if (e.key === 'Escape') App.setReporterSelectionInfoModalOpen(false);
+    };
+
+    if (open) {
+      if (overlay._reporterInfoEsc) {
+        document.removeEventListener('keydown', overlay._reporterInfoEsc);
+      }
+      overlay._reporterInfoEsc = onEsc;
+      overlay.classList.add('is-open');
+      overlay.setAttribute('aria-hidden', 'false');
+      if (trigger) trigger.setAttribute('aria-expanded', 'true');
+      document.addEventListener('keydown', onEsc);
+    } else {
+      overlay.classList.remove('is-open');
+      overlay.setAttribute('aria-hidden', 'true');
+      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+      if (overlay._reporterInfoEsc) {
+        document.removeEventListener('keydown', overlay._reporterInfoEsc);
+        overlay._reporterInfoEsc = null;
+      }
+    }
+  },
+
+  /**
    * Modal before switching reporters: power lock / ADR 1009.
    * @returns {Promise<boolean>} true if user continued, false if cancelled
    */
@@ -4148,7 +4181,12 @@ const App = {
     });
   },
 
-  showBalanceErrorPopup: function(message) {
+  showBalanceErrorPopup: function(message, options) {
+    const opts = Object.assign(
+      { html: false, noAutoClose: false },
+      options && typeof options === 'object' ? options : {}
+    );
+
     const modal = document.createElement('div');
     modal.id = 'balanceErrorModal';
     modal.style.position = 'fixed';
@@ -4157,7 +4195,7 @@ const App = {
     modal.style.width = '100%';
     modal.style.height = '100%';
     modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-    modal.style.zIndex = '1000';
+    modal.style.zIndex = '10100';
     modal.style.display = 'flex';
     modal.style.alignItems = 'center';
     modal.style.justifyContent = 'center';
@@ -4170,14 +4208,18 @@ const App = {
     modalContent.style.padding = '30px';
     modalContent.style.fontFamily = "'PPNeueMontreal-Book', Arial, sans-serif";
     modalContent.style.fontSize = "15px";
-    modalContent.style.width = '400px';
-    modalContent.style.textAlign = 'center';
-    modalContent.style.maxWidth = '90vw';
+    modalContent.style.width = opts.html ? 'auto' : '400px';
+    modalContent.style.textAlign = opts.html ? 'left' : 'center';
+    modalContent.style.maxWidth = opts.html ? 'min(560px, 92vw)' : '90vw';
 
     const messageDiv = document.createElement('div');
-    messageDiv.textContent = message;
+    if (opts.html) {
+      messageDiv.innerHTML = message;
+    } else {
+      messageDiv.textContent = message;
+    }
     messageDiv.style.marginBottom = '25px';
-    messageDiv.style.lineHeight = '1.4';
+    messageDiv.style.lineHeight = '1.45';
     modalContent.appendChild(messageDiv);
 
     const buttonContainer = document.createElement('div');
@@ -4204,35 +4246,38 @@ const App = {
       okButton.style.backgroundColor = '#10b981';
     };
 
-    // Event handlers
-    okButton.onclick = () => {
-      document.body.removeChild(modal);
+    let handleEscape;
+    const cleanup = function () {
+      const stillThere = document.getElementById('balanceErrorModal');
+      if (stillThere && stillThere.parentNode) {
+        document.body.removeChild(stillThere);
+      }
+      document.removeEventListener('keydown', handleEscape);
+    };
+    handleEscape = function (e) {
+      if (e.key === 'Escape') {
+        cleanup();
+      }
+    };
+
+    okButton.onclick = function () {
+      cleanup();
     };
 
     // Close on overlay click
-    modal.onclick = (e) => {
+    modal.onclick = function (e) {
       if (e.target === modal) {
-        document.body.removeChild(modal);
+        cleanup();
       }
     };
 
-    // Close on Escape key
-    const handleEscape = (e) => {
-      if (e.key === 'Escape') {
-        document.body.removeChild(modal);
-        document.removeEventListener('keydown', handleEscape);
-      }
-    };
     document.addEventListener('keydown', handleEscape);
 
-    // Auto-close after 5 seconds
-    setTimeout(() => {
-      const modal = document.getElementById('balanceErrorModal');
-      if (modal) {
-        document.body.removeChild(modal);
-        document.removeEventListener('keydown', handleEscape);
-      }
-    }, 5000);
+    if (!opts.noAutoClose) {
+      setTimeout(function () {
+        cleanup();
+      }, 5000);
+    }
 
     buttonContainer.appendChild(okButton);
     modalContent.appendChild(buttonContainer);
@@ -4301,6 +4346,15 @@ const App = {
         // Validate validator address format (should start with tellorvaloper)
         if (!validatorAddress.startsWith('tellorvaloper')) {
             App.showValidationErrorPopup('Please select a valid validator from the dropdown');
+            return;
+        }
+
+        const validatorConcentration = await App.checkValidatorPowerConcentration(validatorAddress.trim());
+        if (!validatorConcentration.ok) {
+            App.showBalanceErrorPopup(
+                validatorConcentration.message,
+                validatorConcentration.balanceErrorOptions || null
+            );
             return;
         }
 
@@ -4564,6 +4618,15 @@ const App = {
         // Validate reporter address format (should be a valid bech32 address)
         if (!reporterAddress.startsWith('tellor')) {
             App.showValidationErrorPopup('Please select a valid reporter from the dropdown');
+            return;
+        }
+
+        const concentration = await App.checkReporterPowerConcentration(reporterAddress.trim());
+        if (!concentration.ok) {
+            App.showBalanceErrorPopup(
+              concentration.message,
+              concentration.balanceErrorOptions || null
+            );
             return;
         }
 
@@ -6148,11 +6211,105 @@ const App = {
         address: reporter.address,
         name: reporter.metadata?.moniker || 'Unknown Reporter',
         description: `Power: ${reporter.power}, Commission: ${(parseFloat(reporter.metadata?.commission_rate || '0') * 100).toFixed(2)}%`,
+        power: String(reporter.power != null ? reporter.power : '0'),
         active: !reporter.metadata?.jailed || false
       }));
     } catch (error) {
       console.error('Error fetching reporters:', error);
       throw error;
+    }
+  },
+
+  /**
+   * Block selection when the reporter holds >= 25% of total active reporter power (UI guard).
+   * @param {string} reporterAddress
+   * @returns {Promise<{ ok: true } | { ok: false, message: string, balanceErrorOptions?: { html?: boolean, noAutoClose?: boolean } }>}
+   */
+  checkReporterPowerConcentration: async function (reporterAddress) {
+    const MESSAGE =
+      '<p style="margin:0 0 14px 0;"><strong>Unable to Execute:</strong> Please select a different reporter.</p>' +
+      '<p style="margin:0 0 14px 0;">To help combat centralization risk, selections are blocked if they put the reporter over 25% of the total reporter power.</p>' +
+      '<p style="margin:0;">Join the <a href="https://discord.gg/tellor" target="_blank" rel="noopener noreferrer" style="color:#0f766e;font-weight:600;">Tellor Discord</a> for more info.</p>';
+    const addr = String(reporterAddress || '').trim();
+    if (!addr) return { ok: true };
+    try {
+      const reporters = await App.fetchReporters();
+      const selected = reporters.find((r) => r.address === addr);
+      if (!selected) return { ok: true };
+      let selectedPower;
+      try {
+        selectedPower = BigInt(String(selected.power || '0'));
+      } catch {
+        selectedPower = 0n;
+      }
+      let totalActive = 0n;
+      for (const r of reporters) {
+        if (!r.active) continue;
+        try {
+          totalActive += BigInt(String(r.power || '0'));
+        } catch {
+          /* skip malformed */
+        }
+      }
+      if (totalActive <= 0n) return { ok: true };
+      // share >= 25%  <=>  selectedPower / totalActive >= 1/4  <=>  4 * selectedPower >= totalActive
+      if (selectedPower * 4n >= totalActive) {
+        return {
+          ok: false,
+          message: MESSAGE,
+          balanceErrorOptions: { html: true, noAutoClose: true }
+        };
+      }
+      return { ok: true };
+    } catch (e) {
+      console.error('Reporter power concentration check failed:', e);
+      return { ok: true };
+    }
+  },
+
+  /**
+   * Block delegation when the validator holds >= 25% of total non-jailed bonded stake (UI guard).
+   * @param {string} validatorOperatorAddress tellorvaloper…
+   * @returns {Promise<{ ok: true } | { ok: false, message: string, balanceErrorOptions?: { html?: boolean, noAutoClose?: boolean } }>}
+   */
+  checkValidatorPowerConcentration: async function (validatorOperatorAddress) {
+    const MESSAGE =
+      '<p style="margin:0 0 14px 0;"><strong>Unable to Execute:</strong> Please select a different validator.</p>' +
+      '<p style="margin:0 0 14px 0;">To help combat centralization risk, delegations are blocked if the chosen validator holds at least 25% of total validator power.</p>' +
+      '<p style="margin:0;">Join the <a href="https://discord.gg/tellor" target="_blank" rel="noopener noreferrer" style="color:#0f766e;font-weight:600;">Tellor Discord</a> for more info.</p>';
+    const addr = String(validatorOperatorAddress || '').trim();
+    if (!addr) return { ok: true };
+    try {
+      const validators = await App.fetchValidators();
+      const selected = validators.find((v) => v.address === addr);
+      if (!selected || selected.jailed) return { ok: true };
+      let selectedStake;
+      try {
+        selectedStake = BigInt(String(selected.votingPower || '0'));
+      } catch {
+        selectedStake = 0n;
+      }
+      let totalNonJailed = 0n;
+      for (const v of validators) {
+        if (v.jailed) continue;
+        try {
+          totalNonJailed += BigInt(String(v.votingPower || '0'));
+        } catch {
+          /* skip malformed */
+        }
+      }
+      if (totalNonJailed <= 0n) return { ok: true };
+      if (selectedStake * 4n >= totalNonJailed) {
+        return {
+          ok: false,
+          message: MESSAGE,
+          balanceErrorOptions: { html: true, noAutoClose: true }
+        };
+      }
+      return { ok: true };
+    } catch (e) {
+      console.error('Validator power concentration check failed:', e);
+      return { ok: true };
     }
   },
 
