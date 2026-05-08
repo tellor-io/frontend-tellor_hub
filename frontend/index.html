@@ -430,6 +430,21 @@
                         <div class="bridge-direction primary-action-button-row">
                             <button id="selectReporterButton" class="button-style-3" onclick="App.selectReporter()">Select Reporter</button>
                         </div>
+                        <div class="reporter-read-notice-row">
+                            <button type="button" class="reporter-read-notice-trigger" id="openReporterSelectionInfoBtn" aria-haspopup="dialog" aria-controls="reporterSelectionInfoModal" aria-expanded="false" onclick="App.setReporterSelectionInfoModalOpen(true)">
+                                <span class="reporter-read-notice-icon" aria-hidden="true">
+                                    <svg class="reporter-read-notice-icon-svg" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <path d="M9 7h7M9 11h7M9 15h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                        <circle cx="18" cy="5" r="4" fill="#f0b429"/>
+                                        <path d="M18 3.4v2.3" stroke="#1a1a1a" stroke-width="1.7" stroke-linecap="round"/>
+                                        <circle cx="18" cy="8.35" r="0.85" fill="#1a1a1a"/>
+                                    </svg>
+                                </span>
+                                <span class="reporter-read-notice-label">Important: Please Read before selecting</span>
+                            </button>
+                        </div>
                     </div>
                   </div>
 
@@ -1450,5 +1465,43 @@
     </script>
     <script src="./js/inlineHandlerBridge.js"></script>
     <script src="./js/dispute.js"></script>
+
+    <div id="reporterSelectionInfoModal" class="wallet-modal-overlay reporter-selection-info-overlay" role="dialog" aria-modal="true" aria-labelledby="reporterSelectionInfoTitle" aria-hidden="true" onclick="if (event.target === this) App.setReporterSelectionInfoModalOpen(false)">
+      <div class="wallet-modal reporter-selection-info-modal" role="document" onclick="event.stopPropagation()">
+        <div class="wallet-modal-header">
+          <h3 id="reporterSelectionInfoTitle">Reporter selection essentials</h3>
+          <button type="button" class="wallet-modal-close" id="reporterSelectionInfoCloseBtn" aria-label="Close" onclick="App.setReporterSelectionInfoModalOpen(false)">&times;</button>
+        </div>
+        <div class="wallet-modal-content reporter-selection-info-body">
+            <p class="wallet-modal-description reporter-selection-info-lead">
+              Selecting a reporter is different from delegating to a validator. Here are some important things to remember when deciding which reporter to select:
+            </p>
+            <ul class="reporter-selection-info-list">
+              <li>
+                <strong>One reporter, many validators.</strong> You may delegate to any number of validators, but one account can only select one reporter at a time. If you have a lot of TRB to stake, we recommend using multiple accounts for selecting multiple reporters to reduce the risks of centralization and lost funds due to the reporter's operational error.
+              </li>
+              <li>
+                <strong>Switching penalty.</strong> Changing you reporter selection is not free unless the reporter has been inactive for more than 21 days. If your current reporter is actively reporting, you forfeit 21 days worth of rewards after switching. This is a security precaution to prevent bridge manipulation.
+              </li>
+              <li>
+                <strong>Power aggregation.</strong> A reporter&rsquo;s power is the sum of all delegations to their validators. Any future delegation adds to that reporter&rsquo;s total, regardless of which validator you choose.
+              </li>
+              <li>
+                <strong>Reporter's must be Live!:</strong> You don't want to choose just any reporter. Tellor is fully public and trustless for who can be a reporter, and it is possible to accidentally select a reporter who is not actually reporting properly and earning tokens. You can check a reporter's 4 hour liveness numbers via the bot messages in the ⁠#reporter-liveness channel in our discord (link below).
+              </li>
+            </ul>
+            <p class="reporter-selection-info-discord">
+              Questions? Ask in <a href="https://discord.gg/tellor" target="_blank" rel="noopener noreferrer">Tellor Discord</a>.
+            </p>
+            <hr class="reporter-selection-info-divider" />
+            <p class="reporter-selection-info-warning">
+              <strong>Please note:</strong> To help combat centralization risk, selections are blocked if they put the reporter over 25% of the total reporter power.
+            </p>
+        </div>
+        <div class="wallet-modal-footer reporter-selection-info-footer" id="reporterSelectionInfoFooter">
+          <button type="button" class="reporter-selection-info-dismiss" id="reporterSelectionInfoDismissBtn" onclick="App.setReporterSelectionInfoModalOpen(false)">Got it</button>
+        </div>
+      </div>
+    </div>
   </body>
 </html>
