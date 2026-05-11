@@ -125,122 +125,94 @@
             }
         }
 
-        // Unified direct signing method for all message types
-        async signAndBroadcastDirect(signerAddress, messages, fee, memo = "") {
-            try {
-                // Get account info
-                const accountInfo = await this.getAccount(signerAddress);
-
-                if (!accountInfo) {
-                    throw new Error('Account not found');
-                }
-
-                // Get the appropriate signer for direct signing
-                let offlineSigner;
-                if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
-                    // Use wallet adapter if available
-                    offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
-                } else if (window.getOfflineSignerAuto) {
-                    // Fallback to legacy methods
-                    const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
-                    offlineSigner = await window.getOfflineSignerAuto(chainId);
-                } else if (window.getOfflineSignerDirect) {
-                    const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
-                    offlineSigner = window.getOfflineSignerDirect(chainId);
-                } else if (window.getOfflineSigner) {
-                    // Use the current chain ID from the app
+        async _getCosmosOfflineSigner() {
+            let offlineSigner;
+            if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+                offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+            } else if (window.getOfflineSignerAuto) {
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
+                offlineSigner = await window.getOfflineSignerAuto(chainId);
+            } else if (window.getOfflineSignerDirect) {
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
+                offlineSigner = window.getOfflineSignerDirect(chainId);
+            } else if (window.getOfflineSigner) {
                 const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
                 offlineSigner = window.getOfflineSigner(chainId);
-                } else {
-                    throw new Error('No offline signer available');
-                }
+            } else {
+                throw new Error('No offline signer available');
+            }
+            return offlineSigner;
+        }
 
-                // Create protobuf types
-                const root = new protobuf.Root();
-                
-                // Define Coin type
-                const Coin = new protobuf.Type("Coin")
-                    .add(new protobuf.Field("denom", 1, "string"))
-                    .add(new protobuf.Field("amount", 2, "string"));
-                
-                // Define Any type
-                const Any = new protobuf.Type("Any")
-                    .add(new protobuf.Field("typeUrl", 1, "string"))
-                    .add(new protobuf.Field("value", 2, "bytes"));
-                
-                // Define PubKey type for secp256k1
-                const PubKey = new protobuf.Type("PubKey")
-                    .add(new protobuf.Field("key", 1, "bytes"));
-                
-                // Define TxBody type
-                const TxBody = new protobuf.Type("TxBody")
-                    .add(new protobuf.Field("messages", 1, "Any", "repeated"))
-                    .add(new protobuf.Field("memo", 2, "string"))
-                    .add(new protobuf.Field("timeoutHeight", 3, "uint64"))
-                    .add(new protobuf.Field("extensionOptions", 1023, "Any", "repeated"))
-                    .add(new protobuf.Field("nonCriticalExtensionOptions", 2047, "Any", "repeated"));
-                
-                // Define SignMode enum
-                const SignMode = new protobuf.Enum("SignMode")
-                    .add("SIGN_MODE_UNSPECIFIED", 0)
-                    .add("SIGN_MODE_DIRECT", 1)
-                    .add("SIGN_MODE_TEXTUAL", 2)
-                    .add("SIGN_MODE_LEGACY_AMINO_JSON", 127);
-                
-                // Define Single type
-                const Single = new protobuf.Type("Single")
-                    .add(new protobuf.Field("mode", 1, "SignMode"));
-                
-                // Define ModeInfo type
-                const ModeInfo = new protobuf.Type("ModeInfo")
-                    .add(new protobuf.Field("single", 1, "Single"));
-                
-                // Define SignerInfo type
-                const SignerInfo = new protobuf.Type("SignerInfo")
-                    .add(new protobuf.Field("publicKey", 1, "Any"))
-                    .add(new protobuf.Field("modeInfo", 2, "ModeInfo"))
-                    .add(new protobuf.Field("sequence", 3, "uint64"));
-                
-                // Define Fee type
-                const Fee = new protobuf.Type("Fee")
-                    .add(new protobuf.Field("amount", 1, "Coin", "repeated"))
-                    .add(new protobuf.Field("gasLimit", 2, "uint64"))
-                    .add(new protobuf.Field("payer", 3, "string"))
-                    .add(new protobuf.Field("granter", 4, "string"));
-                
-                // Define AuthInfo type
-                const AuthInfo = new protobuf.Type("AuthInfo")
-                    .add(new protobuf.Field("signerInfos", 1, "SignerInfo", "repeated"))
-                    .add(new protobuf.Field("fee", 2, "Fee"));
-                
-                // Define Tx type
-                const Tx = new protobuf.Type("Tx")
-                    .add(new protobuf.Field("body", 1, "TxBody"))
-                    .add(new protobuf.Field("authInfo", 2, "AuthInfo"))
-                    .add(new protobuf.Field("signatures", 3, "bytes", "repeated"));
+        _createDirectTxProtobufEnv() {
+            const root = new protobuf.Root();
+            const Coin = new protobuf.Type("Coin")
+                .add(new protobuf.Field("denom", 1, "string"))
+                .add(new protobuf.Field("amount", 2, "string"));
+            const Any = new protobuf.Type("Any")
+                .add(new protobuf.Field("typeUrl", 1, "string"))
+                .add(new protobuf.Field("value", 2, "bytes"));
+            const PubKey = new protobuf.Type("PubKey")
+                .add(new protobuf.Field("key", 1, "bytes"));
+            const TxBody = new protobuf.Type("TxBody")
+                .add(new protobuf.Field("messages", 1, "Any", "repeated"))
+                .add(new protobuf.Field("memo", 2, "string"))
+                .add(new protobuf.Field("timeoutHeight", 3, "uint64"))
+                .add(new protobuf.Field("extensionOptions", 1023, "Any", "repeated"))
+                .add(new protobuf.Field("nonCriticalExtensionOptions", 2047, "Any", "repeated"));
+            const SignMode = new protobuf.Enum("SignMode")
+                .add("SIGN_MODE_UNSPECIFIED", 0)
+                .add("SIGN_MODE_DIRECT", 1)
+                .add("SIGN_MODE_TEXTUAL", 2)
+                .add("SIGN_MODE_LEGACY_AMINO_JSON", 127);
+            const Single = new protobuf.Type("Single")
+                .add(new protobuf.Field("mode", 1, "SignMode"));
+            const ModeInfo = new protobuf.Type("ModeInfo")
+                .add(new protobuf.Field("single", 1, "Single"));
+            const SignerInfo = new protobuf.Type("SignerInfo")
+                .add(new protobuf.Field("publicKey", 1, "Any"))
+                .add(new protobuf.Field("modeInfo", 2, "ModeInfo"))
+                .add(new protobuf.Field("sequence", 3, "uint64"));
+            const Fee = new protobuf.Type("Fee")
+                .add(new protobuf.Field("amount", 1, "Coin", "repeated"))
+                .add(new protobuf.Field("gasLimit", 2, "uint64"))
+                .add(new protobuf.Field("payer", 3, "string"))
+                .add(new protobuf.Field("granter", 4, "string"));
+            const AuthInfo = new protobuf.Type("AuthInfo")
+                .add(new protobuf.Field("signerInfos", 1, "SignerInfo", "repeated"))
+                .add(new protobuf.Field("fee", 2, "Fee"));
+            const Tx = new protobuf.Type("Tx")
+                .add(new protobuf.Field("body", 1, "TxBody"))
+                .add(new protobuf.Field("authInfo", 2, "AuthInfo"))
+                .add(new protobuf.Field("signatures", 3, "bytes", "repeated"));
+            root.add(Coin);
+            root.add(Any);
+            root.add(PubKey);
+            root.add(TxBody);
+            root.add(SignMode);
+            root.add(Single);
+            root.add(ModeInfo);
+            root.add(SignerInfo);
+            root.add(Fee);
+            root.add(AuthInfo);
+            root.add(Tx);
+            return {
+                root,
+                TxType: root.lookupType("Tx"),
+                AnyType: root.lookupType("Any"),
+                TxBodyType: root.lookupType("TxBody"),
+                AuthInfoType: root.lookupType("AuthInfo"),
+                PubKeyType: root.lookupType("PubKey")
+            };
+        }
 
-                // Add types to root
-                root.add(Coin);
-                root.add(Any);
-                root.add(PubKey);
-                root.add(TxBody);
-                root.add(SignMode);
-                root.add(Single);
-                root.add(ModeInfo);
-                root.add(SignerInfo);
-                root.add(Fee);
-                root.add(AuthInfo);
-                root.add(Tx);
-
-                // Get the types
-                const TxType = root.lookupType("Tx");
-                const AnyType = root.lookupType("Any");
-                const TxBodyType = root.lookupType("TxBody");
-                const AuthInfoType = root.lookupType("AuthInfo");
-                const PubKeyType = root.lookupType("PubKey");
-
-                // Encode messages based on their type
+        _encodeDirectMessagesForSigning(messages, root) {
                 const encodedMessages = [];
+                const dbgEncode = (...args) => {
+                    if (window.App && typeof window.App.debugLog === 'function') {
+                        window.App.debugLog(...args);
+                    }
+                };
                 for (const message of messages) {
                     let encodedMessage;
                     
@@ -267,7 +239,7 @@
                             }
                         };
                         
-                        console.log('Encoding MsgWithdrawTokens:', msgValue);
+                        dbgEncode('Encoding MsgWithdrawTokens:', msgValue);
                         encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else if (message.typeUrl === '/layer.bridge.MsgRequestAttestations') {
                         // Encode attestation request message using the same approach as the original Amino method
@@ -359,7 +331,7 @@
                             payFromBond: message.value.payFromBond
                         };
                         
-                        console.log('Encoding MsgProposeDispute:', msgValue);
+                        dbgEncode('Encoding MsgProposeDispute:', msgValue);
                         encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else if (message.typeUrl === '/layer.dispute.MsgVote') {
                         // Encode dispute vote message
@@ -377,8 +349,7 @@
                             vote: message.value.vote
                         };
                         
-                        console.log('Encoding MsgVote:', msgValue);
-                        console.log('Vote field type:', typeof msgValue.vote, 'Value:', msgValue.vote);
+                        dbgEncode('Encoding MsgVote:', msgValue, 'vote field type:', typeof msgValue.vote, msgValue.vote);
                         encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else if (message.typeUrl === '/layer.dispute.MsgAddFeeToDispute') {
                         // Encode dispute add fee message
@@ -398,7 +369,7 @@
                             payFromBond: message.value.payFromBond
                         };
                         
-                        console.log('Encoding MsgAddFeeToDispute:', msgValue);
+                        dbgEncode('Encoding MsgAddFeeToDispute:', msgValue);
                         encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else if (message.typeUrl === '/layer.dispute.MsgClaimDisputeRewards') {
                         // Encode claim dispute rewards message
@@ -414,7 +385,7 @@
                             disputeId: message.value.disputeId
                         };
                         
-                        console.log('Encoding MsgClaimDisputeRewards:', msgValue);
+                        dbgEncode('Encoding MsgClaimDisputeRewards:', msgValue);
                         encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else if (message.typeUrl === '/layer.dispute.MsgWithdrawFeeRefund') {
                         // Encode withdraw fee refund message
@@ -430,7 +401,7 @@
                             disputeId: message.value.disputeId
                         };
                         
-                        console.log('Encoding MsgWithdrawFeeRefund:', msgValue);
+                        dbgEncode('Encoding MsgWithdrawFeeRefund:', msgValue);
                         encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else if (message.typeUrl === '/layer.reporter.MsgSelectReporter') {
                         // Encode reporter selection message
@@ -446,7 +417,7 @@
                             reporterAddress: message.value.reporterAddress
                         };
                         
-                        console.log('Encoding MsgSelectReporter:', msgValue);
+                        dbgEncode('Encoding MsgSelectReporter:', msgValue);
                         encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else if (message.typeUrl === '/layer.reporter.MsgSwitchReporter') {
                         // Encode reporter switch message
@@ -462,7 +433,7 @@
                             reporterAddress: message.value.reporterAddress
                         };
 
-                        console.log('Encoding MsgSwitchReporter:', msgValue);
+                        dbgEncode('Encoding MsgSwitchReporter:', msgValue);
                         encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else if (message.typeUrl === '/layer.reporter.MsgWithdrawTip') {
                         // Encode selector tip withdrawal message
@@ -478,7 +449,7 @@
                             validatorAddress: message.value.validatorAddress
                         };
 
-                        console.log('Encoding MsgWithdrawTip:', msgValue);
+                        dbgEncode('Encoding MsgWithdrawTip:', msgValue);
                         encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else {
                         throw new Error(`Unsupported message type: ${message.typeUrl}`);
@@ -491,6 +462,96 @@
                     };
                     encodedMessages.push(messageAny);
                 }
+                return encodedMessages;
+        }
+
+        /**
+         * Dry-run the same messages via LCD /cosmos/tx/v1beta1/simulate (CosmJS-style unsigned Tx).
+         * @returns {Promise<number>} gas_used from simulation
+         */
+        async simulateDirect(signerAddress, messages, memo = '') {
+            const accountInfo = await this.getAccount(signerAddress);
+            if (!accountInfo) {
+                throw new Error('Account not found');
+            }
+            const offlineSigner = await this._getCosmosOfflineSigner();
+            const accounts = await offlineSigner.getAccounts();
+            if (!accounts || accounts.length === 0) {
+                throw new Error('No accounts found in signer');
+            }
+            const env = this._createDirectTxProtobufEnv();
+            const encodedMessages = this._encodeDirectMessagesForSigning(messages, env.root);
+            const txBody = {
+                messages: encodedMessages,
+                memo: memo || '',
+                timeoutHeight: 0,
+                extensionOptions: [],
+                nonCriticalExtensionOptions: []
+            };
+            const encodedTxBody = env.TxBodyType.encode(env.TxBodyType.create(txBody)).finish();
+            const authInfoSimulate = {
+                signerInfos: [{
+                    publicKey: {
+                        typeUrl: '/cosmos.crypto.secp256k1.PubKey',
+                        value: env.PubKeyType.encode({ key: accounts[0].pubkey }).finish()
+                    },
+                    modeInfo: {
+                        single: {
+                            mode: 0
+                        }
+                    },
+                    sequence: parseInt(String(accountInfo.sequence), 10)
+                }],
+                fee: {
+                    amount: [],
+                    gasLimit: 0,
+                    payer: '',
+                    granter: ''
+                }
+            };
+            const encodedAuthInfo = env.AuthInfoType.encode(env.AuthInfoType.create(authInfoSimulate)).finish();
+            const simTx = {
+                body: env.TxBodyType.decode(encodedTxBody),
+                authInfo: env.AuthInfoType.decode(encodedAuthInfo),
+                signatures: [new Uint8Array(0)]
+            };
+            const encodedTx = env.TxType.encode(env.TxType.create(simTx)).finish();
+            const base64Tx = btoa(String.fromCharCode.apply(null, encodedTx));
+            const response = await fetch(`${this.getRestBase()}/cosmos/tx/v1beta1/simulate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tx_bytes: base64Tx })
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error((result && (result.message || result.error)) || `Simulate HTTP ${response.status}`);
+            }
+            const gasInfo = result.gas_info || result.gasInfo;
+            const gasUsed = gasInfo && (gasInfo.gas_used !== undefined ? gasInfo.gas_used : gasInfo.gasUsed);
+            if (gasUsed === undefined || gasUsed === null) {
+                throw new Error((result.message || JSON.stringify(result)).slice(0, 500) || 'Simulate returned no gas_info');
+            }
+            const n = parseInt(String(gasUsed), 10);
+            if (!Number.isFinite(n) || n <= 0) {
+                throw new Error(`Invalid simulated gas: ${gasUsed}`);
+            }
+            return n;
+        }
+
+        // Unified direct signing method for all message types
+        async signAndBroadcastDirect(signerAddress, messages, fee, memo = "") {
+            try {
+                const accountInfo = await this.getAccount(signerAddress);
+                if (!accountInfo) {
+                    throw new Error('Account not found');
+                }
+                const offlineSigner = await this._getCosmosOfflineSigner();
+                const env = this._createDirectTxProtobufEnv();
+                const encodedMessages = this._encodeDirectMessagesForSigning(messages, env.root);
+                const TxBodyType = env.TxBodyType;
+                const TxType = env.TxType;
+                const AuthInfoType = env.AuthInfoType;
+                const PubKeyType = env.PubKeyType;
 
                 // Create the TxBody
                 const txBody = {

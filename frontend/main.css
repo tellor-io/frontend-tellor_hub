@@ -3415,6 +3415,7 @@ header {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    cursor: help;
 }
 
 #delegateSection .delegation-remaining-toggle {

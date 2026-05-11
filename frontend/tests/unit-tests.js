@@ -267,6 +267,14 @@ export class UnitTests extends TestSuite {
         run: () => this.testSelectorTipsClaimSuccessFlow()
       },
       {
+        name: 'Cosmos LCD simulate gate (HTTPS + trusted host)',
+        run: () => this.testCosmosRestEndpointAllowsSimulate()
+      },
+      {
+        name: 'Cosmos tx error messages (out of gas user copy)',
+        run: () => this.testCosmosTxLogOrErrorToUserMessage()
+      },
+      {
         name: 'Claim modals show moniker with validator address',
         run: () => this.testClaimModalValidatorOptionLabels()
       },
@@ -1335,6 +1343,36 @@ export class UnitTests extends TestSuite {
       window.fetch = prevFetch;
       window.App.cosmosChainId = prevChain;
     }
+  }
+
+  testCosmosRestEndpointAllowsSimulate() {
+    const f = window.App.cosmosRestEndpointAllowsSimulate;
+    if (typeof f !== 'function') {
+      throw new Error('App.cosmosRestEndpointAllowsSimulate missing');
+    }
+    this.assertTrue(f('https://mainnet.tellorlayer.com'), 'Mainnet LCD host should allow simulate');
+    this.assertTrue(f('https://node-palmito.tellorlayer.com'), 'Palmito LCD host should allow simulate');
+    this.assertTrue(f('https://localhost:1317'), 'localhost HTTPS should allow simulate');
+    this.assertTrue(f('https://127.0.0.1:1317'), '127.0.0.1 HTTPS should allow simulate');
+    this.assertFalse(f('http://mainnet.tellorlayer.com'), 'HTTP should not allow simulate');
+    this.assertFalse(f('https://untrusted-lcd.example.com'), 'Unknown host should not allow simulate');
+    this.assertFalse(f(''), 'Empty URL should not allow simulate');
+    this.assertFalse(f('not-a-valid-url'), 'Invalid URL should not allow simulate');
+  }
+
+  testCosmosTxLogOrErrorToUserMessage() {
+    const f = window.App.cosmosTxLogOrErrorToUserMessage;
+    if (typeof f !== 'function') {
+      throw new Error('App.cosmosTxLogOrErrorToUserMessage missing');
+    }
+    const oogLog =
+      'out of gas in location: ReadFlat; gasWanted: 200000, gasUsed: 200153: out of gas';
+    const oogMsg = f(oogLog, 'fallback');
+    this.assertTrue(oogMsg.includes('ran out of gas'), 'OOG raw_log should map to user guidance');
+    this.assertFalse(oogMsg.includes('ReadFlat'), 'User message should not echo low-level SDK location');
+    this.assertEqual(f({ raw_log: 'something else happened' }, 'fb'), 'something else happened');
+    this.assertEqual(f({ message: 'insufficient fees' }, 'fb'), f('insufficient fees', 'fb'));
+    this.assertTrue(f('insufficient fee', 'fb').toLowerCase().includes('fee was too low'));
   }
 
   async testSelectorTipsClaimSuccessFlow() {

@@ -8,6 +8,17 @@ const LAYER_TESTNET_CHAIN_ID = 'layertest-5';
 const LAYER_TESTNET_LCD = 'https://node-palmito.tellorlayer.com';
 const LAYER_TESTNET_RPC = 'https://node-palmito.tellorlayer.com/rpc';
 
+/** Hostnames allowed for LCD gas simulate (HTTPS only). Expand for self-hosted dev. */
+const COSMOS_LCD_SIMULATE_TRUSTED_HOSTS = new Set([
+  'mainnet.tellorlayer.com',
+  'node-palmito.tellorlayer.com',
+  'localhost',
+  '127.0.0.1'
+]);
+
+/** Upper bound on gas_wanted after simulate×multiplier (many MsgWithdrawDelegatorReward in one tx). */
+const COSMOS_SIMULATE_GAS_WANTED_MAX = 12_000_000;
+
 const SEPOLIA_TOKEN_BRIDGE_ADDRESS = '0x55355157703A44f7516FBB831333317E98944e32';
 const ETHEREUM_MAINNET_TOKEN_BRIDGE_ADDRESS = '0x6ec401744008f4B018Ed9A36f76e6629799Ee50E';
 const SEPOLIA_V2_STARTING_WITHDRAW_ID = 0;
@@ -1656,6 +1667,31 @@ const App = {
       return 'https://mainnet.tellorlayer.com';
     }
     return LAYER_TESTNET_LCD;
+  },
+
+  /**
+   * Whether to call LCD /cosmos/tx/v1beta1/simulate for gas (HTTPS + known host only).
+   * Unknown hosts fall back to static gas/fee so a swapped REST URL cannot drive absurd gas_wanted.
+   */
+  cosmosRestEndpointAllowsSimulate: function(url) {
+    if (!url || typeof url !== 'string') {
+      return false;
+    }
+    if (!url.startsWith('https://')) {
+      console.warn('[Cosmos] simulate skipped: REST base must use HTTPS.', url);
+      return false;
+    }
+    try {
+      const host = new URL(url).hostname;
+      if (!COSMOS_LCD_SIMULATE_TRUSTED_HOSTS.has(host)) {
+        console.warn('[Cosmos] simulate skipped: LCD host not in trusted list.', host);
+        return false;
+      }
+    } catch (e) {
+      console.warn('[Cosmos] simulate skipped: invalid REST URL.', e);
+      return false;
+    }
+    return true;
   },
 
   // Get the appropriate Cosmos RPC endpoint based on current Cosmos network
@@ -3412,18 +3448,18 @@ const App = {
             const w = App.withdrawalAttestationDelayLabel().long;
             App.showSuccessPopup(`Withdrawal successful! You will need to wait ${w} before you can claim your tokens on Ethereum.`, txHash, 'cosmos');
         } else {
-            throw new Error(result?.rawLog || result?.raw_log || "Withdrawal failed");
+            throw new Error(App.cosmosTxLogOrErrorToUserMessage(result, 'Withdrawal failed'));
         }
         
         await App.updateKeplrBalance();
         return result;
         } else {
-            throw new Error(result?.rawLog || result?.raw_log || "Withdrawal failed");
+            throw new Error(App.cosmosTxLogOrErrorToUserMessage(result, 'Withdrawal failed'));
         }
     } catch (error) {
         // console.error(...);
         App.hidePendingPopup();
-        App.showErrorPopup(error.message || "Error withdrawing tokens. Please try again.");
+        App.showErrorPopup(App.cosmosTxLogOrErrorToUserMessage(error, 'Error withdrawing tokens. Please try again.'));
         throw error;
     }
   },
@@ -6707,6 +6743,7 @@ const App = {
             <select id="selectorClaimModalValidator" class="input-address">
               <option value="">Select validator destination...</option>
             </select>
+                        <div style="font-size:11px;color:#7a9e9e;line-height:1.35;">If you pick a validator you are not already delegated to, this claim creates a new delegation there (same as adding stake to that validator).</div>
           </div>
         `;
         const select = container.querySelector('#selectorClaimModalValidator');
@@ -6749,6 +6786,34 @@ const App = {
     return { offlineSigner, signerAddress };
   },
 
+  /**
+   * Turn Cosmos tx raw_log or an Error into a short user-facing popup string.
+   * Detects out-of-gas (SDK codespace) so users see guidance instead of only chain jargon.
+   */
+  cosmosTxLogOrErrorToUserMessage: function(source, fallback = 'Transaction failed.') {
+    let raw = '';
+    if (source && typeof source === 'object') {
+      if (typeof source.message === 'string') {
+        raw = source.message;
+      } else if (typeof source.raw_log === 'string') {
+        raw = source.raw_log;
+      } else if (typeof source.rawLog === 'string') {
+        raw = source.rawLog;
+      }
+    } else if (typeof source === 'string') {
+      raw = source;
+    }
+    raw = String(raw || '').trim();
+    const lower = raw.toLowerCase();
+    if (lower.includes('out of gas')) {
+      return 'This transaction ran out of gas before it could finish. Please try again in a moment. If you were claiming rewards from many validators in one step, try claiming fewer validators per transaction. If this keeps happening, contact Tellor and include any message from your wallet or block explorer.';
+    }
+    if (lower.includes('insufficient fee') || lower.includes('insufficient fees')) {
+      return 'The attached fee was too low for the network’s current minimum. Try again; if it persists, your wallet or the public node may be out of date—contact Tellor.';
+    }
+    return raw || fallback;
+  },
+
   broadcastCosmosMessages: async function(messages, memo = '') {
     if (!Array.isArray(messages) || messages.length === 0) {
       throw new Error('No messages to broadcast.');
@@ -6758,8 +6823,34 @@ const App = {
       App.getCosmosRpcEndpoint(),
       offlineSigner
     );
-    const gasAmount = Math.max(200000, 120000 * messages.length);
-    const feeAmount = Math.max(15000, 8000 * messages.length);
+    const GAS_MULT = 1.4;
+    const GAS_PRICE_LOYA = 0.025;
+    const fallbackGas = Math.max(350000, 120000 * messages.length);
+    const fallbackFee = Math.max(20000, 8000 * messages.length);
+    const minGasFloor = 80000 * messages.length;
+    const restBase = App.getCosmosApiEndpoint();
+    const simulateAllowed =
+      typeof client.simulateDirect === 'function' &&
+      App.cosmosRestEndpointAllowsSimulate(restBase);
+    let gasAmount;
+    let feeAmount;
+    if (simulateAllowed) {
+      try {
+        const simUsed = await client.simulateDirect(signerAddress, messages, memo);
+        gasAmount = Math.max(Math.ceil(simUsed * GAS_MULT), minGasFloor);
+        gasAmount = Math.min(gasAmount, COSMOS_SIMULATE_GAS_WANTED_MAX);
+        gasAmount = Math.max(gasAmount, minGasFloor);
+        feeAmount = Math.max(Math.ceil(gasAmount * GAS_PRICE_LOYA), 5000 * messages.length);
+      } catch (err) {
+        console.warn('[broadcastCosmosMessages] gas simulate failed (best-effort), using static cap:', err);
+        gasAmount = fallbackGas;
+        feeAmount = fallbackFee;
+      }
+    } else {
+      console.warn('[broadcastCosmosMessages] gas simulate skipped; using static cap.');
+      gasAmount = fallbackGas;
+      feeAmount = fallbackFee;
+    }
     return client.signAndBroadcastDirect(
       signerAddress,
       messages,
@@ -6852,14 +6943,14 @@ const App = {
       const result = await App.broadcastCosmosMessages(messages, 'Claim All Delegator Rewards');
       App.hidePendingPopup();
       if (!result || result.code !== 0) {
-        throw new Error(result?.rawLog || 'Delegator reward claim failed');
+        throw new Error(App.cosmosTxLogOrErrorToUserMessage(result, 'Delegator reward claim failed'));
       }
       App.showSuccessPopup('Delegator rewards claimed successfully!', result?.txhash || null, 'cosmos');
       await App.refreshCurrentStatus();
     } catch (error) {
       console.error('Failed to claim all delegator rewards:', error);
       App.hidePendingPopup();
-      App.showErrorPopup(error.message || 'Failed to claim delegator rewards');
+      App.showErrorPopup(App.cosmosTxLogOrErrorToUserMessage(error, 'Failed to claim delegator rewards'));
     }
   },
 
@@ -6885,14 +6976,14 @@ const App = {
       ], 'Claim Selected Delegator Reward');
       App.hidePendingPopup();
       if (!result || result.code !== 0) {
-        throw new Error(result?.rawLog || 'Selected reward claim failed');
+        throw new Error(App.cosmosTxLogOrErrorToUserMessage(result, 'Selected reward claim failed'));
       }
       App.showSuccessPopup('Validator reward claimed successfully!', result?.txhash || null, 'cosmos');
       await App.refreshCurrentStatus();
     } catch (error) {
       console.error('Failed to claim selected delegator reward:', error);
       App.hidePendingPopup();
-      App.showErrorPopup(error.message || 'Failed to claim selected validator reward');
+      App.showErrorPopup(App.cosmosTxLogOrErrorToUserMessage(error, 'Failed to claim selected validator reward'));
     }
   },
 
@@ -6922,14 +7013,14 @@ const App = {
       ], 'Claim Selector Tips');
       App.hidePendingPopup();
       if (!result || result.code !== 0) {
-        throw new Error(result?.rawLog || 'Selector tip claim failed');
+        throw new Error(App.cosmosTxLogOrErrorToUserMessage(result, 'Selector tip claim failed'));
       }
       App.showSuccessPopup('Selector tips claimed successfully!', result?.txhash || null, 'cosmos');
       await App.refreshCurrentStatus();
     } catch (error) {
       console.error('Failed to claim selector tips:', error);
       App.hidePendingPopup();
-      App.showErrorPopup(error.message || 'Failed to claim selector tips');
+      App.showErrorPopup(App.cosmosTxLogOrErrorToUserMessage(error, 'Failed to claim selector tips'));
     }
   },
 
@@ -7180,11 +7271,15 @@ const App = {
       const topValidatorAddress = topDelegation.validatorAddress;
       const topValidatorMoniker = validatorMonikers[topValidatorAddress] || 'Validator';
       const topValidatorAmountTrb = topDelegation.amountValue / 1000000;
+      const topDelegationTooltip = `${topValidatorMoniker}\n${topValidatorAddress}`
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;');
 
       statusElement.innerHTML = `
         <div class="delegation-summary-layout">
           <div class="delegation-summary-row delegation-summary-row-middle">
-            <span class="delegation-top-display">Top Delegation: ${topValidatorMoniker} (${topValidatorAmountTrb.toFixed(6)} TRB)</span>
+            <span class="delegation-top-display" title="${topDelegationTooltip}">Top Delegation: ${topValidatorMoniker} (${topValidatorAmountTrb.toFixed(6)} TRB)</span>
             <button type="button" class="delegation-remaining-toggle" onclick="App.toggleDelegationsDropdown();">
               Remaining Delegations
               <span class="dropdown-arrow" id="delegationsDropdownArrow">▼</span>
@@ -8252,12 +8347,12 @@ const App = {
                     }
                 }, 2000);
             } else {
-                throw new Error(result.rawLog || 'Transaction failed');
+                throw new Error(App.cosmosTxLogOrErrorToUserMessage(result, 'Transaction failed'));
             }
         } catch (error) {
             console.error('Failed to claim dispute rewards:', error);
             App.hidePendingPopup();
-            App.showErrorPopup(error.message || 'Failed to claim dispute rewards');
+            App.showErrorPopup(App.cosmosTxLogOrErrorToUserMessage(error, 'Failed to claim dispute rewards'));
         }
     },
 
@@ -8341,12 +8436,12 @@ const App = {
                     }
                 }, 2000);
             } else {
-                throw new Error(result.rawLog || 'Transaction failed');
+                throw new Error(App.cosmosTxLogOrErrorToUserMessage(result, 'Transaction failed'));
             }
         } catch (error) {
             console.error('Failed to withdraw fee refund:', error);
             App.hidePendingPopup();
-            App.showErrorPopup(error.message || 'Failed to withdraw fee refund');
+            App.showErrorPopup(App.cosmosTxLogOrErrorToUserMessage(error, 'Failed to withdraw fee refund'));
         }
     },
 
