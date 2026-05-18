@@ -57,8 +57,11 @@
             Run Dispute Tests Only
           </button>
           <button id="run-full-runtime-tests" class="w-full bg-amber-600 text-white px-4 py-2 rounded hover:bg-amber-700">
-            Run Full Runtime Suite (Slow)
+            Run Full Runtime Suite (same as Run All Tests)
           </button>
+          <p class="text-xs text-gray-500">
+            Unit, integration, and full-runtime buttons load <code>unit-tests.js</code> and bootstrap <code>app.js</code> (includes delegation manage / cancel unbond tests).
+          </p>
           <button id="clear-results" class="w-full bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">
             Clear Results
           </button>
@@ -180,7 +183,6 @@
     <!-- Delegations / reporter status containers -->
     <div id="currentDelegationsStatus"></div>
     <div id="currentDelegationsTotal">Total: --</div>
-    <span id="currentDelegationsCountBadge" style="display:none;"></span>
     <div id="delegationsDropdown" style="display:none;">
       <div id="delegationsDropdownContent"></div>
     </div>
@@ -464,7 +466,7 @@
         // Build lightweight mock elements mirroring delegation dropdown controls
         const host = document.createElement('div');
         host.innerHTML = `
-          <button type="button" class="delegation-remaining-toggle">Remaining Delegations</button>
+          <button type="button" class="delegation-remaining-toggle">Manage Delegations</button>
           <div id="delegationsDropdown" style="display:none;">
             <div id="delegationsDropdownContent"></div>
           </div>
@@ -545,7 +547,7 @@
 
         const button = document.createElement('button');
         button.id = 'remainingDelegationUnstakeButton_test';
-        button.textContent = 'Unstake';
+        button.textContent = 'Unbond';
         document.body.appendChild(button);
 
         const captured = [];
@@ -568,7 +570,7 @@
             amount,
             validatorAddress,
             triggerButton,
-            buttonLabel: 'Unstake'
+            buttonLabel: 'Unbond'
           });
           if (amountInput) amountInput.value = '';
         };
@@ -585,7 +587,7 @@
           this.assertEqual(captured[0].validatorAddress, validatorAddress, 'Should pass validator address');
           this.assertEqual(captured[0].amount, '1.250000', 'Should pass unstake amount');
           this.assertEqual(captured[0].triggerButton, button, 'Should pass row button reference');
-          this.assertEqual(captured[0].buttonLabel, 'Unstake', 'Should pass row button label');
+          this.assertEqual(captured[0].buttonLabel, 'Unbond', 'Should pass row button label');
           this.assertEqual(input.value, '', 'Should clear row input after successful action');
         } finally {
           if (input.parentNode) input.parentNode.removeChild(input);
@@ -1326,53 +1328,54 @@
       }
 
       async runAllTests() {
-        this.useInlineMode();
-        await this.runTests([
+        await this.runWithExternalSuites([
           ...this.getUnitTests(),
           ...this.getIntegrationTests()
         ]);
       }
 
       async runUnitTests() {
-        this.useInlineMode();
-        await this.runTests(this.getUnitTests());
+        await this.runWithExternalSuites(this.getUnitTests());
       }
 
       async runIntegrationTests() {
-        this.useInlineMode();
-        await this.runTests(this.getIntegrationTests());
+        await this.runWithExternalSuites(this.getIntegrationTests());
       }
 
       async runDisputeTests() {
-        this.useInlineMode();
-        const disputeUnitTests = this.unitTests.getTests().filter(test => 
-          test.name.toLowerCase().includes('dispute')
-        );
-        const disputeIntegrationTests = this.integrationTests.getTests().filter(test => 
-          test.name.toLowerCase().includes('dispute')
-        );
-        
-        await this.runTests([
-          ...disputeUnitTests,
-          ...disputeIntegrationTests
-        ]);
+        await this.runWithExternalSuites(async () => {
+          const disputeUnitTests = this.unitTests.getTests().filter((test) =>
+            test.name.toLowerCase().includes('dispute')
+          );
+          const disputeIntegrationTests = this.integrationTests.getTests().filter((test) =>
+            test.name.toLowerCase().includes('dispute')
+          );
+          return [...disputeUnitTests, ...disputeIntegrationTests];
+        });
       }
 
       async runFullRuntimeTests() {
+        await this.runWithExternalSuites([
+          ...this.getUnitTests(),
+          ...this.getIntegrationTests()
+        ]);
+      }
+
+      async runWithExternalSuites(testsOrFactory) {
         try {
           await this.activateFullRuntimeMode();
-          await this.runTests([
-            ...this.getUnitTests(),
-            ...this.getIntegrationTests()
-          ]);
+          const tests = typeof testsOrFactory === 'function'
+            ? await testsOrFactory()
+            : testsOrFactory;
+          await this.runTests(tests);
         } catch (error) {
-          console.error('Unable to start full runtime suite:', error);
+          console.error('Unable to start external test suites:', error);
           this.useInlineMode();
           this.clearResults();
           this.results.push({
-            name: 'Full runtime bootstrap',
+            name: 'External test suite bootstrap',
             status: 'fail',
-            error: error.message || 'Unknown full runtime bootstrap error',
+            error: error.message || 'Unknown external test suite bootstrap error',
             duration: 0
           });
           this.totalTests = 1;

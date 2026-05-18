@@ -294,6 +294,25 @@
                             }
                         };
                         encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
+                    } else if (message.typeUrl === '/cosmos.staking.v1beta1.MsgCancelUnbondingDelegation') {
+                        const MsgCancelUnbondingDelegation = new protobuf.Type("MsgCancelUnbondingDelegation")
+                            .add(new protobuf.Field("delegatorAddress", 1, "string"))
+                            .add(new protobuf.Field("validatorAddress", 2, "string"))
+                            .add(new protobuf.Field("amount", 3, "Coin"))
+                            .add(new protobuf.Field("creationHeight", 4, "int64"));
+
+                        root.add(MsgCancelUnbondingDelegation);
+                        const MsgType = root.lookupType("MsgCancelUnbondingDelegation");
+                        const msgValue = {
+                            delegatorAddress: message.value.delegatorAddress,
+                            validatorAddress: message.value.validatorAddress,
+                            amount: {
+                                denom: message.value.amount.denom,
+                                amount: message.value.amount.amount.toString()
+                            },
+                            creationHeight: message.value.creationHeight
+                        };
+                        encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
                     } else if (message.typeUrl === '/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward') {
                         // Encode delegator staking reward withdrawal message
                         const MsgWithdrawDelegatorReward = new protobuf.Type("MsgWithdrawDelegatorReward")
@@ -984,6 +1003,59 @@
         }
     }
 
+    async function cancelUnbondingDelegation(account, validatorAddress, amount, creationHeight) {
+        try {
+            let offlineSigner;
+            if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+                offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+            } else if (window.getOfflineSigner) {
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
+                offlineSigner = window.getOfflineSigner(chainId);
+            } else {
+                throw new Error('No offline signer available');
+            }
+
+            const rpcEndpoint = window.App && window.App.getCosmosRpcEndpoint ? window.App.getCosmosRpcEndpoint() : 'https://node-palmito.tellorlayer.com/rpc';
+            const client = await SigningStargateClient.connectWithSigner(
+                rpcEndpoint,
+                offlineSigner
+            );
+
+            const amountInMicroUnits = Math.floor(parseFloat(amount) * 1000000).toString();
+            const heightValue = typeof creationHeight === 'string'
+                ? parseInt(creationHeight, 10)
+                : creationHeight;
+
+            const msg = {
+                typeUrl: '/cosmos.staking.v1beta1.MsgCancelUnbondingDelegation',
+                value: {
+                    delegatorAddress: account,
+                    validatorAddress: validatorAddress,
+                    amount: {
+                        denom: 'loya',
+                        amount: amountInMicroUnits
+                    },
+                    creationHeight: heightValue
+                }
+            };
+
+            const result = await client.signAndBroadcastDirect(
+                account,
+                [msg],
+                {
+                    amount: [{ denom: 'loya', amount: '7500' }],
+                    gas: '300000'
+                },
+                'Cancel unbonding delegation'
+            );
+
+            return result;
+        } catch (error) {
+            console.error('Cancel unbonding delegation error:', error);
+            throw error;
+        }
+    }
+
     // Function to select a reporter
     async function selectReporter(account, reporterAddress) {
         try {
@@ -1087,6 +1159,7 @@
     exports.requestAttestations = requestAttestations;
     exports.delegateTokens = delegateTokens;
     exports.undelegateTokens = undelegateTokens;
+    exports.cancelUnbondingDelegation = cancelUnbondingDelegation;
     exports.selectReporter = selectReporter;
     exports.switchReporter = switchReporter;
     exports.pollTransactionStatus = pollTransactionStatus;
@@ -1101,6 +1174,7 @@
     window.cosmjs.stargate.requestAttestations = requestAttestations;
     window.cosmjs.stargate.delegateTokens = delegateTokens;
     window.cosmjs.stargate.undelegateTokens = undelegateTokens;
+    window.cosmjs.stargate.cancelUnbondingDelegation = cancelUnbondingDelegation;
     window.cosmjs.stargate.selectReporter = selectReporter;
     window.cosmjs.stargate.switchReporter = switchReporter;
     window.cosmjs.stargate.pollTransactionStatus = pollTransactionStatus;
@@ -1111,6 +1185,7 @@
         requestAttestations: requestAttestations,
         delegateTokens: delegateTokens,
         undelegateTokens: undelegateTokens,
+        cancelUnbondingDelegation: cancelUnbondingDelegation,
         selectReporter: selectReporter,
         switchReporter: switchReporter,
         pollTransactionStatus: pollTransactionStatus
