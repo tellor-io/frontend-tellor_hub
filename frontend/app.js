@@ -4511,7 +4511,7 @@ const App = {
             return;
         }
 
-        if (!validatorAddress.startsWith('tellorvaloper')) {
+        if (!App.isValidTellorValidatorAddress(validatorAddress)) {
             App.showValidationErrorPopup('Please select a valid validator from the dropdown');
             return;
         }
@@ -4608,6 +4608,140 @@ const App = {
       if (validatorDropdown) validatorDropdown.value = '';
     } catch (error) {
       // error popups are handled by executeUndelegation
+    }
+  },
+
+  executeCancelUnbonding: async function({
+    amount,
+    validatorAddress,
+    creationHeight,
+    triggerButton,
+    buttonLabel = 'Cancel Unbond'
+  } = {}) {
+    try {
+      if (!App.isKeplrConnected) {
+        alert('Please connect your Cosmos wallet first');
+        return;
+      }
+
+      try {
+        if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+          await window.cosmosWalletAdapter.enableChain();
+        } else if (window.keplr) {
+          await window.keplr.enable(App.cosmosChainId);
+        } else {
+          throw new Error('No wallet available');
+        }
+      } catch (error) {
+        App.isKeplrConnected = false;
+        App.keplrAddress = null;
+        const keplrButton = document.getElementById('keplrButton');
+        if (keplrButton) {
+          keplrButton.innerHTML = 'Connect Cosmos Wallet';
+        }
+        alert('Please reconnect your Cosmos wallet');
+        return;
+      }
+
+      if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+        App.showValidationErrorPopup('Please enter a valid amount');
+        return;
+      }
+
+      if (!validatorAddress || !validatorAddress.trim()) {
+        App.showValidationErrorPopup('Invalid validator for cancel unbond');
+        return;
+      }
+
+      if (!App.isValidTellorValidatorAddress(validatorAddress)) {
+        App.showValidationErrorPopup('Please use a valid validator address');
+        return;
+      }
+
+      const creationHeightStr = creationHeight == null ? '' : String(creationHeight).trim();
+      if (!App.isValidUnbondCreationHeight(creationHeightStr)) {
+        App.showValidationErrorPopup('Missing or invalid unbonding entry height');
+        return;
+      }
+
+      const amountInMicroUnits = Math.floor(parseFloat(amount) * 1000000);
+      if (!Number.isFinite(amountInMicroUnits) || amountInMicroUnits <= 0) {
+        App.showValidationErrorPopup('Please enter a valid amount');
+        return;
+      }
+
+      const unbondingEntries = await App.fetchUnbondingDelegations(App.keplrAddress);
+      const matchingEntry = Array.isArray(unbondingEntries)
+        ? unbondingEntries.find(
+            (entry) =>
+              entry.validatorAddress === validatorAddress &&
+              String(entry.creationHeight) === creationHeightStr
+          )
+        : null;
+
+      if (!matchingEntry) {
+        App.showValidationErrorPopup('No matching pending unbonding entry found');
+        return;
+      }
+
+      const entryBalanceMicro = parseInt(matchingEntry.balanceMicro, 10) || 0;
+      if (!entryBalanceMicro || entryBalanceMicro <= 0) {
+        App.showValidationErrorPopup('This unbonding entry has no remaining balance');
+        return;
+      }
+
+      if (amountInMicroUnits > entryBalanceMicro) {
+        App.showValidationErrorPopup(
+          `Amount exceeds unbonding balance. Max: ${(entryBalanceMicro / 1000000).toFixed(6)} TRB`
+        );
+        return;
+      }
+
+      if (triggerButton) {
+        triggerButton.disabled = true;
+        triggerButton.textContent = 'Canceling...';
+      }
+
+      App.showPendingPopup('Canceling unbonding...');
+
+      let offlineSigner;
+      if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+        offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+      } else {
+        offlineSigner = window.keplr.getOfflineSigner(App.cosmosChainId);
+      }
+      const accounts = await offlineSigner.getAccounts();
+      const layerAccount = accounts[0].address;
+
+      const result = await window.cosmjs.stargate.cancelUnbondingDelegation(
+        layerAccount,
+        validatorAddress,
+        amount,
+        matchingEntry.creationHeight
+      );
+
+      App.hidePendingPopup();
+
+      if (result && result.code === 0) {
+        const txHash = result.txhash || result.tx_response?.txhash;
+        App.showSuccessPopup(
+          'Cancel unbond submitted. Stake returns to your delegation (not liquid wallet balance).',
+          txHash,
+          'cosmos'
+        );
+        await App.refreshCurrentStatus();
+        return result;
+      }
+      throw new Error(result?.rawLog || 'Cancel unbond failed');
+    } catch (error) {
+      App.hidePendingPopup();
+      App.showErrorPopup(error.message || 'Error canceling unbond. Please try again.');
+      throw error;
+    } finally {
+      if (triggerButton) {
+        triggerButton.disabled = false;
+        triggerButton.textContent = buttonLabel;
+      }
     }
   },
 
@@ -6398,7 +6532,7 @@ const App = {
   // Add function to fetch current delegations
   fetchCurrentDelegations: async function(delegatorAddress) {
     try {
-      const endpoint = `${App.getCosmosApiEndpoint()}/cosmos/staking/v1beta1/delegations/${delegatorAddress}`;
+      const endpoint = `${App.getCosmosApiEndpoint()}/cosmos/staking/v1beta1/delegations/${encodeURIComponent(delegatorAddress)}`;
       
       const response = await fetch(endpoint);
       
@@ -6422,6 +6556,82 @@ const App = {
       console.error('Error fetching delegations:', error);
       throw error;
     }
+  },
+
+  fetchUnbondingDelegations: async function(delegatorAddress) {
+    try {
+      const baseEndpoint = `${App.getCosmosApiEndpoint()}/cosmos/staking/v1beta1/delegators/${encodeURIComponent(delegatorAddress)}/unbonding_delegations`;
+      const entries = [];
+      let nextKey = null;
+
+      do {
+        const url = nextKey
+          ? `${baseEndpoint}?pagination.key=${encodeURIComponent(nextKey)}`
+          : baseEndpoint;
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch unbonding delegations: ${response.status}`);
+        }
+        const data = await response.json();
+        App.debugLog('Unbonding delegations data:', data);
+
+        const responses = data.unbonding_responses;
+        if (Array.isArray(responses)) {
+          responses.forEach((unbonding) => {
+            const validatorAddress = unbonding.validator_address;
+            if (!Array.isArray(unbonding.entries)) {
+              return;
+            }
+            unbonding.entries.forEach((entry) => {
+              const { amountMicro: balanceMicro, denom } = App.parseStakingRestAmount(entry.balance);
+              if (balanceMicro <= 0) {
+                return;
+              }
+              const initialParsed = App.parseStakingRestAmount(entry.initial_balance, denom);
+              const completionMs = entry.completion_time
+                ? Date.parse(entry.completion_time)
+                : NaN;
+              if (Number.isFinite(completionMs) && completionMs <= Date.now()) {
+                return;
+              }
+              entries.push({
+                validatorAddress,
+                creationHeight: entry.creation_height,
+                balanceMicro: String(balanceMicro),
+                initialBalanceMicro: String(initialParsed.amountMicro || balanceMicro),
+                completionTime: entry.completion_time || '',
+                denom
+              });
+            });
+          });
+        }
+
+        nextKey = data.pagination?.next_key || null;
+      } while (nextKey);
+
+      return entries.filter((entry) => entry.denom === 'loya');
+    } catch (error) {
+      console.error('Error fetching unbonding delegations:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Parse staking REST balance fields that may be a Coin object or a plain amount string (Layer LCD).
+   */
+  parseStakingRestAmount: function(value, defaultDenom = 'loya') {
+    if (value == null) {
+      return { amountMicro: 0, denom: defaultDenom };
+    }
+    if (typeof value === 'string' || typeof value === 'number') {
+      const amountMicro = parseInt(String(value), 10) || 0;
+      return { amountMicro, denom: defaultDenom };
+    }
+    if (typeof value === 'object') {
+      const amountMicro = parseInt(String(value.amount), 10) || 0;
+      return { amountMicro, denom: value.denom || defaultDenom };
+    }
+    return { amountMicro: 0, denom: defaultDenom };
   },
 
   extractLoyaAmountFromCoins: function(coins) {
@@ -7191,7 +7401,7 @@ const App = {
         amount,
         validatorAddress,
         triggerButton: button,
-        buttonLabel: 'Unstake'
+        buttonLabel: 'Unbond'
       });
       if (input) input.value = '';
     } catch (error) {
@@ -7199,42 +7409,325 @@ const App = {
     }
   },
 
-  // Add function to display current delegations status
+  setCancelUnbondAmountToMax: function(inputId, maxTrbAmount) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const parsed = Number(maxTrbAmount);
+    if (!Number.isFinite(parsed) || parsed <= 0) return;
+    input.value = parsed.toFixed(6);
+  },
+
+  triggerCancelUnbondRow: async function(validatorAddress, creationHeight, inputId, buttonId) {
+    const input = document.getElementById(inputId);
+    const button = document.getElementById(buttonId);
+    const amount = input ? input.value : '';
+    try {
+      await App.executeCancelUnbonding({
+        amount,
+        validatorAddress,
+        creationHeight,
+        triggerButton: button,
+        buttonLabel: 'Cancel'
+      });
+      if (input) input.value = '';
+    } catch (error) {
+      // error popups are handled by executeCancelUnbonding
+    }
+  },
+
+  formatUnbondingCompletionLabel: function(completionTime) {
+    if (!completionTime) {
+      return 'Completion time unknown';
+    }
+    const completionMs = Date.parse(completionTime);
+    if (!Number.isFinite(completionMs)) {
+      return completionTime;
+    }
+    const completionDate = new Date(completionMs);
+    const remainingMs = completionMs - Date.now();
+    const dateLabel = completionDate.toLocaleString();
+    if (remainingMs <= 0) {
+      return `Completed ${dateLabel}`;
+    }
+    const days = Math.floor(remainingMs / (24 * 60 * 60 * 1000));
+    const hours = Math.floor((remainingMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+    return `Completes ${dateLabel} (~${days}d ${hours}h remaining)`;
+  },
+
+  formatValidatorUnbondMetaShort: function(unbonds) {
+    if (!unbonds || !unbonds.length) {
+      return '';
+    }
+    const totalMicro = unbonds.reduce((sum, entry) => sum + (parseInt(entry.balanceMicro, 10) || 0), 0);
+    if (totalMicro <= 0) {
+      return '';
+    }
+    const totalTrb = (totalMicro / 1000000).toFixed(6);
+    const sorted = [...unbonds].sort(
+      (a, b) => parseInt(b.creationHeight, 10) - parseInt(a.creationHeight, 10)
+    );
+    const completionMs = sorted[0].completionTime ? Date.parse(sorted[0].completionTime) : NaN;
+    let timePart = '';
+    if (Number.isFinite(completionMs)) {
+      const remainingMs = completionMs - Date.now();
+      if (remainingMs > 0) {
+        const days = Math.floor(remainingMs / (24 * 60 * 60 * 1000));
+        timePart = ` · ~${days}d left`;
+      }
+    }
+    const countSuffix = unbonds.length > 1 ? ` (${unbonds.length} pending)` : '';
+    return `${totalTrb} TRB unbonding${countSuffix}${timePart}`;
+  },
+
+  buildDelegationManageRows: function(sortedDelegations, unbondingEntries) {
+    const unbondByValidator = {};
+    (unbondingEntries || []).forEach((entry) => {
+      if (!unbondByValidator[entry.validatorAddress]) {
+        unbondByValidator[entry.validatorAddress] = [];
+      }
+      unbondByValidator[entry.validatorAddress].push(entry);
+    });
+
+    const validatorAddresses = new Set();
+    sortedDelegations.forEach((delegation) => validatorAddresses.add(delegation.validatorAddress));
+    (unbondingEntries || []).forEach((entry) => validatorAddresses.add(entry.validatorAddress));
+
+    const rows = [];
+    validatorAddresses.forEach((validatorAddress) => {
+      const delegation = sortedDelegations.find((item) => item.validatorAddress === validatorAddress);
+      const delegationMicro = delegation ? delegation.amountValue : 0;
+      const unbonds = unbondByValidator[validatorAddress] || [];
+      const unbondMicro = unbonds.reduce((sum, entry) => sum + (parseInt(entry.balanceMicro, 10) || 0), 0);
+      rows.push({
+        validatorAddress,
+        delegationMicro,
+        unbonds,
+        sortKey: Math.max(delegationMicro, unbondMicro)
+      });
+    });
+
+    rows.sort((a, b) => b.sortKey - a.sortKey);
+    return rows;
+  },
+
+  escapeDelegationHtmlAttr: function(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;');
+  },
+
+  escapeDelegationHtmlText: function(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  },
+
+  escapeDelegationJsString: function(value) {
+    return String(value == null ? '' : value)
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
+      .replace(/\r/g, '\\r')
+      .replace(/\n/g, '\\n')
+      .replace(/</g, '\\u003c');
+  },
+
+  isValidTellorValidatorAddress: function(address) {
+    return typeof address === 'string' && /^tellorvaloper1[0-9a-z]{38,}$/i.test(address.trim());
+  },
+
+  isValidUnbondCreationHeight: function(creationHeight) {
+    return typeof creationHeight === 'string' && /^[0-9]+$/.test(creationHeight);
+  },
+
+  renderDelegationManageSplitRowHtml: function({
+    rowIndex,
+    fullAddr,
+    moniker,
+    shortAddr,
+    bondedTrb,
+    unbondTrb,
+    hasDelegation,
+    primaryUnbond,
+    headerLabel,
+    isSupplemental
+  }) {
+    const bondedInputId = `delegationManageBondedAmount_${rowIndex}`;
+    const unbondingInputId = `delegationManageUnbondingAmount_${rowIndex}`;
+    const unbondButtonId = `delegationManageUnbondButton_${rowIndex}`;
+    const cancelButtonId = `delegationManageCancelButton_${rowIndex}`;
+    const maxBondedTrb = hasDelegation ? bondedTrb.toFixed(6) : '0';
+    const maxUnbondTrb = primaryUnbond ? unbondTrb.toFixed(6) : '0';
+    const cancelEnabled = Boolean(primaryUnbond);
+    const cancelDisabledAttr = cancelEnabled ? '' : ' disabled';
+    const unbondDisabledAttr = hasDelegation ? '' : ' disabled';
+    const cancelTitle = App.escapeDelegationHtmlAttr(
+      cancelEnabled
+        ? 'Cancel returns stake to delegation (not liquid balance). Large cancels may hit the 12h 5% stake-change limit.'
+        : 'No active unbonding for this validator'
+    );
+    const unbondTitle = App.escapeDelegationHtmlAttr(
+      hasDelegation ? 'Start unbonding from this validator' : 'No bonded stake for this validator'
+    );
+    const creationHeightRaw = primaryUnbond ? String(primaryUnbond.creationHeight) : '';
+    const creationHeight = App.isValidUnbondCreationHeight(creationHeightRaw) ? creationHeightRaw : '';
+    const completionTitle = primaryUnbond
+      ? App.escapeDelegationHtmlAttr(App.formatUnbondingCompletionLabel(primaryUnbond.completionTime))
+      : '';
+    const supplementalClass = isSupplemental ? ' delegation-manage-item-supplemental' : '';
+    const headerText = headerLabel || `${moniker} (${shortAddr})`;
+    const safeHeaderText = App.escapeDelegationHtmlText(headerText);
+    const safeUnbondMeta = App.escapeDelegationHtmlText(
+      primaryUnbond ? App.formatValidatorUnbondMetaShort([primaryUnbond]) : ''
+    );
+    const safeFullAddr = App.isValidTellorValidatorAddress(fullAddr)
+      ? fullAddr
+      : 'tellorvaloper1invalid';
+    const jsFullAddr = App.escapeDelegationJsString(safeFullAddr);
+    const jsBondedInputId = App.escapeDelegationJsString(bondedInputId);
+    const jsUnbondingInputId = App.escapeDelegationJsString(unbondingInputId);
+    const jsUnbondButtonId = App.escapeDelegationJsString(unbondButtonId);
+    const jsCancelButtonId = App.escapeDelegationJsString(cancelButtonId);
+    const jsCreationHeight = App.escapeDelegationJsString(creationHeight);
+
+    return `
+      <div class="status-item status-delegation delegation-manage-item${supplementalClass}">
+        <div class="delegation-manage-validator-header">
+          <span class="delegation-manage-validator-name">${safeHeaderText}</span>
+          <button class="copy-btn" onclick="App.copyToClipboard('${jsFullAddr}')" data-tooltip="Copy full address">⧉</button>
+        </div>
+        <div class="delegation-manage-split">
+          <div class="delegation-manage-panel delegation-manage-panel-bonded">
+            <span class="delegation-manage-panel-label">Bonded TRB</span>
+            <span class="delegation-manage-panel-balance">${hasDelegation ? maxBondedTrb : '—'}</span>
+            <span class="delegation-manage-panel-meta delegation-manage-panel-meta-empty" aria-hidden="true"></span>
+            <div class="delegation-manage-panel-controls">
+              <input
+                type="number"
+                id="${bondedInputId}"
+                class="delegation-unstake-input delegation-manage-panel-input"
+                min="0"
+                step="0.000001"
+                max="${maxBondedTrb}"
+                placeholder="Amt"
+                ${hasDelegation ? '' : ' disabled'}
+              />
+              <button type="button" class="delegation-unstake-btn delegation-manage-panel-btn" onclick="App.setUnstakeAmountToMax('${jsBondedInputId}', ${maxBondedTrb})"${unbondDisabledAttr} title="${unbondTitle}">Max</button>
+              <button type="button" id="${unbondButtonId}" class="delegation-unstake-btn delegation-unstake-btn-primary delegation-manage-panel-btn"${unbondDisabledAttr} title="${unbondTitle}" onclick="App.triggerDelegationRowUnstake('${jsFullAddr}', '${jsBondedInputId}', '${jsUnbondButtonId}')">Unbond</button>
+            </div>
+          </div>
+          <div class="delegation-manage-split-divider" aria-hidden="true"></div>
+          <div class="delegation-manage-panel delegation-manage-panel-unbonding">
+            <span class="delegation-manage-panel-label">Unbonding TRB</span>
+            <span class="delegation-manage-panel-balance">${cancelEnabled ? maxUnbondTrb : '—'}</span>
+            ${cancelEnabled ? `<span class="delegation-manage-panel-meta" title="${completionTitle}">${safeUnbondMeta}</span>` : '<span class="delegation-manage-panel-meta delegation-manage-panel-meta-empty"></span>'}
+            <div class="delegation-manage-panel-controls">
+              <input
+                type="number"
+                id="${unbondingInputId}"
+                class="delegation-unstake-input delegation-manage-panel-input"
+                min="0"
+                step="0.000001"
+                max="${maxUnbondTrb}"
+                placeholder="Amt"
+                ${cancelEnabled ? '' : ' disabled'}
+              />
+              <button type="button" class="delegation-unstake-btn delegation-manage-panel-btn" onclick="App.setCancelUnbondAmountToMax('${jsUnbondingInputId}', ${maxUnbondTrb})"${cancelDisabledAttr}>Max</button>
+              <button type="button" id="${cancelButtonId}" class="delegation-unstake-btn delegation-cancel-unbond-btn delegation-manage-panel-btn"${cancelDisabledAttr} title="${cancelTitle}" onclick="App.triggerCancelUnbondRow('${jsFullAddr}', '${jsCreationHeight}', '${jsUnbondingInputId}', '${jsCancelButtonId}')">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
+  renderDelegationManageDropdownHtml: function(manageRows, validatorMonikers) {
+    if (!manageRows.length) {
+      return '<div class="status-empty">No delegations to manage</div>';
+    }
+
+    let dropdownHtml = '';
+    let rowIndex = 0;
+
+    manageRows.forEach((row) => {
+      const fullAddr = row.validatorAddress;
+      const shortAddr = fullAddr.length > 20 ? `${fullAddr.substring(0, 17)}...` : fullAddr;
+      const moniker = validatorMonikers[fullAddr] || 'Validator';
+      const bondedTrb = row.delegationMicro / 1000000;
+      const hasDelegation = row.delegationMicro > 0;
+      const unbonds = row.unbonds || [];
+      const primaryUnbond = unbonds.length
+        ? [...unbonds].sort((a, b) => parseInt(b.creationHeight, 10) - parseInt(a.creationHeight, 10))[0]
+        : null;
+      const unbondTrb = primaryUnbond
+        ? (parseInt(primaryUnbond.balanceMicro, 10) || 0) / 1000000
+        : 0;
+
+      dropdownHtml += App.renderDelegationManageSplitRowHtml({
+        rowIndex,
+        fullAddr,
+        moniker,
+        shortAddr,
+        bondedTrb,
+        unbondTrb,
+        hasDelegation,
+        primaryUnbond,
+        isSupplemental: false
+      });
+
+      rowIndex += 1;
+
+      if (unbonds.length > 1) {
+        const supplementalUnbonds = [...unbonds]
+          .sort((a, b) => parseInt(b.creationHeight, 10) - parseInt(a.creationHeight, 10))
+          .slice(1);
+        supplementalUnbonds.forEach((unbondEntry) => {
+          dropdownHtml += App.renderDelegationManageSplitRowHtml({
+            rowIndex,
+            fullAddr,
+            moniker,
+            shortAddr,
+            bondedTrb: 0,
+            unbondTrb: (parseInt(unbondEntry.balanceMicro, 10) || 0) / 1000000,
+            hasDelegation: false,
+            primaryUnbond: unbondEntry,
+            headerLabel: `Additional unbonding · ${moniker}`,
+            isSupplemental: true
+          });
+          rowIndex += 1;
+        });
+      }
+    });
+
+    return dropdownHtml;
+  },
+
   displayCurrentDelegationsStatus: async function(delegatorAddress) {
     const statusElement = document.getElementById('currentDelegationsStatus');
-    const countBadge = document.getElementById('currentDelegationsCountBadge');
     const totalHeader = document.getElementById('currentDelegationsTotal');
+    const dropdownContent = document.getElementById('delegationsDropdownContent');
     if (!statusElement) return;
 
     try {
       statusElement.innerHTML = '<div class="status-loading">Loading...</div>';
-      
-      const delegations = await this.fetchCurrentDelegations(delegatorAddress);
-      
-      if (!delegations || delegations.length === 0) {
-        statusElement.innerHTML = '<div class="status-empty">No delegations found</div>';
-        if (totalHeader) {
-          totalHeader.textContent = 'Total: 0.000000 TRB';
-        }
-        if (countBadge) {
-          countBadge.style.display = 'none';
-          countBadge.textContent = '';
-        }
-        return;
-      }
 
-      // Fetch validators to map operator address -> moniker
+      const [delegations, unbondingEntries] = await Promise.all([
+        this.fetchCurrentDelegations(delegatorAddress),
+        this.fetchUnbondingDelegations(delegatorAddress)
+      ]);
+
       let validatorMonikers = {};
       try {
         const validators = await this.fetchValidators();
-        validators.forEach(validator => {
+        validators.forEach((validator) => {
           validatorMonikers[validator.address] = validator.moniker || 'Unknown Validator';
         });
       } catch (e) {
         console.error('Error fetching validators for delegations status:', e);
       }
 
-      const sortedDelegations = delegations
+      const sortedDelegations = (delegations || [])
         .filter((delegation) => delegation.denom === 'loya')
         .map((delegation) => ({
           ...delegation,
@@ -7243,14 +7736,15 @@ const App = {
         .filter((delegation) => delegation.amountValue > 0)
         .sort((a, b) => b.amountValue - a.amountValue);
 
-      if (sortedDelegations.length === 0) {
+      const manageRows = App.buildDelegationManageRows(sortedDelegations, unbondingEntries || []);
+
+      if (!manageRows.length) {
         statusElement.innerHTML = '<div class="status-empty">No delegations found</div>';
+        if (dropdownContent) {
+          dropdownContent.innerHTML = '<div class="status-empty">No delegations to manage</div>';
+        }
         if (totalHeader) {
           totalHeader.textContent = 'Total: 0.000000 TRB';
-        }
-        if (countBadge) {
-          countBadge.style.display = 'none';
-          countBadge.textContent = '';
         }
         return;
       }
@@ -7258,104 +7752,40 @@ const App = {
       const totalDelegated = sortedDelegations.reduce((sum, delegation) => sum + delegation.amountValue, 0);
       const totalTRB = (totalDelegated / 1000000).toFixed(6);
       const delegationCount = sortedDelegations.length;
+      const pendingUnbondCount = (unbondingEntries || []).length;
+
       if (totalHeader) {
         totalHeader.textContent = `Total: ${totalTRB} TRB`;
       }
-      if (countBadge) {
-        countBadge.textContent = `${delegationCount} Delegation${delegationCount !== 1 ? 's' : ''}`;
-        countBadge.style.display = 'inline-flex';
-      }
 
-      const topDelegation = sortedDelegations[0];
-      const remainingDelegations = sortedDelegations.slice(1);
-      const topValidatorAddress = topDelegation.validatorAddress;
-      const topValidatorMoniker = validatorMonikers[topValidatorAddress] || 'Validator';
-      const topValidatorAmountTrb = topDelegation.amountValue / 1000000;
-      const topDelegationTooltip = `${topValidatorMoniker}\n${topValidatorAddress}`
-        .replace(/&/g, '&amp;')
-        .replace(/"/g, '&quot;')
-        .replace(/</g, '&lt;');
+      let summaryBadgeText = `${delegationCount} Delegation${delegationCount !== 1 ? 's' : ''}`;
+      if (pendingUnbondCount > 0) {
+        summaryBadgeText += ` · ${pendingUnbondCount} unbonding`;
+      }
 
       statusElement.innerHTML = `
         <div class="delegation-summary-layout">
           <div class="delegation-summary-row delegation-summary-row-middle">
-            <span class="delegation-top-display" title="${topDelegationTooltip}">Top Delegation: ${topValidatorMoniker} (${topValidatorAmountTrb.toFixed(6)} TRB)</span>
-            <button type="button" class="delegation-remaining-toggle" onclick="App.toggleDelegationsDropdown();">
-              Remaining Delegations
+            <span class="delegation-summary-badge status-badge">${summaryBadgeText}</span>
+            <button type="button" class="delegation-remaining-toggle delegation-manage-toggle" onclick="App.toggleDelegationsDropdown();">
+              Manage Delegations
               <span class="dropdown-arrow" id="delegationsDropdownArrow">▼</span>
             </button>
-          </div>
-          <div class="delegation-summary-row delegation-summary-row-bottom">
-            <span class="status-label">Unstake from Top Delegation</span>
-            <div class="delegation-unstake-controls">
-              <input
-                type="number"
-                id="totalDelegationUnstakeAmount"
-                class="delegation-unstake-input"
-                min="0"
-                step="0.000001"
-                max="${topValidatorAmountTrb.toFixed(6)}"
-                placeholder="Amount TRB"
-              />
-              <button type="button" class="delegation-unstake-btn" onclick="App.setUnstakeAmountToMax('totalDelegationUnstakeAmount', ${topValidatorAmountTrb})">Max</button>
-              <button type="button" id="totalDelegationUnstakeButton" class="delegation-unstake-btn delegation-unstake-btn-primary" onclick="App.triggerDelegationRowUnstake('${topValidatorAddress}', 'totalDelegationUnstakeAmount', 'totalDelegationUnstakeButton')">Unstake</button>
-            </div>
           </div>
         </div>
       `;
 
-      // Populate dropdown with remaining delegations (highest -> lowest).
-      const dropdownContent = document.getElementById('delegationsDropdownContent');
       if (dropdownContent) {
-        if (remainingDelegations.length === 0) {
-          dropdownContent.innerHTML = '<div class="status-empty">No remaining delegations</div>';
-        } else {
-          let dropdownHtml = '';
-          remainingDelegations.forEach((delegation, index) => {
-          const amountTRB = (delegation.amountValue / 1000000).toFixed(6);
-          const fullAddr = delegation.validatorAddress;
-          const shortAddr = fullAddr.length > 20 
-            ? fullAddr.substring(0, 17) + '...'
-            : fullAddr;
-          const moniker = validatorMonikers[fullAddr] || 'Validator';
-          const amountInputId = `remainingDelegationUnstakeAmount_${index}`;
-          const buttonId = `remainingDelegationUnstakeButton_${index}`;
-          
-          dropdownHtml += `
-            <div class="status-item status-delegation">
-              <div class="address-with-copy">
-                <span class="status-address">${moniker} (${shortAddr})</span>
-                <button class="copy-btn" onclick="App.copyToClipboard('${fullAddr}')" data-tooltip="Copy full address">⧉</button>
-              </div>
-              <span class="status-amount">${amountTRB} TRB</span>
-              <div class="delegation-unstake-controls delegation-unstake-controls-row">
-                <input
-                  type="number"
-                  id="${amountInputId}"
-                  class="delegation-unstake-input"
-                  min="0"
-                  step="0.000001"
-                  max="${amountTRB}"
-                  placeholder="Amount TRB"
-                />
-                <button type="button" class="delegation-unstake-btn" onclick="App.setUnstakeAmountToMax('${amountInputId}', ${amountTRB})">Max</button>
-                <button type="button" id="${buttonId}" class="delegation-unstake-btn delegation-unstake-btn-primary" onclick="App.triggerDelegationRowUnstake('${fullAddr}', '${amountInputId}', '${buttonId}')">Unstake</button>
-              </div>
-            </div>
-          `;
-          });
-          dropdownContent.innerHTML = dropdownHtml;
-        }
+        dropdownContent.innerHTML = App.renderDelegationManageDropdownHtml(manageRows, validatorMonikers);
       }
     } catch (error) {
       console.error('Error displaying delegations status:', error);
       statusElement.innerHTML = '<div class="status-empty">Error loading delegations</div>';
+      if (dropdownContent) {
+        dropdownContent.innerHTML = '<div class="status-empty">Error loading delegations</div>';
+      }
       if (totalHeader) {
         totalHeader.textContent = 'Total: --';
-      }
-      if (countBadge) {
-        countBadge.style.display = 'none';
-        countBadge.textContent = '';
       }
     }
   },
@@ -7365,16 +7795,11 @@ const App = {
     if (!App.isKeplrConnected || !App.keplrAddress) {
       const delegationsStatus = document.getElementById('currentDelegationsStatus');
       const delegationsTotal = document.getElementById('currentDelegationsTotal');
-      const delegationsCountBadge = document.getElementById('currentDelegationsCountBadge');
       if (delegationsStatus) {
         delegationsStatus.innerHTML = '<div class="status-empty">Connect Cosmos wallet to view delegations</div>';
       }
       if (delegationsTotal) {
         delegationsTotal.textContent = 'Total: --';
-      }
-      if (delegationsCountBadge) {
-        delegationsCountBadge.style.display = 'none';
-        delegationsCountBadge.textContent = '';
       }
       const reporterStatus = document.getElementById('currentReporterStatus');
       if (reporterStatus) {
@@ -7395,7 +7820,7 @@ const App = {
       await Promise.all([
         this.displayCurrentReporterStatus(App.keplrAddress),
         this.displayCurrentDelegationsStatus(App.keplrAddress),
-        this.displayDelegatorRewardsStatus(App.keplrAddress),
+this.displayDelegatorRewardsStatus(App.keplrAddress),
         this.displaySelectorTipsStatus(App.keplrAddress)
       ]);
     } catch (error) {
@@ -7429,7 +7854,6 @@ const App = {
     if (selectorTipsStatus && !App.isKeplrConnected) {
       selectorTipsStatus.innerHTML = '<div class="status-empty">Connect Cosmos wallet to view selector tips</div>';
     }
-    
     // Add change event listener to update the hidden input
     if (dropdown && !dropdown.hasAttribute('data-initialized')) {
       dropdown.setAttribute('data-initialized', 'true');

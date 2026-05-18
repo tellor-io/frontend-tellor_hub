@@ -3369,6 +3369,168 @@ header {
     background: #0a5d5d;
 }
 
+#delegateSection .delegation-cancel-unbond-btn {
+    background: #5a4a8f;
+    color: #f3eeff;
+}
+
+#delegateSection .delegation-cancel-unbond-btn:hover {
+    background: #4a3d78;
+}
+
+#delegateSection .delegation-manage-validator-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    width: 100%;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid #d4e6df;
+    margin-bottom: 0.35rem;
+}
+
+#delegateSection .delegation-manage-validator-name {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #214d43;
+    text-align: center;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#delegateSection .delegation-manage-split {
+    display: flex;
+    align-items: stretch;
+    width: 100%;
+    gap: 0;
+    min-width: 0;
+}
+
+#delegateSection .delegation-manage-split-divider {
+    flex: 0 0 1px;
+    align-self: stretch;
+    background: #b8d4cb;
+    margin: 0 0.25rem;
+}
+
+#delegateSection .delegation-manage-panel {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.2rem;
+    text-align: center;
+    align-self: stretch;
+}
+
+#delegateSection .delegation-manage-panel-label {
+    font-size: 0.64rem;
+    font-weight: 600;
+    color: #3d6459;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+#delegateSection .delegation-manage-panel-balance {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #0a7f5e;
+    line-height: 1.2;
+}
+
+#delegateSection .delegation-manage-panel-meta {
+    font-size: 0.62rem;
+    color: #5a4a8f;
+    line-height: 1.2;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#delegateSection .delegation-manage-panel-meta-empty {
+    min-height: 0.85rem;
+}
+
+#delegateSection .delegation-manage-panel-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: nowrap;
+    gap: 0.2rem;
+    width: 100%;
+    margin-top: auto;
+    padding: 0;
+}
+
+#delegateSection .delegation-manage-panel-controls .delegation-unstake-input {
+    min-width: 0;
+    width: 56px;
+    max-width: 60px;
+    flex: 0 0 auto;
+    padding: 3px 4px;
+}
+
+#delegateSection .delegation-manage-panel-controls .delegation-unstake-btn {
+    flex: 0 0 auto;
+    padding: 3px 7px;
+    font-size: 0.63rem;
+    white-space: nowrap;
+}
+
+#delegateSection .delegation-manage-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+#delegateSection .delegation-manage-identity {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+#delegateSection .delegation-manage-unbond-meta {
+    flex: 0 1 42%;
+    font-size: 0.68rem;
+    color: #5a4a8f;
+    text-align: right;
+    line-height: 1.25;
+    min-width: 0;
+}
+
+#delegateSection .delegation-manage-unbond-meta-empty {
+    flex: 0 0 0;
+}
+
+#delegateSection .delegation-manage-item-supplemental {
+    padding-left: 0.85rem;
+    border-left: 3px solid #b8a4d8;
+}
+
+#delegateSection .delegation-manage-supplemental-label {
+    font-size: 0.68rem;
+    color: #5a4a8f;
+}
+
+#delegateSection #delegationsDropdown .delegation-manage-item {
+    gap: 0;
+}
+
+#delegateSection .delegation-cancel-unbond-btn:disabled {
+    background: #e8e4ef;
+    color: #8a8499;
+    border-color: #c5bfd4;
+}
+
 #delegateSection .delegation-summary-layout {
     display: flex;
     flex-direction: column;
@@ -3418,24 +3580,34 @@ header {
     cursor: help;
 }
 
-#delegateSection .delegation-remaining-toggle {
+#delegateSection .delegation-remaining-toggle,
+#delegateSection .delegation-manage-toggle {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
-    border: 1px solid #8db3a4;
+    gap: 0.35rem;
+    border: 1px solid #6fa39a;
     border-radius: 999px;
     background: #f4f9f7;
     color: #214d43;
-    font-size: 0.68rem;
+    font-size: 0.8rem;
     font-weight: 600;
-    line-height: 1;
-    padding: 5px 9px;
+    line-height: 1.2;
+    padding: 8px 14px;
     cursor: pointer;
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
-#delegateSection .delegation-remaining-toggle:hover {
+#delegateSection .delegation-remaining-toggle:hover,
+#delegateSection .delegation-manage-toggle:hover {
     background: #e8f4ef;
+    border-color: #4d8f84;
+}
+
+#delegateSection .delegation-summary-badge {
+    margin-left: 0;
+    font-size: 0.72rem;
+    padding: 0.2rem 0.55rem;
 }
 
 #delegateSection .delegation-summary-row-bottom {
@@ -3445,7 +3617,11 @@ header {
 }
 
 #delegateSection #delegationsDropdown .status-dropdown-content {
-    gap: 0.4rem;
+    gap: 0;
+    border: 1px solid #b8d4cb;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fafcfb;
 }
 
 #delegateSection #delegationsDropdown .status-delegation {
@@ -3454,6 +3630,26 @@ header {
     align-items: flex-start;
     gap: 0.2rem;
     padding: 0.2rem 0;
+}
+
+#delegateSection #delegationsDropdown .delegation-manage-item {
+    border-bottom: 1px solid #b8d4cb;
+    padding: 0.55rem 0.4rem;
+    margin: 0;
+    background: #ffffff;
+}
+
+#delegateSection #delegationsDropdown .delegation-manage-item:last-child {
+    border-bottom: none;
+}
+
+#delegateSection #delegationsDropdown .delegation-manage-item:nth-child(even) {
+    background: #f6faf8;
+}
+
+#delegateSection #delegationsDropdown .delegation-manage-item-supplemental {
+    border-bottom: 1px solid #b8d4cb;
+    background: #f3effa;
 }
 
 #delegateSection #delegationsDropdown .address-with-copy {

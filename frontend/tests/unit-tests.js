@@ -167,6 +167,42 @@ export class UnitTests extends TestSuite {
         run: () => this.testRemainingDelegationUnstakeActionWiring()
       },
       {
+        name: 'Staking REST amount parsing (string vs Coin)',
+        run: () => this.testParseStakingRestAmount()
+      },
+      {
+        name: 'Manage delegations shows unbond info',
+        run: () => this.testManageDelegationsUnbondDisplay()
+      },
+      {
+        name: 'Delegation manage split row HTML',
+        run: () => this.testRenderDelegationManageSplitRowHtml()
+      },
+      {
+        name: 'Delegation manage dropdown HTML',
+        run: () => this.testRenderDelegationManageDropdownHtml()
+      },
+      {
+        name: 'Build delegation manage rows',
+        run: () => this.testBuildDelegationManageRows()
+      },
+      {
+        name: 'Delegation manage separate Max inputs',
+        run: () => this.testDelegationManageSeparateMaxInputs()
+      },
+      {
+        name: 'Delegation manage HTML/JS escaping',
+        run: () => this.testDelegationManageHtmlEscaping()
+      },
+      {
+        name: 'Cancel unbond rejects invalid creation height',
+        run: () => this.testCancelUnbondRejectsInvalidCreationHeight()
+      },
+      {
+        name: 'Cancel unbond row action wiring',
+        run: () => this.testCancelUnbondRowActionWiring()
+      },
+      {
         name: 'Copy to clipboard functionality',
         run: () => this.testCopyToClipboard()
       },
@@ -2259,6 +2295,8 @@ export class UnitTests extends TestSuite {
       // Test delegation fetching
       if (window.App && window.App.fetchCurrentDelegations) {
         const originalFetchValidators = window.App.fetchValidators;
+        const originalFetchUnbonding = window.App.fetchUnbondingDelegations;
+        window.App.fetchUnbondingDelegations = async () => [];
         window.App.fetchValidators = async () => ([
           {
             address: 'tellorvaloper1testvalidator123456789012345678901234567890',
@@ -2293,12 +2331,17 @@ export class UnitTests extends TestSuite {
             this.assertNotNull(dropdownContent, 'Delegations dropdown content should exist');
             
             this.assertContains(totalHeader.textContent, '3.000000 TRB', 'Should display total delegation amount in header');
-            this.assertContains(statusElement.innerHTML, 'Top Delegation:', 'Should display top delegation row');
-            this.assertContains(statusElement.innerHTML, 'Unstake from Top Delegation', 'Should display top unstake controls');
-            this.assertContains(dropdownContent.innerHTML, 'Unstake', 'Remaining delegations should include unstake controls');
+            this.assertContains(statusElement.innerHTML, 'Manage Delegations', 'Should display manage delegations toggle');
+            this.assertContains(statusElement.innerHTML, '2 Delegations', 'Should display delegation count badge in summary row');
+            this.assertContains(dropdownContent.innerHTML, 'Bonded TRB', 'Manage delegations dropdown should show bonded panel');
+            this.assertContains(dropdownContent.innerHTML, 'Unbonding TRB', 'Manage delegations dropdown should show unbonding panel');
+            this.assertContains(dropdownContent.innerHTML, 'Unbond', 'Manage delegations dropdown should include unbond control');
+            this.assertContains(dropdownContent.innerHTML, 'delegationManageBondedAmount_', 'Bonded amount input should be separate from unbonding');
+            this.assertContains(dropdownContent.innerHTML, 'delegationManageUnbondingAmount_', 'Unbonding amount input should be separate from bonded');
           }
         } finally {
           window.App.fetchValidators = originalFetchValidators;
+          window.App.fetchUnbondingDelegations = originalFetchUnbonding;
         }
       }
     } finally {
@@ -2417,6 +2460,371 @@ export class UnitTests extends TestSuite {
     }
   }
 
+  testParseStakingRestAmount() {
+    if (!window.App || !window.App.parseStakingRestAmount) {
+      return;
+    }
+    const fromString = window.App.parseStakingRestAmount('999999');
+    this.assertEqual(fromString.amountMicro, 999999, 'Should parse plain string balance from Layer LCD');
+    this.assertEqual(fromString.denom, 'loya', 'Should default denom for string balance');
+
+    const fromCoin = window.App.parseStakingRestAmount({ denom: 'loya', amount: '1000000' });
+    this.assertEqual(fromCoin.amountMicro, 1000000, 'Should parse Coin object balance');
+    this.assertEqual(fromCoin.denom, 'loya', 'Should read denom from Coin object');
+  }
+
+  async testManageDelegationsUnbondDisplay() {
+    if (!window.App || !window.App.displayCurrentDelegationsStatus) {
+      return;
+    }
+
+    let statusElement = document.getElementById('currentDelegationsStatus');
+    if (!statusElement) {
+      statusElement = document.createElement('div');
+      statusElement.id = 'currentDelegationsStatus';
+      document.body.appendChild(statusElement);
+    }
+
+    let dropdownContent = document.getElementById('delegationsDropdownContent');
+    if (!dropdownContent) {
+      dropdownContent = document.createElement('div');
+      dropdownContent.id = 'delegationsDropdownContent';
+      document.body.appendChild(dropdownContent);
+    }
+
+    let totalHeader = document.getElementById('currentDelegationsTotal');
+    if (!totalHeader) {
+      totalHeader = document.createElement('div');
+      totalHeader.id = 'currentDelegationsTotal';
+      document.body.appendChild(totalHeader);
+    }
+
+    const originalFetchDelegations = window.App.fetchCurrentDelegations;
+    const originalFetchUnbonding = window.App.fetchUnbondingDelegations;
+    const originalFetchValidators = window.App.fetchValidators;
+
+    window.App.fetchCurrentDelegations = async () => ([
+      {
+        validatorAddress: 'tellorvaloper1testvalidator123456789012345678901234567890',
+        amount: '1000000',
+        denom: 'loya'
+      }
+    ]);
+    window.App.fetchUnbondingDelegations = async () => ([
+      {
+        validatorAddress: 'tellorvaloper1testvalidator123456789012345678901234567890',
+        creationHeight: '12345',
+        balanceMicro: '999999',
+        completionTime: new Date(Date.now() + 86400000).toISOString(),
+        denom: 'loya'
+      }
+    ]);
+    window.App.fetchValidators = async () => ([
+      {
+        address: 'tellorvaloper1testvalidator123456789012345678901234567890',
+        moniker: 'Test Validator'
+      }
+    ]);
+
+    try {
+      await window.App.displayCurrentDelegationsStatus('tellor1testdelegator123456789012345678901234567890');
+      const el = document.getElementById('delegationsDropdownContent');
+      this.assertNotNull(el, 'Delegations dropdown content should exist');
+      this.assertContains(el.innerHTML, 'TRB unbonding', 'Should show unbonding meta in unbonding panel');
+      this.assertContains(el.innerHTML, 'Bonded TRB', 'Should render bonded panel in manage dropdown');
+      this.assertContains(el.innerHTML, 'Unbonding TRB', 'Should render unbonding panel in manage dropdown');
+      this.assertContains(el.innerHTML, 'delegation-manage-split', 'Should use split layout for manage row');
+      this.assertContains(el.innerHTML, 'delegationManageBondedAmount_', 'Should render bonded amount input');
+      this.assertContains(el.innerHTML, 'delegationManageUnbondingAmount_', 'Should render separate unbonding amount input');
+      this.assertContains(el.innerHTML, 'Unbond</button>', 'Should render unbond control in bonded panel');
+      this.assertContains(el.innerHTML, 'Cancel</button>', 'Should render cancel control in manage dropdown');
+      this.assertContains(el.innerHTML, 'triggerCancelUnbondRow', 'Cancel button should wire to cancel handler');
+      this.assertContains(el.innerHTML, '12345', 'Should include creation height for cancel tx');
+    } finally {
+      window.App.fetchCurrentDelegations = originalFetchDelegations;
+      window.App.fetchUnbondingDelegations = originalFetchUnbonding;
+      window.App.fetchValidators = originalFetchValidators;
+    }
+  }
+
+  testRenderDelegationManageSplitRowHtml() {
+    if (!window.App || !window.App.renderDelegationManageSplitRowHtml) {
+      return;
+    }
+
+    const validatorAddress = 'tellorvaloper1testvalidator123456789012345678901234567890';
+    const html = window.App.renderDelegationManageSplitRowHtml({
+      rowIndex: 0,
+      fullAddr: validatorAddress,
+      moniker: 'Alpha',
+      shortAddr: 'tellorvaloper1test...',
+      bondedTrb: 2.5,
+      unbondTrb: 0.999999,
+      hasDelegation: true,
+      primaryUnbond: {
+        creationHeight: '12345',
+        balanceMicro: '999999',
+        completionTime: new Date(Date.now() + 86400000).toISOString()
+      },
+      isSupplemental: false
+    });
+
+    this.assertContains(html, 'delegation-manage-split', 'Row should use split container');
+    this.assertContains(html, 'delegation-manage-panel-bonded', 'Row should include bonded panel');
+    this.assertContains(html, 'delegation-manage-panel-unbonding', 'Row should include unbonding panel');
+    this.assertContains(html, 'delegation-manage-split-divider', 'Row should include center divider');
+    this.assertContains(html, 'delegationManageBondedAmount_0', 'Bonded panel should have bonded input id');
+    this.assertContains(html, 'delegationManageUnbondingAmount_0', 'Unbonding panel should have unbonding input id');
+    this.assertContains(
+      html,
+      `triggerDelegationRowUnstake('${validatorAddress}', 'delegationManageBondedAmount_0'`,
+      'Unbond should use bonded amount input'
+    );
+    this.assertContains(
+      html,
+      `triggerCancelUnbondRow('${validatorAddress}', '12345', 'delegationManageUnbondingAmount_0'`,
+      'Cancel should use unbonding amount input and creation height'
+    );
+    this.assertContains(html, "setUnstakeAmountToMax('delegationManageBondedAmount_0'", 'Bonded Max should target bonded input');
+    this.assertContains(html, "setCancelUnbondAmountToMax('delegationManageUnbondingAmount_0'", 'Unbonding Max should target unbonding input');
+    this.assertContains(html, '>Unbond</button>', 'Bonded panel should render Unbond button');
+    this.assertContains(html, '>Cancel</button>', 'Unbonding panel should render Cancel button');
+
+    const disabledBondedHtml = window.App.renderDelegationManageSplitRowHtml({
+      rowIndex: 1,
+      fullAddr: validatorAddress,
+      moniker: 'Alpha',
+      shortAddr: 'tellorvaloper1test...',
+      bondedTrb: 0,
+      unbondTrb: 0,
+      hasDelegation: false,
+      primaryUnbond: null,
+      isSupplemental: false
+    });
+    this.assertContains(disabledBondedHtml, 'delegationManageBondedAmount_1', 'Bonded input id should follow row index');
+    this.assertContains(disabledBondedHtml, ' disabled', 'Bonded/unbonding controls should disable when inactive');
+  }
+
+  testRenderDelegationManageDropdownHtml() {
+    if (!window.App || !window.App.renderDelegationManageDropdownHtml) {
+      return;
+    }
+
+    const emptyHtml = window.App.renderDelegationManageDropdownHtml([], {});
+    this.assertContains(emptyHtml, 'No delegations to manage', 'Empty manage rows should render empty state');
+
+    const validatorAddress = 'tellorvaloper1testvalidator123456789012345678901234567890';
+    const manageRows = [
+      {
+        validatorAddress,
+        delegationMicro: 2000000,
+        unbonds: [
+          {
+            validatorAddress,
+            creationHeight: '200',
+            balanceMicro: '500000',
+            completionTime: new Date(Date.now() + 86400000).toISOString()
+          },
+          {
+            validatorAddress,
+            creationHeight: '100',
+            balanceMicro: '250000',
+            completionTime: new Date(Date.now() + 172800000).toISOString()
+          }
+        ],
+        sortKey: 2000000
+      }
+    ];
+    const monikers = { [validatorAddress]: 'Test Validator' };
+    const html = window.App.renderDelegationManageDropdownHtml(manageRows, monikers);
+
+    this.assertContains(html, 'delegation-manage-validator-header', 'Dropdown row should center validator header');
+    this.assertContains(html, 'delegationManageBondedAmount_0', 'Primary row should use bonded input index 0');
+    this.assertContains(html, 'delegationManageUnbondingAmount_0', 'Primary row should use unbonding input index 0');
+    this.assertContains(html, 'Additional unbonding · Test Validator', 'Should render supplemental row for extra unbond');
+    this.assertContains(html, 'delegation-manage-item-supplemental', 'Supplemental unbond row should be marked');
+    this.assertContains(html, 'delegationManageUnbondingAmount_1', 'Supplemental row should increment unbonding input index');
+    this.assertContains(html, `triggerCancelUnbondRow('${validatorAddress}'`, 'Supplemental row should wire cancel');
+    this.assertContains(html, "'100'", 'Supplemental row should use older unbond creation height');
+  }
+
+  testBuildDelegationManageRows() {
+    if (!window.App || !window.App.buildDelegationManageRows) {
+      return;
+    }
+
+    const validatorA = 'tellorvaloper1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const validatorB = 'tellorvaloper1bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const delegations = [
+      {
+        validatorAddress: validatorA,
+        amountValue: 1000000
+      }
+    ];
+    const unbonding = [
+      {
+        validatorAddress: validatorB,
+        balanceMicro: '500000',
+        creationHeight: '99'
+      }
+    ];
+
+    const rows = window.App.buildDelegationManageRows(delegations, unbonding);
+    this.assertEqual(rows.length, 2, 'Should include validators from delegations and unbonding');
+    const rowA = rows.find((row) => row.validatorAddress === validatorA);
+    const rowB = rows.find((row) => row.validatorAddress === validatorB);
+    this.assertNotNull(rowA, 'Should include delegation validator row');
+    this.assertNotNull(rowB, 'Should include unbond-only validator row');
+    this.assertEqual(rowA.delegationMicro, 1000000, 'Delegation micro should match bonded amount');
+    this.assertEqual(rowA.unbonds.length, 0, 'Validator with only delegation should have no unbonds');
+    this.assertEqual(rowB.delegationMicro, 0, 'Unbond-only validator should have zero delegation');
+    this.assertEqual(rowB.unbonds.length, 1, 'Unbond-only validator should include unbond entry');
+  }
+
+  testDelegationManageHtmlEscaping() {
+    if (!window.App || !window.App.renderDelegationManageSplitRowHtml) {
+      return;
+    }
+
+    const validatorAddress = 'tellorvaloper1testvalidator123456789012345678901234567890';
+    const xssMoniker = `</span><img src=x onerror=alert(1)><span>`;
+    const html = window.App.renderDelegationManageSplitRowHtml({
+      rowIndex: 99,
+      fullAddr: validatorAddress,
+      moniker: xssMoniker,
+      shortAddr: 'tellorvaloper1test...',
+      bondedTrb: 1,
+      unbondTrb: 0,
+      hasDelegation: true,
+      primaryUnbond: null,
+      isSupplemental: false
+    });
+
+    this.assertFalse(html.includes('onerror=alert'), 'Malicious moniker must not appear unescaped in HTML');
+    this.assertContains(html, '&lt;/span&gt;', 'HTML text content should be escaped');
+    this.assertContains(html, 'App.copyToClipboard(', 'Should still render copy handler');
+    this.assertContains(html, 'triggerDelegationRowUnstake', 'Should still render unbond handler');
+
+    this.assertFalse(
+      window.App.isValidUnbondCreationHeight("123');alert(1);//"),
+      'Creation height validator should reject injection payloads'
+    );
+    this.assertTrue(
+      window.App.isValidTellorValidatorAddress(validatorAddress),
+      'Valid tellor validator address should pass validation'
+    );
+    this.assertFalse(
+      window.App.isValidTellorValidatorAddress("tellorvaloper1');alert(1);//"),
+      'Invalid validator address should fail validation'
+    );
+  }
+
+  async testCancelUnbondRejectsInvalidCreationHeight() {
+    if (!window.App || !window.App.executeCancelUnbonding) {
+      return;
+    }
+
+    const originalFetch = window.App.fetchUnbondingDelegations;
+    window.App.fetchUnbondingDelegations = async () => [];
+    const originalExecute = window.cosmjs?.stargate?.cancelUnbondingDelegation;
+
+    let broadcastCalled = false;
+    if (window.cosmjs && window.cosmjs.stargate) {
+      window.cosmjs.stargate.cancelUnbondingDelegation = async () => {
+        broadcastCalled = true;
+        return { code: 0 };
+      };
+    }
+
+    window.App.isKeplrConnected = true;
+
+    try {
+      await window.App.executeCancelUnbonding({
+        amount: '1',
+        validatorAddress: 'tellorvaloper1testvalidator123456789012345678901234567890',
+        creationHeight: "12345');alert(1);//",
+        buttonLabel: 'Cancel'
+      });
+      this.assertFalse(broadcastCalled, 'Invalid creation height must not broadcast tx');
+    } finally {
+      window.App.fetchUnbondingDelegations = originalFetch;
+      if (window.cosmjs && window.cosmjs.stargate && originalExecute) {
+        window.cosmjs.stargate.cancelUnbondingDelegation = originalExecute;
+      }
+    }
+  }
+
+  testDelegationManageSeparateMaxInputs() {
+    if (!window.App || !window.App.setUnstakeAmountToMax || !window.App.setCancelUnbondAmountToMax) {
+      return;
+    }
+
+    const bondedInput = document.createElement('input');
+    bondedInput.id = 'delegationManageBondedAmount_max_test';
+    bondedInput.value = '';
+    document.body.appendChild(bondedInput);
+
+    const unbondingInput = document.createElement('input');
+    unbondingInput.id = 'delegationManageUnbondingAmount_max_test';
+    unbondingInput.value = '';
+    document.body.appendChild(unbondingInput);
+
+    try {
+      window.App.setUnstakeAmountToMax('delegationManageBondedAmount_max_test', 3.25);
+      window.App.setCancelUnbondAmountToMax('delegationManageUnbondingAmount_max_test', 0.75);
+
+      this.assertEqual(bondedInput.value, '3.250000', 'Bonded Max should fill bonded input only');
+      this.assertEqual(unbondingInput.value, '0.750000', 'Unbonding Max should fill unbonding input only');
+    } finally {
+      if (bondedInput.parentNode) bondedInput.parentNode.removeChild(bondedInput);
+      if (unbondingInput.parentNode) unbondingInput.parentNode.removeChild(unbondingInput);
+    }
+  }
+
+  async testCancelUnbondRowActionWiring() {
+    if (!window.App || !window.App.triggerCancelUnbondRow) {
+      return;
+    }
+
+    const inputId = 'pendingUnbondAmount_test';
+    const buttonId = 'pendingUnbondCancelButton_test';
+    const validatorAddress = 'tellorvaloper1testvalidator123456789012345678901234567890';
+    const creationHeight = '99999';
+
+    const input = document.createElement('input');
+    input.id = inputId;
+    input.value = '0.5';
+    document.body.appendChild(input);
+
+    const button = document.createElement('button');
+    button.id = buttonId;
+    button.textContent = 'Cancel';
+    document.body.appendChild(button);
+
+    const originalExecute = window.App.executeCancelUnbonding;
+    const capturedCalls = [];
+    window.App.executeCancelUnbonding = async (payload) => {
+      capturedCalls.push(payload);
+      return { code: 0, txhash: 'test-cancel-unbond-hash' };
+    };
+
+    try {
+      await window.App.triggerCancelUnbondRow(validatorAddress, creationHeight, inputId, buttonId);
+
+      this.assertEqual(capturedCalls.length, 1, 'triggerCancelUnbondRow should call executeCancelUnbonding once');
+      this.assertEqual(capturedCalls[0].validatorAddress, validatorAddress, 'Should pass validator address');
+      this.assertEqual(String(capturedCalls[0].creationHeight), creationHeight, 'Should pass creation height');
+      this.assertEqual(capturedCalls[0].amount, '0.5', 'Should pass input amount');
+      this.assertEqual(capturedCalls[0].triggerButton, button, 'Should pass row button');
+      this.assertEqual(capturedCalls[0].buttonLabel, 'Cancel', 'Should pass Cancel label');
+      this.assertEqual(input.value, '', 'Row input should clear after successful cancel trigger');
+    } finally {
+      window.App.executeCancelUnbonding = originalExecute;
+      if (input.parentNode) input.parentNode.removeChild(input);
+      if (button.parentNode) button.parentNode.removeChild(button);
+    }
+  }
+
   async testRemainingDelegationUnstakeActionWiring() {
     if (!window.App || !window.App.triggerDelegationRowUnstake) {
       return;
@@ -2433,7 +2841,7 @@ export class UnitTests extends TestSuite {
 
     const button = document.createElement('button');
     button.id = buttonId;
-    button.textContent = 'Unstake';
+    button.textContent = 'Unbond';
     document.body.appendChild(button);
 
     const originalExecuteUndelegation = window.App.executeUndelegation;
@@ -2450,7 +2858,7 @@ export class UnitTests extends TestSuite {
       this.assertEqual(capturedCalls[0].validatorAddress, validatorAddress, 'Should pass validator address to executeUndelegation');
       this.assertEqual(capturedCalls[0].amount, '1.234567', 'Should pass input amount to executeUndelegation');
       this.assertEqual(capturedCalls[0].triggerButton, button, 'Should pass row button to executeUndelegation');
-      this.assertEqual(capturedCalls[0].buttonLabel, 'Unstake', 'Should pass Unstake label for row action');
+      this.assertEqual(capturedCalls[0].buttonLabel, 'Unbond', 'Should pass Unbond label for row action');
       this.assertEqual(input.value, '', 'Row input should clear after successful row unstake trigger');
     } finally {
       window.App.executeUndelegation = originalExecuteUndelegation;
