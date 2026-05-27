@@ -243,7 +243,7 @@ try {
   require.resolve('puppeteer');
 } catch (error) {
   console.error('Puppeteer not found. Install it with:');
-  console.error('npm install puppeteer');
+  console.error('pnpm add -D puppeteer');
   console.error('');
   console.error('Or run tests manually by opening test-suite.html in a browser');
   process.exit(1);

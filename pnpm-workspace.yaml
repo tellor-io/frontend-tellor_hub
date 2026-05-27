@@ -1,0 +1,15 @@
+# 30 days (1 month) in minutes — supply-chain delay for publish-and-pwn attacks
+# https://pnpm.io/settings#minimumreleaseage
+minimumReleaseAge: 43200
+
+# Allow lifecycle scripts only for packages that need native/build steps
+allowBuilds:
+  keccak: true
+  protobufjs: true
+  secp256k1: true
+  web3: true
+  web3-bzz: true
+  web3-shh: true
+  bufferutil: false
+  es5-ext: false
+  utf-8-validate: false

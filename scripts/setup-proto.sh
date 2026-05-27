@@ -13,7 +13,7 @@ curl -o frontend/proto/gogoproto/gogo.proto https://raw.githubusercontent.com/co
 curl -o frontend/proto/cosmos_proto/cosmos.proto https://raw.githubusercontent.com/cosmos/cosmos-proto/main/proto/cosmos_proto/cosmos.proto
 
 # Update package.json to include proto compilation
-npm install --save-dev protobufjs-cli
+pnpm add -D protobufjs-cli
 
 # Create a simpler proto file without external dependencies
 cat > frontend/proto/bridge/simple_tx.proto << EOL
@@ -34,8 +34,8 @@ EOL
 
 # Run proto compilation with the correct paths
 cd frontend/proto
-npx pbjs -t static-module -w commonjs -o layer_proto.js bridge/simple_tx.proto
-npx pbts -o layer_proto.d.ts layer_proto.js
+pnpm exec pbjs -t static-module -w commonjs -o layer_proto.js bridge/simple_tx.proto
+pnpm exec pbts -o layer_proto.d.ts layer_proto.js
 
 # Create a browser-compatible version
 cat > layer_proto_browser.js << EOL

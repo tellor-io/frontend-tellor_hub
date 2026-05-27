@@ -2,4 +2,5 @@ node_modules
 cache
 artifacts
 package-lock.json
+yarn.lock
 .env

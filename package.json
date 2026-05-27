@@ -2,6 +2,11 @@
   "name": "tellor-layer-bridge",
   "version": "1.0.0",
   "description": "Tellor Layer Bridge with Keplr support",
+  "packageManager": "pnpm@11.4.0",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=11"
+  },
   "main": "server.js",
   "dependencies": {
     "@cosmjs/proto-signing": "^0.31.0",
@@ -14,8 +19,10 @@
     "web3": "^1.7.4"
   },
   "scripts": {
+    "preinstall": "npx only-allow pnpm",
     "start": "node server.js",
     "dev": "PORT=8000 node server.js",
+    "test": "echo 'Open http://localhost:8000/tests/test-suite.html after pnpm dev'",
     "compile-proto": "pbjs -t static-module -w commonjs -o frontend/proto/layer_proto.js frontend/proto/bridge/tx.proto && pbts -o frontend/proto/layer_proto.d.ts frontend/proto/layer_proto.js"
   },
   "devDependencies": {

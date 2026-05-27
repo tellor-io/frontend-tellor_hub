@@ -5,7 +5,7 @@ Comprehensive test suite for the Layer Bridge frontend application, covering bot
 
 ## Running tests manually (recommended)
 
-1. From the repo root, start the static server: `npm run dev` (serves the `frontend/` folder, default **http://localhost:8000**).
+1. From the repo root, start the static server: `pnpm dev` (serves the `frontend/` folder, default **http://localhost:8000**).
 2. In your browser, open **http://localhost:8000/tests/test-suite.html** (same origin as the app so paths resolve correctly).
 3. Use **Run All Tests**, or **Run Unit Tests Only** / **Run Integration Tests Only**. Leave **Mock wallet connections** and **Mock network calls** checked unless you intentionally want real wallets or network.
 
@@ -134,36 +134,27 @@ Optional: `frontend/tests/run-tests.js` can automate the same HTML via Puppeteer
 }
 ```
 
-## Running Tests
+## Running Tests (CLI)
 
-### All Tests
+Tests run in the browser (see **Running tests manually** above). From the repo root:
+
 ```bash
-npm test
+pnpm dev
+# open http://localhost:8000/tests/test-suite.html
 ```
 
-### Unit Tests Only
-```bash
-npm run test:unit
-```
+Optional headless runner (requires `pnpm add -D puppeteer`):
 
-### Integration Tests Only
 ```bash
-npm run test:integration
-```
-
-### Specific Test Categories
-```bash
-# Network detection tests only
-npm run test:network
-
-# Functional tests only
-npm run test:functional
+node frontend/tests/run-tests.js
+node frontend/tests/run-tests.js --unit
+node frontend/tests/run-tests.js --integration
 ```
 
 ## Test Environment Setup
 
 ### Prerequisites
-- Node.js 16+
+- Node.js 22+ (pnpm 11 via Corepack)
 - Modern browser with ES6 support
 - No actual wallet connections required (all mocked)
 
