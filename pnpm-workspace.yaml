@@ -2,6 +2,10 @@
 # https://pnpm.io/settings#minimumreleaseage
 minimumReleaseAge: 43200
 
+# Heroku/slug already has node_modules from build; avoid pnpm re-install on `pnpm start`
+verifyDepsBeforeRun: false
+confirmModulesPurge: false
+
 # Allow lifecycle scripts only for packages that need native/build steps
 allowBuilds:
   keccak: true
