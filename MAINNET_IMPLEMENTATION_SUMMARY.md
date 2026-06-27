@@ -1,7 +1,7 @@
 # Ethereum Mainnet Implementation Summary
 
 ## Overview
-Successfully added Ethereum Mainnet support to the Layer Bridge frontend while maintaining full Sepolia testnet functionality. Users can now connect to both networks and transact with the appropriate contracts and API endpoints.
+Successfully added Ethereum Mainnet support to the Tellor Bridge frontend while maintaining full Sepolia testnet functionality. Users can now connect to both networks and transact with the appropriate contracts and API endpoints.
 
 ## Key Changes Made
 

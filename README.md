@@ -1,6 +1,6 @@
 # bridge-to-layer-frontend
 
-Front-end for bridging TRB to Tellor Layer.
+Front-end for bridging TRB to Tellor.
 
 ## Local development
 
