@@ -15,12 +15,12 @@ The Tellor Hub has been transformed from a bridge-focused interface into a space
 Modules surround the central hub, each representing a different function:
 
 #### 🌉 Bridge to Tellor
-- **Function**: Transfer TRB tokens from Ethereum to Tellor Layer
+- **Function**: Transfer TRB tokens from Ethereum to Tellor
 - **Icon**: Bridge emoji
-- **Description**: "Transfer TRB to Tellor Layer"
+- **Description**: "Transfer TRB to Tellor"
 
 #### 🔗 Bridge to Ethereum  
-- **Function**: Withdraw TRB tokens from Tellor Layer to Ethereum
+- **Function**: Withdraw TRB tokens from Tellor to Ethereum
 - **Icon**: Link emoji
 - **Description**: "Withdraw TRB to Ethereum"
 

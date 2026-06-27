@@ -5,7 +5,7 @@
 
 ## Description
 
-The `TRBBridge` query type allows users to bridge the TRB from Ethereum to Tellor Layer. The data type works by digesting a deposit ID and direction (bool whether you are going to Layer or not).  The deposit ID corresponds to the deposit ID associated with the deposit on the TRB bridge contract on each chain.  The data type will then return the ETH address, layer address, total amount, and tip amount.  
+The `TRBBridge` query type allows users to bridge the TRB from Ethereum to Tellor. The data type works by digesting a deposit ID and direction (bool whether you are going to Layer or not).  The deposit ID corresponds to the deposit ID associated with the deposit on the TRB bridge contract on each chain.  The data type will then return the ETH address, layer address, total amount, and tip amount.  
 
 
 ## Query Parameters
