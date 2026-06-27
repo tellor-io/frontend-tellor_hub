@@ -5,8 +5,8 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tellor Hub</title>
-    <link rel="stylesheet" href="main.css" />
-    <link rel="stylesheet" href="space-station.css?v=25" />
+    <link rel="stylesheet" href="main.css?v=36" />
+    <link rel="stylesheet" href="space-station.css?v=36" />
     <link rel="icon" type="image/x-icon" href="/drkgrnswsh.png">
 
     <!-- Load protobuf.js first -->
@@ -97,55 +97,59 @@
     <div class="space-station-container" id="spaceStationContainer">
       <!-- Initial Hub State -->
       <div class="hub-only-state" id="hubOnlyState">
-        <!-- Central Hub -->
-        <div class="central-hub">
-          <a href="https://explorer.tellor.io" target="_blank" class="hub-core">
-            <img src="glwgrnswsh.png" alt="Dark Green Swoosh Hub" class="hub-logo">
-          </a>
-        </div>
+        <!-- Dark green hero card holds the intro + modules, pinned at the top -->
+        <section class="hub-hero">
+          <span class="hub-hero-swoosh">
+            <svg viewBox="0 0 170 170" fill="currentColor" aria-hidden="true">
+              <path d="M79.8677 64.0642C60.7927 52.1017 66.1129 44.5748 94.8642 50.8188C127.75 57.9567 143.128 70.82 135.837 84.2702C127.333 99.9586 98.2699 110.584 66.4666 117.885C32.1524 125.76 21.8657 120.137 53.0447 104.715C81.9348 90.4186 107.377 81.3222 79.8677 64.0711V64.0642Z"/>
+            </svg>
+          </span>
 
-        <!-- Orbiting Pods -->
-        <div class="orbit-container">
-          <!-- SVG spoke lines: always connect hub center to each pod center -->
-          <svg class="spoke-svg" xmlns="http://www.w3.org/2000/svg">
-            <line class="spoke-line" id="spoke-bridge" />
-            <line class="spoke-line" id="spoke-delegate" />
-            <line class="spoke-line" id="spoke-dispute" />
-          </svg>
-
-          <!-- Bridge Pod (Consolidated) -->
-          <div class="orbiting-pod" data-function="bridge">
-            <div class="pod-content">
-              <div class="aura aura-1"></div>
-              <div class="aura aura-2"></div>
-              <div class="aura aura-3"></div>
-              <div class="aura aura-4"></div>
-              <img src="Orb_Bridge_Tellor.png" alt="Bridge" class="pod-icon">
-            </div>
+          <!-- Intro -->
+          <div class="hub-intro">
+            <h1 class="hub-intro-title">Everything you need to operate on <em>Tellor</em> - In one place.</h1>
           </div>
 
-          <!-- Delegate Pod -->
-          <div class="orbiting-pod" data-function="delegate">
-            <div class="pod-content">
-              <div class="aura aura-1"></div>
-              <div class="aura aura-2"></div>
-              <div class="aura aura-3"></div>
-              <div class="aura aura-4"></div>
-              <img src="Orb_Delegate.png" alt="Delegate" class="pod-icon">
-            </div>
+          <!-- Module Cards (data-function + orbiting-pod hooks preserved for navigation) -->
+          <div class="hub-module-grid orbit-container">
+          <div class="orbiting-pod hub-module-card" data-function="bridge">
+            <span class="hub-card-arrow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>
+            </span>
+            <span class="hub-card-media"><img src="./symbol_bridge_tellor.png" alt="Bridge"></span>
+            <span class="hub-card-eyebrow">cross-chain</span>
+            <span class="hub-card-title">Bridge</span>
+            <span class="hub-card-desc">Transfer TRB between Ethereum and Tellor Layer in both directions.</span>
           </div>
 
-          <!-- Dispute Pod -->
-          <div class="orbiting-pod" data-function="dispute">
-            <div class="pod-content">
-              <div class="aura aura-1"></div>
-              <div class="aura aura-2"></div>
-              <div class="aura aura-3"></div>
-              <div class="aura aura-4"></div>
-              <img src="Orb_Dispute.png" alt="Dispute" class="pod-icon">
-            </div>
+          <div class="orbiting-pod hub-module-card" data-function="delegate">
+            <span class="hub-card-arrow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>
+            </span>
+            <span class="hub-card-media"><img src="./symbol_delegate.png" alt="Delegate"></span>
+            <span class="hub-card-eyebrow">staking</span>
+            <span class="hub-card-title">Delegate</span>
+            <span class="hub-card-desc">Stake TRB with validators and choose a reporter for data submissions.</span>
           </div>
-        </div>
+
+          <div class="orbiting-pod hub-module-card" data-function="dispute">
+            <span class="hub-card-arrow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>
+            </span>
+            <span class="hub-card-media"><img src="./symbol_dispute.png" alt="Dispute"></span>
+            <span class="hub-card-eyebrow">governance</span>
+            <span class="hub-card-title">Dispute</span>
+            <span class="hub-card-desc">Propose disputes against reports and vote to resolve open cases.</span>
+          </div>
+          </div>
+
+          <div class="hub-intro-actions">
+            <a class="hub-intro-link" href="https://explorer.tellor.io" target="_blank" rel="noopener">
+              <span>View explorer</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M9 7h8v8"/></svg>
+            </a>
+          </div>
+        </section>
       </div>
 
       <!-- Function Focus State -->
