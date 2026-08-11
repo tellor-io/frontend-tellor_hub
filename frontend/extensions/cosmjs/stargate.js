@@ -891,32 +891,36 @@
         }
     }
 
+    /**
+     * Prefer App.broadcastCosmosMessages (LCD simulate × buffer + fee).
+     * Falls back to a static gas/fee only if App helpers are unavailable.
+     */
+    async function broadcastStakingMessage(account, messages, memo, fallbackFee) {
+        if (window.App && typeof window.App.broadcastCosmosMessages === 'function') {
+            return window.App.broadcastCosmosMessages(messages, memo);
+        }
+
+        let offlineSigner;
+        if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+            offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+        } else if (window.getOfflineSigner) {
+            const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
+            offlineSigner = window.getOfflineSigner(chainId);
+        } else {
+            throw new Error('No offline signer available');
+        }
+
+        const rpcEndpoint = window.App && window.App.getCosmosRpcEndpoint
+            ? window.App.getCosmosRpcEndpoint()
+            : 'https://node-palmito.tellorlayer.com/rpc';
+        const client = await SigningStargateClient.connectWithSigner(rpcEndpoint, offlineSigner);
+        return client.signAndBroadcastDirect(account, messages, fallbackFee, memo);
+    }
+
     // Updated delegation function using direct signing
     async function delegateTokens(account, validatorAddress, amount) {
         try {
-            // Get offline signer from wallet adapter or fallback to legacy method
-            let offlineSigner;
-            if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
-                offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
-            } else if (window.getOfflineSigner) {
-                // Use the current chain ID from the app
-                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
-                offlineSigner = window.getOfflineSigner(chainId);
-            } else {
-                throw new Error('No offline signer available');
-            }
-
-            // Use the current RPC endpoint from the app
-            const rpcEndpoint = window.App && window.App.getCosmosRpcEndpoint ? window.App.getCosmosRpcEndpoint() : 'https://node-palmito.tellorlayer.com/rpc';
-            const client = await SigningStargateClient.connectWithSigner(
-                rpcEndpoint,
-                offlineSigner
-            );
-
-            // Convert amount to micro units (1 TRB = 1,000,000 micro units)
             const amountInMicroUnits = Math.floor(parseFloat(amount) * 1000000).toString();
-
-            // Create the message
             const msg = {
                 typeUrl: '/cosmos.staking.v1beta1.MsgDelegate',
                 value: {
@@ -929,18 +933,15 @@
                 }
             };
 
-            // Sign and broadcast using direct signing
-            const result = await client.signAndBroadcastDirect(
+            return await broadcastStakingMessage(
                 account,
                 [msg],
+                'Delegate tokens to validator',
                 {
-                    amount: [{ denom: 'loya', amount: '5000' }],
-                    gas: '200000'
-                },
-                'Delegate tokens to validator'
+                    amount: [{ denom: 'loya', amount: '8750' }],
+                    gas: '350000'
+                }
             );
-
-            return result;
         } catch (error) {
             console.error('Delegation error:', error);
             throw error;
@@ -949,29 +950,7 @@
 
     async function undelegateTokens(account, validatorAddress, amount) {
         try {
-            // Get offline signer from wallet adapter or fallback to legacy method
-            let offlineSigner;
-            if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
-                offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
-            } else if (window.getOfflineSigner) {
-                // Use the current chain ID from the app
-                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
-                offlineSigner = window.getOfflineSigner(chainId);
-            } else {
-                throw new Error('No offline signer available');
-            }
-
-            // Use the current RPC endpoint from the app
-            const rpcEndpoint = window.App && window.App.getCosmosRpcEndpoint ? window.App.getCosmosRpcEndpoint() : 'https://node-palmito.tellorlayer.com/rpc';
-            const client = await SigningStargateClient.connectWithSigner(
-                rpcEndpoint,
-                offlineSigner
-            );
-
-            // Convert amount to micro units (1 TRB = 1,000,000 micro units)
             const amountInMicroUnits = Math.floor(parseFloat(amount) * 1000000).toString();
-
-            // Create the message
             const msg = {
                 typeUrl: '/cosmos.staking.v1beta1.MsgUndelegate',
                 value: {
@@ -984,19 +963,15 @@
                 }
             };
 
-            // Sign and broadcast using direct signing
-            const result = await client.signAndBroadcastDirect(
+            return await broadcastStakingMessage(
                 account,
                 [msg],
+                'Undelegate tokens from validator',
                 {
-                    // Keep gas price near prior effective level (0.025 loya/gas) with a higher gas limit.
-                    amount: [{ denom: 'loya', amount: '7500' }],
-                    gas: '300000'
-                },
-                'Undelegate tokens from validator'
+                    amount: [{ denom: 'loya', amount: '8750' }],
+                    gas: '350000'
+                }
             );
-
-            return result;
         } catch (error) {
             console.error('Undelegation error:', error);
             throw error;
@@ -1005,22 +980,6 @@
 
     async function cancelUnbondingDelegation(account, validatorAddress, amount, creationHeight) {
         try {
-            let offlineSigner;
-            if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
-                offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
-            } else if (window.getOfflineSigner) {
-                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
-                offlineSigner = window.getOfflineSigner(chainId);
-            } else {
-                throw new Error('No offline signer available');
-            }
-
-            const rpcEndpoint = window.App && window.App.getCosmosRpcEndpoint ? window.App.getCosmosRpcEndpoint() : 'https://node-palmito.tellorlayer.com/rpc';
-            const client = await SigningStargateClient.connectWithSigner(
-                rpcEndpoint,
-                offlineSigner
-            );
-
             const amountInMicroUnits = Math.floor(parseFloat(amount) * 1000000).toString();
             const heightValue = typeof creationHeight === 'string'
                 ? parseInt(creationHeight, 10)
@@ -1039,17 +998,15 @@
                 }
             };
 
-            const result = await client.signAndBroadcastDirect(
+            return await broadcastStakingMessage(
                 account,
                 [msg],
+                'Cancel unbonding delegation',
                 {
-                    amount: [{ denom: 'loya', amount: '7500' }],
-                    gas: '300000'
-                },
-                'Cancel unbonding delegation'
+                    amount: [{ denom: 'loya', amount: '8750' }],
+                    gas: '350000'
+                }
             );
-
-            return result;
         } catch (error) {
             console.error('Cancel unbonding delegation error:', error);
             throw error;

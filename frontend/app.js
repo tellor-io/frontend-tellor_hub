@@ -2765,11 +2765,26 @@ const App = {
     // Get all TRB input fields
     const delegateStakeAmountInput = document.getElementById('delegateStakeAmount');
     
-    // Position tooltip relative to the active input field
+    // Measure typed text width using the input's computed font (for exponent-style trailing).
+    const textMeasureCanvas = document.createElement('canvas');
+    const textMeasureCtx = textMeasureCanvas.getContext('2d');
+    function measureInputTextWidth(input) {
+        if (!input || !textMeasureCtx) return 0;
+        const styles = window.getComputedStyle(input);
+        const font = [
+            styles.fontStyle,
+            styles.fontWeight,
+            styles.fontSize,
+            styles.fontFamily
+        ].filter(Boolean).join(' ');
+        textMeasureCtx.font = font || '16px sans-serif';
+        return textMeasureCtx.measureText(input.value || '').width;
+    }
+
+    // Sit like an exponent: just after the typed digits, above and to the right.
     function positionTooltip() {
-        // Find which input is currently focused or has a value
         let activeInput = null;
-        
+
         if (document.activeElement && document.activeElement.classList.contains('trb-input-field')) {
             activeInput = document.activeElement;
         } else if (stakeAmountInput && stakeAmountInput.value) {
@@ -2779,22 +2794,35 @@ const App = {
         } else if (delegateStakeAmountInput && delegateStakeAmountInput.value) {
             activeInput = delegateStakeAmountInput;
         }
-        
+
         if (!activeInput) return;
 
         const inputRect = activeInput.getBoundingClientRect();
-        
-        // Special positioning for Bridge to Ethereum section
-        if (activeInput.id === 'ethStakeAmount') {
-            // Position above the input field
-            tooltip.style.left = (inputRect.left + (inputRect.width / 2)) + 'px';
-            tooltip.style.top = (inputRect.top - 10) + 'px';
-            tooltip.style.transform = 'translate(-50%, -100%)';
-        } else {
-            // Standard positioning to the right of the input
-            tooltip.style.left = (inputRect.right + 10) + 'px';
-            tooltip.style.top = (inputRect.top + (inputRect.height / 2)) + 'px';
-            tooltip.style.transform = 'translateY(-50%)';
+        const styles = window.getComputedStyle(activeInput);
+        const paddingLeft = parseFloat(styles.paddingLeft) || 0;
+        const paddingTop = parseFloat(styles.paddingTop) || 0;
+        const borderLeft = parseFloat(styles.borderLeftWidth) || 0;
+        const borderTop = parseFloat(styles.borderTopWidth) || 0;
+        const textWidth = measureInputTextWidth(activeInput);
+        const scrollLeft = activeInput.scrollLeft || 0;
+
+        // Anchor at the trailing edge of the typed number, then lift like a superscript.
+        let left = inputRect.left + borderLeft + paddingLeft - scrollLeft + textWidth + 3;
+        let top = inputRect.top + borderTop + paddingTop;
+
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${top}px`;
+        tooltip.style.transform = 'translateY(-75%)';
+
+        // Keep fully on-screen when the value (or USD string) runs long.
+        const tipRect = tooltip.getBoundingClientRect();
+        if (tipRect.right > window.innerWidth - 8) {
+            left = Math.max(8, window.innerWidth - tipRect.width - 8);
+            tooltip.style.left = `${left}px`;
+        }
+        if (tipRect.top < 8) {
+            top = 8 + tipRect.height * 0.75;
+            tooltip.style.top = `${top}px`;
         }
     }
 
@@ -2967,6 +2995,7 @@ const App = {
         delegateStakeAmountInput.addEventListener('focus', updateTooltip);
     }
     window.addEventListener('resize', positionTooltip);
+    window.addEventListener('scroll', positionTooltip, true);
     
 
 
@@ -3035,13 +3064,12 @@ const App = {
         }
     }
     
-    // Function to show tooltip properly
+    // Function to show tooltip properly (positionTooltip owns transform)
     function showTooltip() {
         if (tooltip) {
             tooltip.style.display = 'block';
             tooltip.style.visibility = 'visible';
             tooltip.style.opacity = '1';
-            tooltip.style.transform = 'scale(1)';
             tooltip.style.pointerEvents = 'none';
             tooltip.style.zIndex = '1000';
         }
