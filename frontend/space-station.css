@@ -2548,19 +2548,20 @@ body:has(.function-focus-state) .frontend-code-link {
   box-shadow: 0 4px 15px rgba(56, 168, 163, 0.4);
 }
 
-/* TRB Price Tooltip Styles */
+/* TRB Price Tooltip — exponent-style trailing USD next to typed amount */
 .trb-price-tooltip {
   position: fixed;
-  background-color: #d1e8e5;
-  padding: 5px 10px;
-  border-radius: 5px;
-  border: 1px solid black;
-  font-size: 14px;
+  background-color: rgba(209, 232, 229, 0.95);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid rgba(8, 59, 68, 0.35);
+  font-size: 11px;
+  line-height: 1.2;
   color: #083b44;
   font-family: 'PPNeueMontreal-Book', Arial, sans-serif;
   z-index: 1000;
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
   pointer-events: none;
   transition: opacity 0.1s ease-out;
 }
