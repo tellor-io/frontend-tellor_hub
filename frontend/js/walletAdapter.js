@@ -54,6 +54,8 @@ class CosmosWalletAdapter {
                     coinMinimalDenom: "loya",
                     coinDecimals: 6,
                 },
+                // Ledger's Cosmos app only signs amino on stargate chains.
+                features: ["stargate", "ibc-transfer", "ibc-go", "no-legacy-stdTx"],
             },
             'tellor-1': {
                 chainId: "tellor-1",
@@ -95,11 +97,16 @@ class CosmosWalletAdapter {
                     coinMinimalDenom: "loya",
                     coinDecimals: 6,
                 },
+                // Ledger's Cosmos app only signs amino on stargate chains.
+                features: ["stargate", "ibc-transfer", "ibc-go", "no-legacy-stdTx"],
             }
         };
         
         // Default to mainnet configuration
         this.chainConfig = this.chainConfigs['tellor-1'];
+        this.preferAmino = false;
+        this._cachedSigner = null;
+        this._signerChainId = null;
     }
 
     debugLog(...args) {
@@ -196,8 +203,9 @@ class CosmosWalletAdapter {
             await this.enableChain();
         }
         
-        // Get offline signer
-        const offlineSigner = this.getOfflineSigner();
+        // Ledger accounts cannot use SIGN_MODE_DIRECT. Pick the signer Keplr
+        // actually supports for the selected key before reading accounts.
+        const offlineSigner = await this.prepareSigner();
         const accounts = await offlineSigner.getAccounts();
         
         if (!accounts || accounts.length === 0) {
@@ -360,47 +368,116 @@ class CosmosWalletAdapter {
             // Fall back to just enabling the chain
             await this.enableChain();
         }
+        await this.prepareSigner();
+    }
+
+    _keplrProvider() {
+        if (!this.currentWallet) {
+            return null;
+        }
+        if (this.walletType === 'cosmostation' && this.currentWallet.providers && this.currentWallet.providers.keplr) {
+            return this.currentWallet.providers.keplr;
+        }
+        if (typeof this.currentWallet.getOfflineSigner === 'function' || typeof this.currentWallet.getKey === 'function') {
+            return this.currentWallet;
+        }
+        return null;
+    }
+
+    _currentChainId() {
+        return window.App && window.App.cosmosChainId ? window.App.cosmosChainId : this.chainId;
+    }
+
+    // Resolve an offline signer. Keplr's getOfflineSignerAuto returns an amino
+    // signer when the selected account is a Ledger, and a direct signer otherwise.
+    async prepareSigner() {
+        const currentChainId = this._currentChainId();
+        this._cachedSigner = null;
+        this._signerChainId = currentChainId;
+        const keplr = this._keplrProvider();
+
+        if (keplr && typeof keplr.getOfflineSignerAuto === 'function') {
+            this._cachedSigner = await keplr.getOfflineSignerAuto(currentChainId);
+            this.preferAmino = typeof this._cachedSigner.signDirect !== 'function';
+            return this._cachedSigner;
+        }
+
+        this.preferAmino = false;
+        if (keplr && typeof keplr.getKey === 'function' && typeof keplr.getOfflineSignerOnlyAmino === 'function') {
+            const key = await keplr.getKey(currentChainId);
+            this.preferAmino = !!(key && key.isNanoLedger);
+        }
+
+        this._cachedSigner = this._createOfflineSigner(currentChainId);
+        return this._cachedSigner;
     }
 
     // Get offline signer from the wallet
     getOfflineSigner() {
+        const currentChainId = this._currentChainId();
+        if (this._cachedSigner && this._signerChainId === currentChainId) {
+            return this._cachedSigner;
+        }
+        return this._createOfflineSigner(currentChainId);
+    }
+
+    _signerFromProvider(provider, currentChainId, missingMessage) {
+        if (this.preferAmino && typeof provider.getOfflineSignerOnlyAmino === 'function') {
+            return provider.getOfflineSignerOnlyAmino(currentChainId);
+        }
+        if (typeof provider.getOfflineSigner !== 'function') {
+            throw new Error(missingMessage);
+        }
+        return provider.getOfflineSigner(currentChainId);
+    }
+
+    _createOfflineSigner(currentChainId) {
         if (!this.currentWallet) {
             throw new Error('No wallet connected');
         }
-        
-        // Use the current chain ID from the app instead of hardcoded value
-        const currentChainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : this.chainId;
-        
+
+        const chainId = currentChainId || this._currentChainId();
+
         this.debugLog('Getting offline signer for wallet type:', this.walletType);
         this.debugLog('Current wallet provider:', this.currentWallet);
-        this.debugLog('Using chain ID:', currentChainId);
-        
+        this.debugLog('Using chain ID:', chainId);
+        this.debugLog('Amino signer:', this.preferAmino);
+
         switch (this.walletType) {
             case 'keplr':
-                if (!this.currentWallet.getOfflineSigner) {
-                    throw new Error('Keplr wallet does not have getOfflineSigner method');
-                }
-                return this.currentWallet.getOfflineSigner(currentChainId);
-                
+                return this._signerFromProvider(
+                    this.currentWallet,
+                    chainId,
+                    'Keplr wallet does not have getOfflineSigner method'
+                );
+
             case 'cosmostation':
                 if (this.currentWallet.providers && this.currentWallet.providers.keplr) {
-                    return this.currentWallet.providers.keplr.getOfflineSigner(currentChainId);
-                } else if (this.currentWallet.getOfflineSigner) {
-                    return this.currentWallet.getOfflineSigner(currentChainId);
-                } else {
-                    throw new Error('Cosmostation wallet does not have getOfflineSigner method');
+                    return this._signerFromProvider(
+                        this.currentWallet.providers.keplr,
+                        chainId,
+                        'Cosmostation wallet does not have getOfflineSigner method'
+                    );
                 }
-                
+                return this._signerFromProvider(
+                    this.currentWallet,
+                    chainId,
+                    'Cosmostation wallet does not have getOfflineSigner method'
+                );
+
             case 'station':
                 if (!this.currentWallet.getOfflineSigner) {
                     throw new Error('Station wallet does not have getOfflineSigner method');
                 }
-                return this.currentWallet.getOfflineSigner(currentChainId);
-                
+                return this.currentWallet.getOfflineSigner(chainId);
+
             default:
-                // Try standard method
-                if (this.currentWallet.getOfflineSigner) {
-                    return this.currentWallet.getOfflineSigner(currentChainId);
+                if (this.currentWallet.getOfflineSigner || this.currentWallet.getOfflineSignerOnlyAmino) {
+                    return this._signerFromProvider(
+                        this.currentWallet,
+                        chainId,
+                        `Unsupported wallet type: ${this.walletType}`
+                    );
                 }
                 console.error('Available methods on wallet:', Object.getOwnPropertyNames(this.currentWallet));
                 throw new Error(`Unsupported wallet type: ${this.walletType}`);
@@ -440,6 +517,9 @@ class CosmosWalletAdapter {
         
         this.currentWallet = null;
         this.walletType = null;
+        this.preferAmino = false;
+        this._cachedSigner = null;
+        this._signerChainId = null;
     }
 
     // Check if wallet is connected

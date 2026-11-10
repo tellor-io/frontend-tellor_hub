@@ -129,20 +129,46 @@ class EthereumWalletModal {
         }
 
         walletList.innerHTML = availableWallets.map(wallet => {
-            const icon = this.getWalletIcon(wallet.type);
-            const description = this.getWalletDescription(wallet.type);
+            const selectionId = this.selectionId(wallet);
+            const icon = this.walletIconHtml(wallet);
+            const description = this.escapeHtml(wallet.rdns || this.getWalletDescription(wallet.type));
+            const name = this.escapeHtml(wallet.name);
             
             return `
-                <div class="wallet-item" onclick="window.ethereumWalletModal.selectWallet('${wallet.type}')">
+                <div class="wallet-item" onclick="window.ethereumWalletModal.selectWallet('${selectionId}')">
                     <div class="wallet-icon">${icon}</div>
                     <div class="wallet-info">
-                        <div class="wallet-name">${wallet.name}</div>
+                        <div class="wallet-name">${name}</div>
                         <div class="wallet-description">${description}</div>
                     </div>
                     <div class="wallet-arrow">→</div>
                 </div>
             `;
         }).join('');
+    }
+
+    selectionId(wallet) {
+        const raw = wallet.uuid || wallet.rdns || wallet.type || '';
+        return String(raw).replace(/[^A-Za-z0-9._:-]/g, '');
+    }
+
+    escapeHtml(value) {
+        return String(value == null ? '' : value).replace(/[&<>"']/g, (ch) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[ch]));
+    }
+
+    walletIconHtml(wallet) {
+        const icon = wallet && wallet.icon;
+        const safe = typeof icon === 'string' && /^data:image\/(png|webp|gif|jpeg);base64,[A-Za-z0-9+/=]+$/.test(icon);
+        if (safe) {
+            return `<img src="${icon}" alt="" width="28" height="28" />`;
+        }
+        return this.getWalletIcon(wallet.type);
     }
 
     // Get wallet icon
@@ -203,7 +229,8 @@ class EthereumWalletModal {
         const walletItems = walletList.querySelectorAll('.wallet-item');
         
         walletItems.forEach(item => {
-            const itemType = item.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+            const handler = item.getAttribute('data-inline-onclick') || item.getAttribute('onclick') || '';
+            const itemType = handler.match(/'([^']+)'/)?.[1];
             if (itemType === walletType) {
                 item.innerHTML = `
                     <div class="wallet-icon">⏳</div>

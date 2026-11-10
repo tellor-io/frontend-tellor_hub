@@ -126,22 +126,214 @@
         }
 
         async _getCosmosOfflineSigner() {
-            let offlineSigner;
+            const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
             if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
-                offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
-            } else if (window.getOfflineSignerAuto) {
-                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
-                offlineSigner = await window.getOfflineSignerAuto(chainId);
-            } else if (window.getOfflineSignerDirect) {
-                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
-                offlineSigner = window.getOfflineSignerDirect(chainId);
-            } else if (window.getOfflineSigner) {
-                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
-                offlineSigner = window.getOfflineSigner(chainId);
-            } else {
-                throw new Error('No offline signer available');
+                if (typeof window.cosmosWalletAdapter.prepareSigner === 'function') {
+                    return window.cosmosWalletAdapter.prepareSigner();
+                }
+                return window.cosmosWalletAdapter.getOfflineSigner();
             }
-            return offlineSigner;
+            const keplr = window.keplr;
+            if (keplr && typeof keplr.getOfflineSignerAuto === 'function') {
+                return keplr.getOfflineSignerAuto(chainId);
+            }
+            if (keplr && typeof keplr.getKey === 'function' && typeof keplr.getOfflineSignerOnlyAmino === 'function') {
+                const key = await keplr.getKey(chainId);
+                if (key && key.isNanoLedger) {
+                    return keplr.getOfflineSignerOnlyAmino(chainId);
+                }
+            }
+            if (window.getOfflineSignerAuto) {
+                return window.getOfflineSignerAuto(chainId);
+            }
+            if (window.getOfflineSignerDirect) {
+                return window.getOfflineSignerDirect(chainId);
+            }
+            if (window.getOfflineSigner) {
+                return window.getOfflineSigner(chainId);
+            }
+            if (keplr && typeof keplr.getOfflineSigner === 'function') {
+                return keplr.getOfflineSigner(chainId);
+            }
+            throw new Error('No offline signer available');
+        }
+
+        _aminoCoin(coin) {
+            if (!coin || coin.denom == null || coin.amount == null || coin.amount === '') {
+                return null;
+            }
+            return { amount: String(coin.amount), denom: String(coin.denom) };
+        }
+
+        _aminoUint(value) {
+            if (value === undefined || value === null || value === '') {
+                return null;
+            }
+            const asString = String(value);
+            return asString === '0' ? null : asString;
+        }
+
+        _withAminoFields(fields) {
+            const out = {};
+            Object.keys(fields).forEach((key) => {
+                const value = fields[key];
+                if (value !== undefined && value !== null && value !== '') {
+                    out[key] = value;
+                }
+            });
+            return out;
+        }
+
+        // SIGN_MODE_LEGACY_AMINO_JSON docs. Type strings match cosmos-sdk aminojson
+        // (amino.name when set, otherwise the protobuf type URL).
+        _toAminoMsgs(messages) {
+            return messages.map((message) => {
+                const value = message.value || {};
+                switch (message.typeUrl) {
+                    case '/layer.bridge.MsgWithdrawTokens': {
+                        const recipient = String(value.recipient || '')
+                            .trim()
+                            .toLowerCase()
+                            .replace(/^0x/, '')
+                            .replace(/\s+/g, '');
+                        return {
+                            type: message.typeUrl,
+                            value: this._withAminoFields({
+                                amount: this._aminoCoin(value.amount),
+                                creator: value.creator,
+                                recipient
+                            })
+                        };
+                    }
+                    case '/layer.bridge.MsgRequestAttestations':
+                        return {
+                            type: message.typeUrl,
+                            value: this._withAminoFields({
+                                creator: value.creator,
+                                query_id: value.query_id != null ? String(value.query_id) : null,
+                                timestamp: value.timestamp != null ? String(value.timestamp) : null
+                            })
+                        };
+                    case '/cosmos.staking.v1beta1.MsgDelegate':
+                        return {
+                            type: 'cosmos-sdk/MsgDelegate',
+                            value: {
+                                amount: this._aminoCoin(value.amount),
+                                delegator_address: value.delegatorAddress,
+                                validator_address: value.validatorAddress
+                            }
+                        };
+                    case '/cosmos.staking.v1beta1.MsgUndelegate':
+                        return {
+                            type: 'cosmos-sdk/MsgUndelegate',
+                            value: {
+                                amount: this._aminoCoin(value.amount),
+                                delegator_address: value.delegatorAddress,
+                                validator_address: value.validatorAddress
+                            }
+                        };
+                    case '/cosmos.staking.v1beta1.MsgCancelUnbondingDelegation':
+                        return {
+                            type: 'cosmos-sdk/MsgCancelUnbondingDelegation',
+                            value: this._withAminoFields({
+                                amount: this._aminoCoin(value.amount),
+                                creation_height: this._aminoUint(value.creationHeight),
+                                delegator_address: value.delegatorAddress,
+                                validator_address: value.validatorAddress
+                            })
+                        };
+                    case '/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward':
+                        return {
+                            type: 'cosmos-sdk/MsgWithdrawDelegationReward',
+                            value: {
+                                delegator_address: value.delegatorAddress,
+                                validator_address: value.validatorAddress
+                            }
+                        };
+                    case '/layer.dispute.MsgProposeDispute':
+                        return {
+                            type: message.typeUrl,
+                            value: this._withAminoFields({
+                                creator: value.creator,
+                                dispute_category: value.disputeCategory ? Number(value.disputeCategory) : null,
+                                disputed_reporter: value.disputedReporter,
+                                fee: this._aminoCoin(value.fee),
+                                pay_from_bond: value.payFromBond ? true : null,
+                                report_meta_id: this._aminoUint(value.reportMetaId),
+                                report_query_id: value.reportQueryId
+                            })
+                        };
+                    case '/layer.dispute.MsgVote':
+                        return {
+                            type: message.typeUrl,
+                            value: this._withAminoFields({
+                                id: this._aminoUint(value.id),
+                                vote: value.vote ? Number(value.vote) : null,
+                                voter: value.voter
+                            })
+                        };
+                    case '/layer.dispute.MsgAddFeeToDispute':
+                        return {
+                            type: message.typeUrl,
+                            value: this._withAminoFields({
+                                amount: this._aminoCoin(value.amount),
+                                creator: value.creator,
+                                dispute_id: this._aminoUint(value.disputeId != null ? value.disputeId : value.dispute_id),
+                                pay_from_bond: value.payFromBond ? true : null
+                            })
+                        };
+                    case '/layer.dispute.MsgClaimDisputeRewards':
+                        return {
+                            type: message.typeUrl,
+                            value: this._withAminoFields({
+                                creator: value.creator || value.caller_address || value.callerAddress,
+                                dispute_id: this._aminoUint(value.disputeId != null ? value.disputeId : value.dispute_id)
+                            })
+                        };
+                    case '/layer.dispute.MsgWithdrawFeeRefund':
+                        return {
+                            type: message.typeUrl,
+                            value: this._withAminoFields({
+                                creator: value.creator || value.caller_address || value.callerAddress,
+                                dispute_id: this._aminoUint(value.disputeId != null ? value.disputeId : value.id)
+                            })
+                        };
+                    case '/layer.reporter.MsgSelectReporter':
+                    case '/layer.reporter.MsgSwitchReporter':
+                        return {
+                            type: message.typeUrl,
+                            value: {
+                                reporter_address: value.reporterAddress || value.reporter_address,
+                                selector_address: value.selectorAddress || value.selector_address
+                            }
+                        };
+                    case '/layer.reporter.MsgWithdrawTip':
+                        return {
+                            type: message.typeUrl,
+                            value: {
+                                selector_address: value.selectorAddress || value.selector_address,
+                                validator_address: value.validatorAddress || value.validator_address
+                            }
+                        };
+                    default:
+                        throw new Error(`Ledger signing is not supported for ${message.typeUrl}`);
+                }
+            });
+        }
+
+        _walletBytes(value) {
+            if (value instanceof Uint8Array) {
+                return value;
+            }
+            if (typeof value !== 'string' || value.length === 0) {
+                throw new Error('Wallet returned an empty signature');
+            }
+            const binary = atob(value);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes;
         }
 
         _createDirectTxProtobufEnv() {
@@ -582,57 +774,106 @@
                 };
 
                 // Encode TxBody
-                const encodedTxBody = TxBodyType.encode(TxBodyType.create(txBody)).finish();
+                let encodedTxBody = TxBodyType.encode(TxBodyType.create(txBody)).finish();
 
-                // Get accounts from signer
                 const accounts = await offlineSigner.getAccounts();
                 if (!accounts || accounts.length === 0) {
                     throw new Error('No accounts found in signer');
                 }
                 const signerAccount = accounts[0];
+                const chainId = window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1';
 
-                // Create the AuthInfo
-                const authInfo = {
-                    signerInfos: [{
-                        publicKey: {
-                            typeUrl: "/cosmos.crypto.secp256k1.PubKey",
-                            value: PubKeyType.encode({ key: signerAccount.pubkey }).finish()
-                        },
-                        modeInfo: {
-                            single: {
-                                mode: 1 // SIGN_MODE_DIRECT
-                            }
-                        },
-                        sequence: parseInt(accountInfo.sequence)
-                    }],
-                    fee: {
-                        amount: fee.amount,
-                        gasLimit: parseInt(fee.gas),
-                        payer: "",
-                        granter: ""
+                let finalTx;
+                // Ledger (and getOfflineSignerOnlyAmino) has no signDirect.
+                if (typeof offlineSigner.signDirect !== 'function') {
+                    if (typeof offlineSigner.signAmino !== 'function') {
+                        throw new Error('This wallet cannot sign. Ledger accounts need amino signing support.');
                     }
-                };
-
-                // Encode AuthInfo
-                const encodedAuthInfo = AuthInfoType.encode(AuthInfoType.create(authInfo)).finish();
-
-                // Create the sign doc for direct signing
-                const signDoc = {
-                    bodyBytes: encodedTxBody,
-                    authInfoBytes: encodedAuthInfo,
-                    chainId: window.App && window.App.cosmosChainId ? window.App.cosmosChainId : 'tellor-1',
-                    accountNumber: parseInt(accountInfo.account_number)
-                };
-
-                // Sign the transaction using signDirect
-                const signResult = await offlineSigner.signDirect(signerAddress, signDoc);
-
-                // Create the final transaction
-                const finalTx = {
-                    body: TxBodyType.decode(signResult.signed.bodyBytes),
-                    authInfo: AuthInfoType.decode(signResult.signed.authInfoBytes),
-                    signatures: [signResult.signature.signature]
-                };
+                    const aminoFee = {
+                        amount: Array.isArray(fee.amount) ? fee.amount.map((coin) => ({
+                            amount: String(coin.amount),
+                            denom: coin.denom
+                        })) : [],
+                        gas: String(fee.gas)
+                    };
+                    const signResult = await offlineSigner.signAmino(signerAddress, {
+                        account_number: String(accountInfo.account_number),
+                        chain_id: chainId,
+                        fee: aminoFee,
+                        memo: memo || '',
+                        msgs: this._toAminoMsgs(messages),
+                        sequence: String(accountInfo.sequence)
+                    });
+                    const signed = signResult.signed || {};
+                    const signedFee = signed.fee || aminoFee;
+                    const signedMemo = typeof signed.memo === 'string' ? signed.memo : (memo || '');
+                    if (signedMemo !== txBody.memo) {
+                        txBody.memo = signedMemo;
+                        encodedTxBody = TxBodyType.encode(TxBodyType.create(txBody)).finish();
+                    }
+                    const pubKeyValue = signResult.signature && signResult.signature.pub_key
+                        ? signResult.signature.pub_key.value
+                        : signerAccount.pubkey;
+                    const authInfo = {
+                        signerInfos: [{
+                            publicKey: {
+                                typeUrl: "/cosmos.crypto.secp256k1.PubKey",
+                                value: PubKeyType.encode({ key: this._walletBytes(pubKeyValue) }).finish()
+                            },
+                            modeInfo: {
+                                single: {
+                                    mode: 127 // SIGN_MODE_LEGACY_AMINO_JSON
+                                }
+                            },
+                            sequence: parseInt(signed.sequence != null ? signed.sequence : accountInfo.sequence, 10)
+                        }],
+                        fee: {
+                            amount: signedFee.amount || [],
+                            gasLimit: parseInt(signedFee.gas, 10),
+                            payer: signedFee.payer || "",
+                            granter: signedFee.granter || ""
+                        }
+                    };
+                    finalTx = {
+                        body: TxBodyType.decode(encodedTxBody),
+                        authInfo: AuthInfoType.decode(AuthInfoType.encode(AuthInfoType.create(authInfo)).finish()),
+                        signatures: [this._walletBytes(signResult.signature.signature)]
+                    };
+                } else {
+                    const authInfo = {
+                        signerInfos: [{
+                            publicKey: {
+                                typeUrl: "/cosmos.crypto.secp256k1.PubKey",
+                                value: PubKeyType.encode({ key: signerAccount.pubkey }).finish()
+                            },
+                            modeInfo: {
+                                single: {
+                                    mode: 1 // SIGN_MODE_DIRECT
+                                }
+                            },
+                            sequence: parseInt(accountInfo.sequence, 10)
+                        }],
+                        fee: {
+                            amount: fee.amount,
+                            gasLimit: parseInt(fee.gas, 10),
+                            payer: "",
+                            granter: ""
+                        }
+                    };
+                    const encodedAuthInfo = AuthInfoType.encode(AuthInfoType.create(authInfo)).finish();
+                    const signDoc = {
+                        bodyBytes: encodedTxBody,
+                        authInfoBytes: encodedAuthInfo,
+                        chainId: chainId,
+                        accountNumber: parseInt(accountInfo.account_number, 10)
+                    };
+                    const signResult = await offlineSigner.signDirect(signerAddress, signDoc);
+                    finalTx = {
+                        body: TxBodyType.decode(signResult.signed.bodyBytes),
+                        authInfo: AuthInfoType.decode(signResult.signed.authInfoBytes),
+                        signatures: [signResult.signature.signature]
+                    };
+                }
 
                 // Encode the final transaction
                 const txObj = TxType.create(finalTx);
