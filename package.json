@@ -23,9 +23,11 @@
     "start": "node server.js",
     "dev": "PORT=8000 node server.js",
     "test": "echo 'Open http://localhost:8000/tests/test-suite.html after pnpm dev'",
-    "compile-proto": "pbjs -t static-module -w commonjs -o frontend/proto/layer_proto.js frontend/proto/bridge/tx.proto && pbts -o frontend/proto/layer_proto.d.ts frontend/proto/layer_proto.js"
+    "compile-proto": "pbjs -t static-module -w commonjs -o frontend/proto/layer_proto.js frontend/proto/bridge/tx.proto && pbts -o frontend/proto/layer_proto.d.ts frontend/proto/layer_proto.js",
+    "build:css": "tailwindcss -i frontend/tailwind.src.css -o frontend/tailwind.css --minify"
   },
   "devDependencies": {
-    "protobufjs-cli": "^1.1.3"
+    "protobufjs-cli": "^1.1.3",
+    "tailwindcss": "3.4.17"
   }
 }

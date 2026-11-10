@@ -962,7 +962,7 @@ export class IntegrationTests extends TestSuite {
 
     const keys = [
       'tellor_cosmos_wallet_type', 'tellor_cosmos_chain_id',
-      'tellor_eth_wallet_type', 'tellor_eth_wallet_connected', 'tellor_eth_chain_id'
+      'tellor_eth_wallet_type', 'tellor_eth_wallet_uuid', 'tellor_eth_wallet_rdns', 'tellor_eth_wallet_connected', 'tellor_eth_chain_id'
     ];
     keys.forEach(k => localStorage.removeItem(k));
 

@@ -10,6 +10,8 @@ app.disable('x-powered-by');
 
 app.use(
   helmet({
+    // Older browsers honor this instead of CSP frame-ancestors.
+    frameguard: { action: 'deny' },
     contentSecurityPolicy: {
       useDefaults: false,
       directives: {
@@ -22,17 +24,24 @@ app.use(
           "'self'",
           // Allow inline scripts in this local dev server (app bootstrap + tests/test-suite.html harness).
           "'unsafe-inline'",
+          // protobufjs compiles each Cosmos message encoder with new Function()
+          // on first use. Real browsers block that, and then delegate, withdraw,
+          // and dispute signing throw, unless this source is allowed.
           "'unsafe-eval'",
           'https://cdn.jsdelivr.net',
           'https://cdn.ethers.io',
-          'https://cdn.tailwindcss.com'
+          // Keplr injects chrome-extension://.../injectedScript.bundle.js into the page.
+          'chrome-extension:',
+          'moz-extension:'
         ],
         connectSrc: [
           "'self'",
           'https://mainnet.tellorlayer.com',
           'https://node-palmito.tellorlayer.com',
           'https://mainnet.infura.io',
-          'https://sepolia.infura.io'
+          'https://sepolia.infura.io',
+          'chrome-extension:',
+          'moz-extension:'
         ],
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", 'data:', 'https:'],

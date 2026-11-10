@@ -442,7 +442,6 @@ const App = {
                             }, 1000);
                         }
                     } catch (error) {
-                        // console.error(...);
                         App.handleError(error);
                     }
                 });
@@ -528,6 +527,10 @@ const App = {
     if (savedEthConnected === 'true' && savedEthWalletType) {
       try {
         App._isAutoReconnecting = true;
+        App._ethReconnectPin = {
+          uuid: localStorage.getItem('tellor_eth_wallet_uuid'),
+          rdns: localStorage.getItem('tellor_eth_wallet_rdns')
+        };
         if (window.ethereumWalletAdapter) {
           await App.connectEthereumWallet(savedEthWalletType);
         } else if (window.ethereum) {
@@ -540,10 +543,13 @@ const App = {
       } catch (err) {
         console.warn('Auto-reconnect Ethereum wallet failed:', err.message);
         localStorage.removeItem('tellor_eth_wallet_type');
+        localStorage.removeItem('tellor_eth_wallet_uuid');
+        localStorage.removeItem('tellor_eth_wallet_rdns');
         localStorage.removeItem('tellor_eth_wallet_connected');
         localStorage.removeItem('tellor_eth_chain_id');
       } finally {
         delete App._isAutoReconnecting;
+        delete App._ethReconnectPin;
       }
     }
   },
@@ -553,87 +559,30 @@ const App = {
       try {
         // Check for Ethereum wallet adapter
         const hasEthereumAdapter = typeof window.ethereumWalletAdapter !== 'undefined';
-        const hasKeplr = typeof window.keplr !== 'undefined';
         
-        // Handle Ethereum wallets
-        if (hasEthereumAdapter) {
-          const availableWallets = window.ethereumWalletAdapter.detectWallets();
-          
-          if (availableWallets.length > 0) {
-            const walletButton = document.getElementById("walletButton");
-            if (walletButton) {
-              walletButton.disabled = false;
-              walletButton.innerHTML = 'Connect Ethereum Wallet';
-            }
-          }
-        } else {
-          const hasMetaMask = typeof window.ethereum !== 'undefined';
-          
-          if (hasMetaMask) {
-            App.web3Provider = window.ethereum;
-            App.web3 = new Web3(window.ethereum);
-
-            const walletButton = document.getElementById("walletButton");
-            if (walletButton) walletButton.disabled = false;
-          }
+        // Prime web3 when there is no adapter and an injected provider is already here.
+        if (!hasEthereumAdapter && typeof window.ethereum !== 'undefined') {
+          App.web3Provider = window.ethereum;
+          App.web3 = new Web3(window.ethereum);
         }
 
-        // Always listen for chain/account changes on window.ethereum
-        // (needed regardless of wallet adapter vs legacy path)
-        if (typeof window.ethereum !== 'undefined') {
-          const handleChainChanged = async (chainIdHex) => {
-            const newChainId = typeof chainIdHex === 'string' && chainIdHex.startsWith('0x')
-              ? parseInt(chainIdHex, 16)
-              : parseInt(chainIdHex);
-            
-            App.chainId = newChainId;
-
-            if (App.isConnected) {
-              localStorage.setItem('tellor_eth_chain_id', String(newChainId));
-              await App.refreshEthereumConnectionState();
-            }
-
-            if (App.updateNetworkDisplay) {
-              App.updateNetworkDisplay();
-            }
-            if (App.updateWalletManagerToggleText) {
-              App.updateWalletManagerToggleText();
-            }
-            if (App.updateNetworkCompatibilityWarning) {
-              App.updateNetworkCompatibilityWarning();
-            }
-          };
-
-          const handleAccountsChanged = (accounts) => {
-            App.handleAccountsChanged(accounts);
-          };
-
-          const handleDisconnect = () => {
-            App.disconnectMetaMask();
-          };
-
-          window.ethereum.removeListener('chainChanged', handleChainChanged);
-          window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-          window.ethereum.removeListener('disconnect', handleDisconnect);
-
-          window.ethereum.on('chainChanged', handleChainChanged);
-          window.ethereum.on('accountsChanged', handleAccountsChanged);
-          window.ethereum.on('disconnect', handleDisconnect);
+        // Always enable the Ethereum button. MetaMask injects after this runs on
+        // some pages, and a disabled button only greys out on hover.
+        const walletButton = document.getElementById("walletButton");
+        if (walletButton && !App.isConnected) {
+          walletButton.disabled = false;
+          walletButton.innerHTML = 'Connect Ethereum Wallet';
         }
+
+        // Chain and account events bind to the pinned provider after connect.
+        // Listening on window.ethereum would follow whichever extension injected last.
         
-        // Handle Cosmos wallets
-        const hasCosmosWallet = hasKeplr || 
-                               typeof window.cosmostation !== 'undefined' || 
-                               typeof window.station !== 'undefined';
-        
-        if (hasCosmosWallet) {
-          // Enable Cosmos wallet buttons
-          const keplrButton = document.getElementById("keplrButton");
-          if (keplrButton) {
-            keplrButton.disabled = false;
-            // Update button text to be more generic
-            keplrButton.innerHTML = 'Connect Cosmos Wallet';
-          }
+        // Enable the Cosmos button even when Keplr injects after this runs.
+        // A disabled button only greys out on hover and never receives the click.
+        const keplrButton = document.getElementById("keplrButton");
+        if (keplrButton && !App.isKeplrConnected) {
+          keplrButton.disabled = false;
+          keplrButton.innerHTML = 'Connect Cosmos Wallet';
         }
         
         resolve();
@@ -644,19 +593,57 @@ const App = {
     });
   },
 
-  connectMetaMask: async function() {
-    try {
-        // Use wallet adapter if available, otherwise fall back to direct MetaMask
-        if (window.ethereumWalletAdapter) {
-            return await this.connectEthereumWallet();
-        } else {
-            return await this.connectMetaMaskLegacy();
-        }
-    } catch (error) {
-        // console.error(...);
-        App.handleError(error);
-        throw error;
+  bindEthereumProviderEvents: function(provider) {
+    if (App._ethProviderEvents && App._ethProviderEvents.provider) {
+      const previous = App._ethProviderEvents;
+      try {
+        previous.provider.removeListener('chainChanged', previous.onChainChanged);
+        previous.provider.removeListener('accountsChanged', previous.onAccountsChanged);
+        previous.provider.removeListener('disconnect', previous.onDisconnect);
+      } catch (error) {
+        // The previous provider may already be gone.
+      }
+      App._ethProviderEvents = null;
     }
+
+    if (!provider || typeof provider.on !== 'function') return;
+
+    const onChainChanged = async (chainIdHex) => {
+      const newChainId = typeof chainIdHex === 'string' && chainIdHex.startsWith('0x')
+        ? parseInt(chainIdHex, 16)
+        : parseInt(chainIdHex);
+
+      App.chainId = newChainId;
+
+      if (App.isConnected) {
+        localStorage.setItem('tellor_eth_chain_id', String(newChainId));
+        await App.refreshEthereumConnectionState();
+      }
+
+      if (App.updateNetworkDisplay) App.updateNetworkDisplay();
+      if (App.updateWalletManagerToggleText) App.updateWalletManagerToggleText();
+      if (App.updateNetworkCompatibilityWarning) App.updateNetworkCompatibilityWarning();
+    };
+    const onAccountsChanged = (accounts) => {
+      App.handleAccountsChanged(accounts);
+    };
+    const onDisconnect = () => {
+      App.disconnectMetaMask();
+    };
+
+    provider.on('chainChanged', onChainChanged);
+    provider.on('accountsChanged', onAccountsChanged);
+    provider.on('disconnect', onDisconnect);
+    App._ethProviderEvents = { provider, onChainChanged, onAccountsChanged, onDisconnect };
+  },
+
+  connectMetaMask: async function() {
+    await this.waitForEthereumWallet();
+    // Callers surface the error. Waiting covers a late MetaMask inject.
+    if (window.ethereumWalletAdapter) {
+        return await this.connectEthereumWallet();
+    }
+    return await this.connectMetaMaskLegacy();
   },
 
   connectEthereumWallet: async function(walletType = null) {
@@ -679,8 +666,9 @@ const App = {
             });
         }
 
-        // Connect to the selected wallet
-        const connectionResult = await window.ethereumWalletAdapter.connectToWallet(walletType);
+        // Connect to the selected wallet. Auto-reconnect passes the saved uuid
+        // so a different extension that also sets isMetaMask cannot take the session.
+        const connectionResult = await window.ethereumWalletAdapter.connectToWallet(walletType, App._ethReconnectPin || null);
         
         // Set wallet state
         App.account = connectionResult.account;
@@ -690,9 +678,14 @@ const App = {
         App.ethers = connectionResult.ethers;
         App.isConnected = true;
         
-        // Persist connection for auto-reconnect on page refresh
-        localStorage.setItem('tellor_eth_wallet_type', walletType);
+        // Persist the wallet the user picked, including its EIP-6963 identity.
+        localStorage.setItem('tellor_eth_wallet_type', connectionResult.walletType || walletType);
+        if (connectionResult.uuid) localStorage.setItem('tellor_eth_wallet_uuid', connectionResult.uuid);
+        else localStorage.removeItem('tellor_eth_wallet_uuid');
+        if (connectionResult.rdns) localStorage.setItem('tellor_eth_wallet_rdns', connectionResult.rdns);
+        else localStorage.removeItem('tellor_eth_wallet_rdns');
         localStorage.setItem('tellor_eth_wallet_connected', 'true');
+        App.bindEthereumProviderEvents(connectionResult.provider);
         
         // During auto-reconnect, respect whatever chain MetaMask is already on.
         // Only prompt/force mainnet on fresh user-initiated connects.
@@ -754,10 +747,7 @@ const App = {
         App.updateNetworkDisplay();
         
         return connectionResult;
-        
     } catch (error) {
-        // console.error(...);
-        App.handleError(error);
         throw error;
     }
   },
@@ -881,8 +871,11 @@ const App = {
         
         // Persist connection for auto-reconnect on page refresh
         localStorage.setItem('tellor_eth_wallet_type', 'metamask');
+        localStorage.removeItem('tellor_eth_wallet_uuid');
+        localStorage.removeItem('tellor_eth_wallet_rdns');
         localStorage.setItem('tellor_eth_wallet_connected', 'true');
         localStorage.setItem('tellor_eth_chain_id', String(App.chainId));
+        App.bindEthereumProviderEvents(window.ethereum);
         
         // Initialize contracts
         await App.initBridgeContract();
@@ -905,25 +898,53 @@ const App = {
         // Update network display
         App.updateNetworkDisplay();
     } catch (error) {
-        // console.error(...);
-        App.handleError(error);
         throw error;
     }
   },
 
-  connectKeplr: async function() {
-    try {
-        // Use wallet adapter if available, otherwise fall back to direct Keplr
-        if (window.cosmosWalletAdapter) {
-            return await this.connectCosmosWallet();
-        } else {
-            return await this.connectKeplrLegacy();
-        }
-    } catch (error) {
-        // console.error(...);
-        App.handleError(error);
-        throw error;
+  waitForEthereumWallet: async function(timeoutMs = 2000) {
+    if (typeof window.ethereum !== 'undefined') {
+      return;
     }
+    if (window.ethereumWalletAdapter && typeof window.ethereumWalletAdapter.waitForInjectedProvider === 'function') {
+      await window.ethereumWalletAdapter.waitForInjectedProvider(timeoutMs);
+      return;
+    }
+    const started = Date.now();
+    await new Promise((resolve) => {
+      const timer = setInterval(() => {
+        if (typeof window.ethereum !== 'undefined' || Date.now() - started >= timeoutMs) {
+          clearInterval(timer);
+          resolve();
+        }
+      }, 100);
+    });
+  },
+
+  waitForCosmosWallet: async function(timeoutMs = 2000) {
+    const ready = () => window.keplr || window.cosmostation || window.station;
+    if (ready()) {
+      return;
+    }
+    const started = Date.now();
+    await new Promise((resolve) => {
+      const timer = setInterval(() => {
+        if (ready() || Date.now() - started >= timeoutMs) {
+          clearInterval(timer);
+          resolve();
+        }
+      }, 100);
+    });
+  },
+
+  connectKeplr: async function() {
+    await this.waitForCosmosWallet();
+    // Use wallet adapter if available, otherwise fall back to direct Keplr.
+    // Callers surface the error.
+    if (window.cosmosWalletAdapter) {
+        return await this.connectCosmosWallet();
+    }
+    return await this.connectKeplrLegacy();
   },
 
   connectCosmosWallet: async function(walletType = null) {
@@ -1107,13 +1128,25 @@ const App = {
                 coinMinimalDenom: "loya",
                 coinDecimals: 6,
             },
+            // Ledger's Cosmos app only signs amino on stargate chains.
+            features: ["stargate", "ibc-transfer", "ibc-go", "no-legacy-stdTx"],
         });
 
         // Enable the chain
         await window.keplr.enable(App.cosmosChainId);
-        
-        // Get the offline signer
-        const offlineSigner = window.keplr.getOfflineSigner(App.cosmosChainId);
+
+        // getOfflineSigner is direct-only. Ledger keys need the amino signer.
+        let offlineSigner;
+        if (typeof window.keplr.getOfflineSignerAuto === 'function') {
+            offlineSigner = await window.keplr.getOfflineSignerAuto(App.cosmosChainId);
+        } else if (typeof window.keplr.getKey === 'function' && typeof window.keplr.getOfflineSignerOnlyAmino === 'function') {
+            const key = await window.keplr.getKey(App.cosmosChainId);
+            offlineSigner = key && key.isNanoLedger
+                ? window.keplr.getOfflineSignerOnlyAmino(App.cosmosChainId)
+                : window.keplr.getOfflineSigner(App.cosmosChainId);
+        } else {
+            offlineSigner = window.keplr.getOfflineSigner(App.cosmosChainId);
+        }
         const accounts = await offlineSigner.getAccounts();
         
         if (!accounts || accounts.length === 0) {
@@ -1183,8 +1216,11 @@ const App = {
 
         // Clear auto-reconnect persistence
         localStorage.removeItem('tellor_eth_wallet_type');
+        localStorage.removeItem('tellor_eth_wallet_uuid');
+        localStorage.removeItem('tellor_eth_wallet_rdns');
         localStorage.removeItem('tellor_eth_wallet_connected');
         localStorage.removeItem('tellor_eth_chain_id');
+        App.bindEthereumProviderEvents(null);
 
         // Disconnect from wallet adapter if available
         if (window.ethereumWalletAdapter && window.ethereumWalletAdapter.isWalletConnected()) {
@@ -1441,8 +1477,32 @@ const App = {
   },
 
   handleError: function(error) {
-    // console.error(...);
-    alert("An error occurred. Please check the console for more details.");
+    const message = (error && error.ledgerHint)
+      || (error && error.message)
+      || 'An error occurred. Please check the console for more details.';
+    alert(message);
+  },
+
+  // All Ethereum contract sends go through the adapter so a Ledger account
+  // stays on eth_sendTransaction and can fall back to a legacy (type 0) tx.
+  sendEthereumTx: function(contractMethod, sendOptions) {
+    if (window.ethereumWalletAdapter && typeof window.ethereumWalletAdapter.sendContractCall === 'function') {
+      return window.ethereumWalletAdapter.sendContractCall(contractMethod, sendOptions);
+    }
+    return contractMethod.send(sendOptions);
+  },
+
+  ethereumTxErrorMessage: function(error, fallback) {
+    if (error && error.ledgerHint) return error.ledgerHint;
+    const message = error && error.message ? error.message : '';
+    const lower = message.toLowerCase();
+    if (lower.includes('insufficient funds')) {
+      return 'Insufficient ETH for gas fees. Please add more ETH to your wallet.';
+    }
+    if (lower.includes('user rejected') || lower.includes('user denied')) {
+      return 'Transaction was cancelled. Please try again.';
+    }
+    return fallback;
   },
 
   isSupportedEthereumNetwork: function(chainId = App.chainId) {
@@ -2500,10 +2560,10 @@ const App = {
     nonce = document.getElementById("_nonce").value;
     queryData = document.getElementById("_queryData").value;
     
-    App.contracts.Bridge.methods
-      .submitValue(queryId, value, nonce, queryData)
-      .send({ from: App.account })
-      .then(function (result) {
+    App.sendEthereumTx(
+      App.contracts.Bridge.methods.submitValue(queryId, value, nonce, queryData),
+      { from: App.account }
+    ).then(function (result) {
         // Handle result silently
       });
   },
@@ -2522,9 +2582,10 @@ const App = {
     depositButton.disabled = true;
 
     App.showPendingPopup("Approval transaction pending...");
-    App.contracts.Token.methods.approve(App.contracts.Bridge.options.address, amountToSend)
-      .send({ from: App.account })
-      .then(function(approvalResult) {
+    App.sendEthereumTx(
+      App.contracts.Token.methods.approve(App.contracts.Bridge.options.address, amountToSend),
+      { from: App.account }
+    ).then(function(approvalResult) {
         App.hidePendingPopup();
         App.showSuccessPopup("Approval successful! You can now bridge your tokens.", approvalResult.transactionHash, 'ethereum');
         
@@ -2545,14 +2606,7 @@ const App = {
         approveButton.disabled = false;
         depositButton.disabled = true;
         
-        // Show user-friendly error message
-        let errorMessage = "Error in approval. Please try again.";
-        if (error.message && error.message.includes('insufficient funds')) {
-          errorMessage = "Insufficient ETH for gas fees. Please add more ETH to your wallet.";
-        } else if (error.message && error.message.includes('user rejected')) {
-          errorMessage = "Transaction was cancelled. Please try again.";
-        }
-        alert(errorMessage);
+        alert(App.ethereumTxErrorMessage(error, "Error in approval. Please try again."));
       });
   },
 
@@ -2698,11 +2752,13 @@ const App = {
         approveButton.disabled = true;
         depositButton.disabled = true;
 
-        const tx = await App.contracts.Bridge.methods.depositToLayer(amountToSend, tipToSend, recipient)
-            .send({ 
+        const tx = await App.sendEthereumTx(
+            App.contracts.Bridge.methods.depositToLayer(amountToSend, tipToSend, recipient),
+            {
                 from: App.account,
                 gas: gasLimit
-            });
+            }
+        );
         
         App.hidePendingPopup();
         await App.updateBalance();
@@ -2722,20 +2778,22 @@ const App = {
         const depositButton = document.getElementById('depositButton');
         
         // Show user-friendly error message
-        let errorMessage = "Error in depositing to layer. Please try again.";
-        if (error.message && error.message.includes('insufficient allowance')) {
+        let errorMessage = App.ethereumTxErrorMessage(error, "Error in depositing to layer. Please try again.");
+        if (error.ledgerHint) {
+          if (window.checkAllowance) {
+            setTimeout(() => checkAllowance(), 1000);
+          }
+        } else if (error.message && error.message.includes('insufficient allowance')) {
           errorMessage = "Insufficient token allowance. Please approve more TRB tokens first.";
           // Re-enable approve button, keep deposit disabled
           approveButton.disabled = false;
           depositButton.disabled = true;
         } else if (error.message && error.message.includes('insufficient funds')) {
-          errorMessage = "Insufficient ETH for gas fees. Please add more ETH to your wallet.";
           // Re-enable both buttons
           if (window.checkAllowance) {
             setTimeout(() => checkAllowance(), 1000);
           }
-        } else if (error.message && error.message.includes('user rejected')) {
-          errorMessage = "Transaction was cancelled. Please try again.";
+        } else if (error.message && (error.message.includes('user rejected') || error.message.toLowerCase().includes('user denied'))) {
           // Re-enable both buttons
           if (window.checkAllowance) {
             setTimeout(() => checkAllowance(), 1000);
@@ -4363,6 +4421,8 @@ const App = {
 
   // Add new function to handle delegation
   delegateTokens: async function() {
+    const delegateButton = document.getElementById('delegateButton');
+    let delegateButtonBusy = false;
     try {
         if (!App.isKeplrConnected) {
             alert('Please connect your Cosmos wallet first');
@@ -4448,10 +4508,10 @@ const App = {
             return;
         }
 
-        const delegateButton = document.getElementById('delegateButton');
         if (delegateButton) {
             delegateButton.disabled = true;
             delegateButton.innerHTML = '<span>Delegating</span><span>...</span>';
+            delegateButtonBusy = true;
         }
 
         App.showPendingPopup("Delegating tokens...");
@@ -4492,12 +4552,10 @@ const App = {
         // console.error(...);
         App.hidePendingPopup();
         App.showErrorPopup(error.message || "Error delegating tokens. Please try again.");
-        
-        // Re-enable the delegate button if there was an error
-        const delegateButton = document.getElementById('delegateButton');
-        if (delegateButton) {
+    } finally {
+        if (delegateButtonBusy && delegateButton) {
             delegateButton.disabled = false;
-            delegateButton.innerHTML = '<span>Delegate</span><span>Tokens</span>';
+            delegateButton.textContent = 'Delegate Tokens';
         }
     }
   },
@@ -4941,6 +4999,11 @@ const App = {
 
   // Add new function to handle attestation requests
   requestAttestation: async function(withdrawalId) {
+    const attestButton = document.querySelector(
+        `button[data-inline-onclick="App.requestAttestation(${withdrawalId})"], button[onclick="App.requestAttestation(${withdrawalId})"]`
+    );
+    const attestButtonHtml = attestButton ? attestButton.innerHTML : null;
+    let attestButtonBusy = false;
     try {
         if (!App.isKeplrConnected) {
             alert('Please connect your Cosmos wallet first');
@@ -4970,9 +5033,6 @@ const App = {
             return;
         }
 
-        const attestButton = document.querySelector(
-            `button[data-inline-onclick="App.requestAttestation(${withdrawalId})"], button[onclick="App.requestAttestation(${withdrawalId})"]`
-        );
         const claimButton = document.querySelector(
             `button[data-inline-onclick="App.claimWithdrawal(${withdrawalId})"], button[onclick="App.claimWithdrawal(${withdrawalId})"]`
         );
@@ -4980,6 +5040,7 @@ const App = {
         if (attestButton) {
             attestButton.disabled = true;
             attestButton.innerHTML = '<span>Requesting</span><span>...</span>';
+            attestButtonBusy = true;
         }
 
         App.showPendingPopup("Requesting attestation...");
@@ -5039,14 +5100,12 @@ const App = {
         // console.error(...);
         App.hidePendingPopup();
         App.showErrorPopup(error.message || "Error requesting attestation. Please try again.");
-        
-        // Re-enable the attest button if there was an error
-        const attestButton = document.querySelector(
-            `button[data-inline-onclick="App.requestAttestation(${withdrawalId})"], button[onclick="App.requestAttestation(${withdrawalId})"]`
-        );
-        if (attestButton) {
+    } finally {
+        // History refresh replaces this node on success. If it is still in the
+        // page, put the original label back — success used to leave "Requesting...".
+        if (attestButtonBusy && attestButton && attestButton.isConnected) {
             attestButton.disabled = false;
-            attestButton.innerHTML = '<span>Request</span><span>Attestation</span>';
+            attestButton.innerHTML = attestButtonHtml;
         }
     }
   },
@@ -5204,7 +5263,7 @@ const App = {
             txData.depositId
         );
         const gasLimit = await App.estimateBridgeClaimGas(claimMethod);
-        const tx = await claimMethod.send({ from: App.account, gas: gasLimit });
+        const tx = await App.sendEthereumTx(claimMethod, { from: App.account, gas: gasLimit });
 
         txHash = tx.transactionHash;
         // console.log(...);
@@ -5218,6 +5277,12 @@ const App = {
             txHash = error.transactionHash;
         } else if (error.receipt && error.receipt.transactionHash) {
             txHash = error.receipt.transactionHash;
+        }
+
+        if (error && error.ledgerHint) {
+            console.error('[claimWithdrawal]', error);
+            App.showErrorPopup(error.ledgerHint);
+            return;
         }
 
         const decoded = App.decodeContractError(error);
@@ -5304,7 +5369,7 @@ const App = {
 
         const extraMethod = App.contracts.Bridge.methods.claimExtraWithdrawByWithdrawId(withdrawalId);
         const extraGas = await App.estimateBridgeClaimGas(extraMethod);
-        const tx = await extraMethod.send({ from: App.account, gas: extraGas });
+        const tx = await App.sendEthereumTx(extraMethod, { from: App.account, gas: extraGas });
 
         txHash = tx.transactionHash;
         App.showSuccessPopup("Extra withdrawal claimed successfully!", txHash, 'ethereum');
@@ -5316,6 +5381,12 @@ const App = {
             txHash = error.transactionHash;
         } else if (error.receipt && error.receipt.transactionHash) {
             txHash = error.receipt.transactionHash;
+        }
+
+        if (error && error.ledgerHint) {
+            console.error('[claimExtraWithdraw]', error);
+            App.showErrorPopup(error.ledgerHint);
+            return;
         }
 
         const decodedExtra = App.decodeContractError(error);
