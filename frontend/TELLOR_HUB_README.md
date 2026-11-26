@@ -24,7 +24,7 @@ Modules surround the central hub, each representing a different function:
 - **Icon**: Link emoji
 - **Description**: "Withdraw TRB to Ethereum"
 
-#### ⚡ Delegate Tokens
+#### ⚡ Delegate TRB
 - **Function**: Stake TRB tokens with validators
 - **Icon**: Lightning bolt emoji
 - **Description**: "Stake TRB with validators"

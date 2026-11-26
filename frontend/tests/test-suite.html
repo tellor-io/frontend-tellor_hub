@@ -122,7 +122,7 @@
         <option value="validator2">Validator 2</option>
       </select>
       <input id="delegateValidatorAddress" type="text" placeholder="Validator address" />
-      <button id="delegateButton">Delegate Tokens</button>
+      <button id="delegateButton">Delegate TRB</button>
     </div>
 
     <!-- Mock dispute sections -->
@@ -174,7 +174,7 @@
     <!-- Mock bridge direction buttons -->
     <button id="bridgeToLayerBtn">Bridge to Tellor</button>
     <button id="bridgeToEthBtn">Bridge to Ethereum</button>
-    <button id="delegateBtn">Delegate Tokens</button>
+    <button id="delegateBtn">Delegate TRB</button>
 
     <!-- Bridge inner content containers used by runtime bridge-nav tests -->
     <div id="bridgeToTellorContent" style="display:block;"></div>
@@ -1328,18 +1328,18 @@
       }
 
       async runAllTests() {
-        await this.runWithExternalSuites([
+        await this.runWithExternalSuites(() => [
           ...this.getUnitTests(),
           ...this.getIntegrationTests()
         ]);
       }
 
       async runUnitTests() {
-        await this.runWithExternalSuites(this.getUnitTests());
+        await this.runWithExternalSuites(() => this.getUnitTests());
       }
 
       async runIntegrationTests() {
-        await this.runWithExternalSuites(this.getIntegrationTests());
+        await this.runWithExternalSuites(() => this.getIntegrationTests());
       }
 
       async runDisputeTests() {
@@ -1355,7 +1355,7 @@
       }
 
       async runFullRuntimeTests() {
-        await this.runWithExternalSuites([
+        await this.runWithExternalSuites(() => [
           ...this.getUnitTests(),
           ...this.getIntegrationTests()
         ]);

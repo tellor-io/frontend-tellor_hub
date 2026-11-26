@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tellor Hub</title>
-    <link rel="stylesheet" href="main.css?v=36" />
+    <link rel="stylesheet" href="main.css?v=45" />
     <link rel="stylesheet" href="space-station.css?v=36" />
     <link rel="icon" type="image/x-icon" href="/drkgrnswsh.png">
 
@@ -165,12 +165,12 @@
           <div class="side-nav-options">
             <div class="nav-option" data-function="bridge">
               <img class="nav-option-icon" src="./symbol_bridge_tellor.png" alt="Bridge"/>
-              <div class="nav-option-title">Bridge Tokens</div>
+              <div class="nav-option-title">Bridge TRB</div>
             </div>
             
             <div class="nav-option" data-function="delegate">
-              <img class="nav-option-icon"src="./symbol_delegate.png" alt="Delegate tokens"/>
-              <div class="nav-option-title">Delegate Tokens</div>
+              <img class="nav-option-icon"src="./symbol_delegate.png" alt="Delegate TRB"/>
+              <div class="nav-option-title">Delegate TRB</div>
             </div>
             
             <div class="nav-option" data-function="dispute">
@@ -203,7 +203,7 @@
               
               <!-- Bridge to Tellor Content -->
               <div id="bridgeToTellorContent" class="bridge-content">
-                <div class="wallet-disclaimer">*Please connect your Ethereum wallet to bridge tokens*</div>
+                <div class="wallet-disclaimer">*Please connect your Ethereum wallet to bridge TRB tokens*</div>
                 <w3m-button></w3m-button>
                 <div class="balance-info">
                   <div class="input-button-container">
@@ -218,7 +218,7 @@
                   <div class="input-button-container">
                     <div class="input-with-label">
                       <input class="input-address" type="text" id="_queryId" placeholder="To address (e.g. tellor1py3fs...)" />
-                      <span class="info-icon" data-tooltip="Don't have a tellor prefix address? <a href='https://docs.tellor.io/tellor/running-tellor-layer/node-setup' target='_blank'>Click here</a> to learn how to create one">ⓘ</span>
+                      <span class="info-icon" data-tooltip="Don't have a tellor prefix address? <a href='https://docs.tellor.io/tellor/running-palmito-testnet/node-setup' target='_blank'>Click here</a> to learn how to create one">ⓘ</span>
                     </div>
                   </div>
                   <div class="bridge-direction">
@@ -301,7 +301,7 @@
             <!-- Delegate Section -->
             <div id="delegateSection" class="function-section">
               <div class="section-header">
-                <h2>Delegate Tokens/Select Reporters</h2>
+                <h2>Delegate TRB to Validators/Select Reporters</h2>
                 <p class="section-description">Please connect your Cosmos wallet.</p>
                 <div class="wallet-disclaimer"></div>
               </div>
@@ -309,10 +309,10 @@
 
               <!-- Action Sections (Side by Side) -->
               <div class="action-sections">
-                <!-- Delegate Tokens Container -->
+                <!-- Delegate TRB Container -->
                 <div class="action-container">
                   <div class="section-header">
-                    <h3>Delegate Tokens</h3>
+                    <h3>Delegate TRB</h3>
                     <p class="section-description">Stake your TRB tokens with validators</p>
                   </div>
 
@@ -376,7 +376,7 @@
                           </div>
                         </div>
                         <div class="bridge-direction primary-action-button-row">
-                            <button id="delegateButton" class="button-style-3" onclick="App.delegateTokens()">Delegate Tokens</button>
+                            <button id="delegateButton" class="button-style-3" onclick="App.delegateTokens()">Delegate TRB</button>
                         </div>
                     </div>
                   </div>
@@ -513,14 +513,6 @@
                     </div>
                     <div class="dispute-submit-container">
                       <button id="proposeDisputeBtn" class="button-style-3" onclick="App.proposeDispute()">Propose Dispute</button>
-                      <!-- Subtle scroll indicator positioned next to button -->
-                      <div class="scroll-indicator-subtle" id="proposeDisputeScrollIndicator">
-                        <div class="scroll-indicator-subtle-content">
-                          <span class="scroll-indicator-dots">⋯</span>
-                          <span class="scroll-indicator-text-subtle">Scroll down for more fields</span>
-                          <span class="scroll-indicator-arrow-subtle">↓</span>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -808,6 +800,38 @@
         let tooltipTimer;
         
         // Function to hide all tooltips
+        // Keep the docs links, drop every other tag. template.innerHTML does not run scripts.
+        function fillInfoTooltip(tooltip, raw) {
+            tooltip.replaceChildren();
+            const template = document.createElement('template');
+            template.innerHTML = raw || '';
+            const appendSafe = (parent, node) => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    parent.appendChild(document.createTextNode(node.textContent));
+                    return;
+                }
+                if (node.nodeType !== Node.ELEMENT_NODE) return;
+                if (node.tagName === 'A') {
+                    let url;
+                    try {
+                        url = new URL(node.getAttribute('href') || '', window.location.origin);
+                    } catch (error) {
+                        return;
+                    }
+                    if (url.protocol !== 'https:') return;
+                    const link = document.createElement('a');
+                    link.href = url.href;
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    link.textContent = node.textContent;
+                    parent.appendChild(link);
+                    return;
+                }
+                node.childNodes.forEach((child) => appendSafe(parent, child));
+            };
+            template.content.childNodes.forEach((node) => appendSafe(tooltip, node));
+        }
+
         function hideAllTooltips() {
             clearTimeout(tooltipTimer);
             document.querySelectorAll('.tooltip').forEach(tooltip => {
@@ -1007,7 +1031,8 @@
             if (icon.closest('#bridgeSection') || icon.closest('#delegateSection')) {
                 const tooltip = document.createElement('div');
                 tooltip.className = 'tooltip';
-                tooltip.innerHTML = icon.getAttribute('data-tooltip');
+                tooltip._sourceIcon = icon;
+                fillInfoTooltip(tooltip, icon.getAttribute('data-tooltip'));
                 document.body.appendChild(tooltip);
                 
                 // Show tooltip on hover
@@ -1066,12 +1091,30 @@
                     tooltip.style.display = 'block';
                 });
                 
-                // Hide tooltip when mouse leaves
-                icon.addEventListener('mouseleave', function(e) {
-                    e.stopPropagation();
+                const pointerStillOnTip = (event) => {
+                    const next = event.relatedTarget;
+                    if (!next || !next.closest) return false;
+                    return next === icon || next === tooltip || icon.contains(next) || tooltip.contains(next);
+                };
+                const scheduleHide = () => {
+                    clearTimeout(tooltipTimer);
                     tooltipTimer = setTimeout(() => {
                         tooltip.style.display = 'none';
                     }, 500);
+                };
+
+                // Hide only after the pointer leaves both the icon and the blurb.
+                icon.addEventListener('mouseleave', function(e) {
+                    e.stopPropagation();
+                    if (pointerStillOnTip(e)) return;
+                    scheduleHide();
+                });
+                tooltip.addEventListener('mouseenter', function() {
+                    clearTimeout(tooltipTimer);
+                });
+                tooltip.addEventListener('mouseleave', function(e) {
+                    if (pointerStillOnTip(e)) return;
+                    scheduleHide();
                 });
                 
                 // Also handle click for mobile devices
@@ -1135,7 +1178,7 @@
         window.addEventListener('resize', function() {
             document.querySelectorAll('.tooltip').forEach(tooltip => {
                 if (tooltip.style.display === 'block') {
-                    const icon = document.querySelector('.info-icon[data-tooltip="' + tooltip.innerHTML + '"]');
+                    const icon = tooltip._sourceIcon;
                     if (icon && (document.getElementById('bridgeSection').classList.contains('active') || 
                                 document.getElementById('delegateSection').classList.contains('active'))) {
                         const iconRect = icon.getBoundingClientRect();
