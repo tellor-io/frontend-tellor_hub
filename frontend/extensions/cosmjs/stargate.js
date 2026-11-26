@@ -232,6 +232,16 @@
                                 validator_address: value.validatorAddress
                             }
                         };
+                    case '/cosmos.staking.v1beta1.MsgBeginRedelegate':
+                        return {
+                            type: 'cosmos-sdk/MsgBeginRedelegate',
+                            value: {
+                                amount: this._aminoCoin(value.amount),
+                                delegator_address: value.delegatorAddress,
+                                validator_src_address: value.validatorSrcAddress,
+                                validator_dst_address: value.validatorDstAddress
+                            }
+                        };
                     case '/cosmos.staking.v1beta1.MsgCancelUnbondingDelegation':
                         return {
                             type: 'cosmos-sdk/MsgCancelUnbondingDelegation',
@@ -480,6 +490,25 @@
                         const msgValue = {
                             delegatorAddress: message.value.delegatorAddress,
                             validatorAddress: message.value.validatorAddress,
+                            amount: {
+                                denom: message.value.amount.denom,
+                                amount: message.value.amount.amount.toString()
+                            }
+                        };
+                        encodedMessage = MsgType.encode(MsgType.create(msgValue)).finish();
+                    } else if (message.typeUrl === '/cosmos.staking.v1beta1.MsgBeginRedelegate') {
+                        const MsgBeginRedelegate = new protobuf.Type("MsgBeginRedelegate")
+                            .add(new protobuf.Field("delegatorAddress", 1, "string"))
+                            .add(new protobuf.Field("validatorSrcAddress", 2, "string"))
+                            .add(new protobuf.Field("validatorDstAddress", 3, "string"))
+                            .add(new protobuf.Field("amount", 4, "Coin"));
+
+                        root.add(MsgBeginRedelegate);
+                        const MsgType = root.lookupType("MsgBeginRedelegate");
+                        const msgValue = {
+                            delegatorAddress: message.value.delegatorAddress,
+                            validatorSrcAddress: message.value.validatorSrcAddress,
+                            validatorDstAddress: message.value.validatorDstAddress,
                             amount: {
                                 denom: message.value.amount.denom,
                                 amount: message.value.amount.amount.toString()
@@ -1177,10 +1206,10 @@
             return await broadcastStakingMessage(
                 account,
                 [msg],
-                'Delegate tokens to validator',
+                'Delegate TRB to validator',
                 {
-                    amount: [{ denom: 'loya', amount: '8750' }],
-                    gas: '350000'
+                    amount: [{ denom: 'loya', amount: '20000' }],
+                    gas: '800000'
                 }
             );
         } catch (error) {
@@ -1207,14 +1236,45 @@
             return await broadcastStakingMessage(
                 account,
                 [msg],
-                'Undelegate tokens from validator',
+                'Undelegate TRB from validator',
                 {
-                    amount: [{ denom: 'loya', amount: '8750' }],
-                    gas: '350000'
+                    amount: [{ denom: 'loya', amount: '20000' }],
+                    gas: '800000'
                 }
             );
         } catch (error) {
             console.error('Undelegation error:', error);
+            throw error;
+        }
+    }
+
+    async function redelegateTokens(account, validatorSrcAddress, validatorDstAddress, amount) {
+        try {
+            const amountInMicroUnits = Math.floor(parseFloat(amount) * 1000000).toString();
+            const msg = {
+                typeUrl: '/cosmos.staking.v1beta1.MsgBeginRedelegate',
+                value: {
+                    delegatorAddress: account,
+                    validatorSrcAddress: validatorSrcAddress,
+                    validatorDstAddress: validatorDstAddress,
+                    amount: {
+                        denom: 'loya',
+                        amount: amountInMicroUnits
+                    }
+                }
+            };
+
+            return await broadcastStakingMessage(
+                account,
+                [msg],
+                'Redelegate TRB to another validator',
+                {
+                    amount: [{ denom: 'loya', amount: '20000' }],
+                    gas: '800000'
+                }
+            );
+        } catch (error) {
+            console.error('Redelegation error:', error);
             throw error;
         }
     }
@@ -1244,8 +1304,8 @@
                 [msg],
                 'Cancel unbonding delegation',
                 {
-                    amount: [{ denom: 'loya', amount: '8750' }],
-                    gas: '350000'
+                    amount: [{ denom: 'loya', amount: '20000' }],
+                    gas: '800000'
                 }
             );
         } catch (error) {
@@ -1357,6 +1417,7 @@
     exports.requestAttestations = requestAttestations;
     exports.delegateTokens = delegateTokens;
     exports.undelegateTokens = undelegateTokens;
+    exports.redelegateTokens = redelegateTokens;
     exports.cancelUnbondingDelegation = cancelUnbondingDelegation;
     exports.selectReporter = selectReporter;
     exports.switchReporter = switchReporter;
@@ -1372,6 +1433,7 @@
     window.cosmjs.stargate.requestAttestations = requestAttestations;
     window.cosmjs.stargate.delegateTokens = delegateTokens;
     window.cosmjs.stargate.undelegateTokens = undelegateTokens;
+    window.cosmjs.stargate.redelegateTokens = redelegateTokens;
     window.cosmjs.stargate.cancelUnbondingDelegation = cancelUnbondingDelegation;
     window.cosmjs.stargate.selectReporter = selectReporter;
     window.cosmjs.stargate.switchReporter = switchReporter;
@@ -1383,6 +1445,7 @@
         requestAttestations: requestAttestations,
         delegateTokens: delegateTokens,
         undelegateTokens: undelegateTokens,
+        redelegateTokens: redelegateTokens,
         cancelUnbondingDelegation: cancelUnbondingDelegation,
         selectReporter: selectReporter,
         switchReporter: switchReporter,

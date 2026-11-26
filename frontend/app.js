@@ -1,4 +1,5 @@
-import { ethers } from 'https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.esm.min.js';
+// Local copy of ethers@5.7.2/dist/ethers.esm.min.js. An ES import cannot carry an integrity hash.
+import { ethers } from './extensions/ethers-5.7.2.esm.min.js';
 import { 
     generateWithdrawalQueryId
 } from './js/bridgeContract.js';
@@ -4555,7 +4556,7 @@ const App = {
     } finally {
         if (delegateButtonBusy && delegateButton) {
             delegateButton.disabled = false;
-            delegateButton.textContent = 'Delegate Tokens';
+            delegateButton.textContent = 'Delegate TRB';
         }
     }
   },
@@ -4694,6 +4695,191 @@ const App = {
       if (validatorDropdown) validatorDropdown.value = '';
     } catch (error) {
       // error popups are handled by executeUndelegation
+    }
+  },
+
+  executeRedelegation: async function({
+    amount,
+    validatorSrcAddress,
+    validatorDstAddress,
+    triggerButton,
+    buttonLabel = 'Redelegate'
+  } = {}) {
+    try {
+      if (!App.isKeplrConnected) {
+        alert('Please connect your Cosmos wallet first');
+        return;
+      }
+
+      try {
+        if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+          await window.cosmosWalletAdapter.enableChain();
+        } else if (window.keplr) {
+          await window.keplr.enable(App.cosmosChainId);
+        } else {
+          throw new Error('No wallet available');
+        }
+      } catch (error) {
+        App.isKeplrConnected = false;
+        App.keplrAddress = null;
+        const keplrButton = document.getElementById('keplrButton');
+        if (keplrButton) {
+          keplrButton.innerHTML = 'Connect Cosmos Wallet';
+        }
+        alert('Please reconnect your Cosmos wallet');
+        return;
+      }
+
+      if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+        App.showValidationErrorPopup('Enter an amount of bonded TRB to move.');
+        return;
+      }
+
+      const srcAddress = validatorSrcAddress ? validatorSrcAddress.trim() : '';
+      const dstAddress = validatorDstAddress ? validatorDstAddress.trim() : '';
+      if (!App.isValidTellorValidatorAddress(srcAddress)) {
+        App.showValidationErrorPopup('Choose a valid validator to move stake from.');
+        return;
+      }
+      if (!App.isValidTellorValidatorAddress(dstAddress)) {
+        App.showValidationErrorPopup('Choose the validator that should receive this stake.');
+        return;
+      }
+      if (srcAddress === dstAddress) {
+        App.showValidationErrorPopup('Choose a different validator than the one you are leaving.');
+        return;
+      }
+
+      const amountInMicroUnits = Math.floor(parseFloat(amount) * 1000000);
+      if (!Number.isFinite(amountInMicroUnits) || amountInMicroUnits <= 0) {
+        App.showValidationErrorPopup('Enter an amount of bonded TRB to move.');
+        return;
+      }
+
+      const delegations = await App.fetchCurrentDelegations(App.keplrAddress);
+      const matchingDelegation = Array.isArray(delegations)
+        ? delegations.find((entry) => entry.validatorAddress === srcAddress && entry.denom === 'loya')
+        : null;
+      const delegatedAmount = matchingDelegation ? parseInt(matchingDelegation.amount, 10) : 0;
+      if (!delegatedAmount || delegatedAmount <= 0) {
+        App.showValidationErrorPopup('No bonded stake was found on the validator you are leaving.');
+        return;
+      }
+      if (amountInMicroUnits > delegatedAmount) {
+        App.showValidationErrorPopup(
+          `That amount is larger than the bonded stake on this validator. The most you can move is ${(delegatedAmount / 1000000).toFixed(6)} TRB.`
+        );
+        return;
+      }
+
+      let redelegationEntries = [];
+      try {
+        redelegationEntries = await App.fetchRedelegations(App.keplrAddress);
+      } catch (error) {
+        console.error('Error checking open redelegations:', error);
+      }
+      const summary = App.summarizeRedelegations(redelegationEntries);
+      const incomingCompletion = summary.locks[srcAddress];
+      if (incomingCompletion) {
+        const completionLabel = App.formatRedelegateAvailableLabel(incomingCompletion);
+        App.showValidationErrorPopup(
+          `Stake was redelegated onto this validator recently, so it cannot be moved again yet. ${completionLabel}`
+        );
+        return;
+      }
+
+      let limits = App.stakingRedelegateLimits(null);
+      try {
+        limits = App.stakingRedelegateLimits(await App.fetchStakingParams());
+      } catch (error) {
+        console.error('Error reading redelegation limits:', error);
+      }
+      const pairCount = summary.pairEntryCounts[`${srcAddress}|${dstAddress}`] || 0;
+      if (pairCount >= limits.maxEntries) {
+        const entryLabel = limits.maxEntries === 1 ? '1 redelegation' : `${limits.maxEntries} redelegations`;
+        App.showValidationErrorPopup(
+          `This pair of validators already has ${pairCount} redelegations in progress. The chain allows ${entryLabel} at a time, so wait for one to finish before moving more stake this way.`
+        );
+        return;
+      }
+
+      const validatorConcentration = await App.checkValidatorPowerConcentration(dstAddress);
+      if (!validatorConcentration.ok) {
+        App.showBalanceErrorPopup(
+          validatorConcentration.message,
+          validatorConcentration.balanceErrorOptions || null
+        );
+        return;
+      }
+
+      if (triggerButton) {
+        triggerButton.disabled = true;
+        triggerButton.textContent = 'Redelegating...';
+      }
+
+      App.showPendingPopup('Redelegating stake...');
+
+      let offlineSigner;
+      if (window.cosmosWalletAdapter && window.cosmosWalletAdapter.isConnected()) {
+        offlineSigner = window.cosmosWalletAdapter.getOfflineSigner();
+      } else {
+        offlineSigner = window.keplr.getOfflineSigner(App.cosmosChainId);
+      }
+      const accounts = await offlineSigner.getAccounts();
+      const layerAccount = accounts[0].address;
+
+      const result = await window.cosmjs.stargate.redelegateTokens(
+        layerAccount,
+        srcAddress,
+        dstAddress,
+        amount
+      );
+
+      App.hidePendingPopup();
+
+      if (result && result.code === 0) {
+        const txHash = result.txhash || result.tx_response?.txhash;
+        App.showSuccessPopup(
+          'Redelegation submitted. Your stake is now bonded to the new validator, and those tokens cannot be redelegated again until the unbonding period ends.',
+          txHash,
+          'cosmos'
+        );
+        await App.refreshCurrentStatus();
+        return result;
+      }
+      throw new Error(result?.rawLog || 'Redelegation failed');
+    } catch (error) {
+      App.hidePendingPopup();
+      App.showErrorPopup(error.message || 'Error redelegating stake. Please try again.');
+      throw error;
+    } finally {
+      if (triggerButton) {
+        triggerButton.disabled = false;
+        triggerButton.textContent = buttonLabel;
+      }
+    }
+  },
+
+  triggerDelegationRowRedelegate: async function(validatorSrcAddress, inputId, selectId, buttonId) {
+    const input = document.getElementById(inputId);
+    const select = document.getElementById(selectId);
+    const button = document.getElementById(buttonId);
+    const amount = input ? input.value : '';
+    const validatorDstAddress = select ? select.value : '';
+    try {
+      const result = await App.executeRedelegation({
+        amount,
+        validatorSrcAddress,
+        validatorDstAddress,
+        triggerButton: button,
+        buttonLabel: 'Redelegate'
+      });
+      if (result && result.code === 0) {
+        if (input) input.value = '';
+        if (select) select.value = '';
+      }
+    } catch (error) {
+      // error popups are handled by executeRedelegation
     }
   },
 
@@ -6546,12 +6732,17 @@ const App = {
       '<p style="margin:0 0 14px 0;"><strong>Unable to Execute:</strong> Please select a different validator.</p>' +
       '<p style="margin:0 0 14px 0;">To help combat centralization risk, delegations are blocked if the chosen validator holds at least 25% of total validator power.</p>' +
       '<p style="margin:0;">Join the <a href="https://discord.gg/tellor" target="_blank" rel="noopener noreferrer" style="color:#0f766e;font-weight:600;">Tellor Discord</a> for more info.</p>';
+    const UNAVAILABLE =
+      'Voting power could not be checked, so this was not submitted. Refresh the validator list and try again.';
     const addr = String(validatorOperatorAddress || '').trim();
     if (!addr) return { ok: true };
     try {
       const validators = await App.fetchValidators();
       const selected = validators.find((v) => v.address === addr);
-      if (!selected || selected.jailed) return { ok: true };
+      if (!selected) {
+        return { ok: false, message: UNAVAILABLE };
+      }
+      if (selected.jailed) return { ok: true };
       let selectedStake;
       try {
         selectedStake = BigInt(String(selected.votingPower || '0'));
@@ -6567,7 +6758,9 @@ const App = {
           /* skip malformed */
         }
       }
-      if (totalNonJailed <= 0n) return { ok: true };
+      if (totalNonJailed <= 0n) {
+        return { ok: false, message: UNAVAILABLE };
+      }
       if (selectedStake * 4n >= totalNonJailed) {
         return {
           ok: false,
@@ -6578,7 +6771,7 @@ const App = {
       return { ok: true };
     } catch (e) {
       console.error('Validator power concentration check failed:', e);
-      return { ok: true };
+      return { ok: false, message: UNAVAILABLE };
     }
   },
 
@@ -6882,7 +7075,8 @@ const App = {
     modal.appendChild(actions);
 
     const infoTooltip = document.createElement('div');
-    infoTooltip.style.cssText = 'display:none;position:fixed;z-index:13000;max-width:260px;background:#f9f9f9;color:#1e2b2b;border:1px solid #d3e5e5;border-radius:6px;padding:8px 10px;font-size:12px;line-height:1.35;box-shadow:0 6px 16px rgba(0,0,0,0.2);pointer-events:none;';
+    infoTooltip.className = 'modal-info-tooltip';
+    infoTooltip.style.cssText = 'display:none;position:fixed;z-index:13000;max-width:260px;background:#f9f9f9;color:#1e2b2b;border:1px solid #d3e5e5;border-radius:6px;padding:8px 10px;font-size:12px;line-height:1.35;box-shadow:0 6px 16px rgba(0,0,0,0.2);';
     document.body.appendChild(infoTooltip);
 
     const positionInfoTooltip = (target) => {
@@ -6902,23 +7096,56 @@ const App = {
       infoTooltip.style.top = `${top}px`;
     };
 
+    let infoTooltipTimer = null;
+    let infoTooltipIcon = null;
+
+    const hideInfoTooltip = () => {
+      clearTimeout(infoTooltipTimer);
+      infoTooltip.style.display = 'none';
+      infoTooltipIcon = null;
+    };
+
+    const scheduleHideInfoTooltip = () => {
+      clearTimeout(infoTooltipTimer);
+      infoTooltipTimer = setTimeout(hideInfoTooltip, 200);
+    };
+
+    const pointerStillOnInfoTip = (event, icon) => {
+      const next = event.relatedTarget;
+      if (!next || !next.closest) return false;
+      if (next === infoTooltip || infoTooltip.contains(next)) return true;
+      return Boolean(icon && (next === icon || icon.contains(next)));
+    };
+
     const showInfoTooltip = (target) => {
       const msg = target.getAttribute('data-modal-tooltip');
       if (!msg) return;
+      clearTimeout(infoTooltipTimer);
+      infoTooltipIcon = target;
       infoTooltip.textContent = msg;
       infoTooltip.style.display = 'block';
       positionInfoTooltip(target);
     };
 
-    const hideInfoTooltip = () => {
-      infoTooltip.style.display = 'none';
-    };
+    infoTooltip.addEventListener('mouseenter', () => {
+      clearTimeout(infoTooltipTimer);
+    });
+    infoTooltip.addEventListener('mouseleave', (event) => {
+      if (pointerStillOnInfoTip(event, infoTooltipIcon)) return;
+      scheduleHideInfoTooltip();
+    });
 
     modal.querySelectorAll('[data-modal-tooltip]').forEach((icon) => {
       icon.addEventListener('mouseenter', () => showInfoTooltip(icon));
-      icon.addEventListener('mouseleave', hideInfoTooltip);
+      icon.addEventListener('mouseleave', (event) => {
+        if (pointerStillOnInfoTip(event, icon)) return;
+        scheduleHideInfoTooltip();
+      });
       icon.addEventListener('focus', () => showInfoTooltip(icon));
-      icon.addEventListener('blur', hideInfoTooltip);
+      icon.addEventListener('blur', (event) => {
+        if (pointerStillOnInfoTip(event, icon)) return;
+        hideInfoTooltip();
+      });
     });
     overlay.appendChild(modal);
     document.body.appendChild(overlay);
@@ -7134,8 +7361,14 @@ const App = {
     );
     const GAS_MULT = 1.4;
     const GAS_PRICE_LOYA = 0.025;
-    const fallbackGas = Math.max(350000, 120000 * messages.length);
-    const fallbackFee = Math.max(20000, 8000 * messages.length);
+    // A mainnet MsgBeginRedelegate used 376,256 gas. 800,000 covers that with room,
+    // and at 0.025 loya/gas the fee stays 20,000 loya for a single message.
+    const fallbackGas = Math.max(800000, 120000 * messages.length);
+    const fallbackFee = Math.max(
+      Math.ceil(fallbackGas * GAS_PRICE_LOYA),
+      20000,
+      8000 * messages.length
+    );
     const minGasFloor = 80000 * messages.length;
     const restBase = App.getCosmosApiEndpoint();
     const simulateAllowed =
@@ -7402,6 +7635,7 @@ const App = {
       if (arrow) {
         arrow.classList.remove('rotated');
       }
+      App.hideRedelegateTooltip();
     }
   },
 
@@ -7414,6 +7648,7 @@ const App = {
     if (arrow) {
       arrow.classList.remove('rotated');
     }
+    App.hideRedelegateTooltip();
   },
 
   // Copy text to clipboard
@@ -7534,6 +7769,29 @@ const App = {
     }
   },
 
+  formatRedelegateAvailableLabel: function(completionTime) {
+    const completionMs = Date.parse(completionTime);
+    if (!Number.isFinite(completionMs)) {
+      return 'You can move it again after that entry finishes.';
+    }
+    const dateLabel = new Date(completionMs).toLocaleString();
+    const remainingMs = completionMs - Date.now();
+    if (remainingMs <= 0) {
+      return `That entry finished on ${dateLabel}.`;
+    }
+    const days = Math.floor(remainingMs / (24 * 60 * 60 * 1000));
+    const hours = Math.floor((remainingMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+    let remaining = 'in less than an hour';
+    if (days > 0 && hours > 0) {
+      remaining = `about ${days} day${days === 1 ? '' : 's'} and ${hours} hour${hours === 1 ? '' : 's'} from now`;
+    } else if (days > 0) {
+      remaining = `about ${days} day${days === 1 ? '' : 's'} from now`;
+    } else if (hours > 0) {
+      remaining = `about ${hours} hour${hours === 1 ? '' : 's'} from now`;
+    }
+    return `You can move it again on ${dateLabel}, ${remaining}.`;
+  },
+
   formatUnbondingCompletionLabel: function(completionTime) {
     if (!completionTime) {
       return 'Completion time unknown';
@@ -7644,6 +7902,245 @@ const App = {
     return typeof creationHeight === 'string' && /^[0-9]+$/.test(creationHeight);
   },
 
+  parseStakingDurationSeconds: function(value) {
+    if (value == null) return null;
+    if (typeof value === 'object' && value.seconds != null) {
+      const seconds = parseInt(value.seconds, 10);
+      return Number.isFinite(seconds) ? seconds : null;
+    }
+    const match = String(value).trim().match(/^(\d+(?:\.\d+)?)s$/);
+    if (!match) return null;
+    const seconds = Math.round(parseFloat(match[1]));
+    return Number.isFinite(seconds) ? seconds : null;
+  },
+
+  describeUnbondingWindow: function(unbondingTime) {
+    const seconds = App.parseStakingDurationSeconds(unbondingTime);
+    if (!seconds || seconds <= 0) {
+      return 'about 21 days';
+    }
+    const days = Math.max(1, Math.round(seconds / 86400));
+    return days === 1 ? 'about 1 day' : `about ${days} days`;
+  },
+
+  stakingRedelegateLimits: function(params) {
+    const maxEntriesRaw = parseInt(params && params.max_entries, 10);
+    return {
+      unbondingLabel: App.describeUnbondingWindow(params && params.unbonding_time),
+      maxEntries: Number.isFinite(maxEntriesRaw) && maxEntriesRaw > 0 ? maxEntriesRaw : 7
+    };
+  },
+
+  fetchStakingParams: async function() {
+    const cacheKey = App.cosmosChainId || 'tellor-1';
+    const cached = App._stakingParamsCache;
+    if (cached && cached.key === cacheKey && Date.now() - cached.at < 60000) {
+      return cached.params;
+    }
+    const response = await fetch(`${App.getCosmosApiEndpoint()}/cosmos/staking/v1beta1/params`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch staking params: ${response.status}`);
+    }
+    const data = await response.json();
+    const params = data.params || {};
+    App._stakingParamsCache = { key: cacheKey, at: Date.now(), params };
+    return params;
+  },
+
+  fetchRedelegations: async function(delegatorAddress) {
+    const endpoint = `${App.getCosmosApiEndpoint()}/cosmos/staking/v1beta1/delegators/${encodeURIComponent(delegatorAddress)}/redelegations`;
+    const response = await fetch(endpoint);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch redelegations: ${response.status}`);
+    }
+    const data = await response.json();
+    const responses = data.redelegation_responses || [];
+    if (!Array.isArray(responses)) {
+      return [];
+    }
+    const entries = [];
+    responses.forEach((item) => {
+      const redelegation = item.redelegation || {};
+      const src = redelegation.validator_src_address;
+      const dst = redelegation.validator_dst_address;
+      const rawEntries = Array.isArray(item.entries) ? item.entries : [];
+      rawEntries.forEach((entry) => {
+        const inner = entry.redelegation_entry || entry;
+        const completionTime = inner.completion_time || '';
+        const completionMs = completionTime ? Date.parse(completionTime) : NaN;
+        if (Number.isFinite(completionMs) && completionMs <= Date.now()) {
+          return;
+        }
+        entries.push({
+          validatorSrcAddress: src,
+          validatorDstAddress: dst,
+          completionTime
+        });
+      });
+    });
+    return entries;
+  },
+
+  summarizeRedelegations: function(entries) {
+    const locks = {};
+    const pairEntryCounts = {};
+    (entries || []).forEach((entry) => {
+      const src = entry.validatorSrcAddress;
+      const dst = entry.validatorDstAddress;
+      if (!src || !dst) return;
+      const pairKey = `${src}|${dst}`;
+      pairEntryCounts[pairKey] = (pairEntryCounts[pairKey] || 0) + 1;
+      const prev = locks[dst];
+      const nextMs = entry.completionTime ? Date.parse(entry.completionTime) : NaN;
+      const prevMs = prev ? Date.parse(prev) : NaN;
+      if (!prev || (Number.isFinite(nextMs) && (!Number.isFinite(prevMs) || nextMs > prevMs))) {
+        locks[dst] = entry.completionTime || prev || '';
+      }
+    });
+    return { locks, pairEntryCounts };
+  },
+
+  buildRedelegateDisclaimerText: function(limits) {
+    const windowLabel = (limits && limits.unbondingLabel) || 'about 21 days';
+    const maxEntries = limits && Number.isFinite(limits.maxEntries) && limits.maxEntries > 0
+      ? limits.maxEntries
+      : 7;
+    const entryLabel = maxEntries === 1 ? '1 redelegation' : `${maxEntries} redelegations`;
+    return [
+      'Redelegate moves stake that is already bonded with one validator over to a different validator. The tokens stay bonded the entire time, so they never return to your wallet, and this does not begin an unbonding period.',
+      `Once those tokens move, they cannot be redelegated again until the unbonding period ends, which takes ${windowLabel}. If stake was moved onto a validator recently and that entry is still open, wait until it finishes before moving the stake again. The chain also keeps at most ${entryLabel} open between the same two validators.`,
+      'This does not change the reporter you have selected. The destination has to be a different validator, and the move is blocked if it would leave that validator with 25% or more of total voting power.'
+    ].join('\n\n');
+  },
+
+  ensureRedelegateTooltip: function() {
+    if (App._redelegateTooltipBound) return;
+    App._redelegateTooltipBound = true;
+    const tooltip = document.createElement('div');
+    tooltip.className = 'tooltip delegation-manage-tooltip';
+    tooltip.style.display = 'none';
+    document.body.appendChild(tooltip);
+    App._redelegateTooltipEl = tooltip;
+
+    const hideSoon = () => {
+      clearTimeout(App._redelegateTooltipTimer);
+      App._redelegateTooltipTimer = setTimeout(() => {
+        tooltip.style.display = 'none';
+      }, 180);
+    };
+    const stayingInside = (event) => {
+      const next = event.relatedTarget;
+      return Boolean(next && next.closest && (next.closest('.delegation-manage-info') || next.closest('.delegation-manage-tooltip')));
+    };
+
+    document.addEventListener('mouseover', (event) => {
+      const icon = event.target.closest && event.target.closest('.delegation-manage-info');
+      if (icon) {
+        clearTimeout(App._redelegateTooltipTimer);
+        App.showRedelegateTooltip(icon);
+        return;
+      }
+      if (event.target.closest && event.target.closest('.delegation-manage-tooltip')) {
+        clearTimeout(App._redelegateTooltipTimer);
+      }
+    });
+    document.addEventListener('mouseout', (event) => {
+      const fromIcon = event.target.closest && event.target.closest('.delegation-manage-info');
+      const fromTip = event.target.closest && event.target.closest('.delegation-manage-tooltip');
+      if (!fromIcon && !fromTip) return;
+      if (stayingInside(event)) return;
+      hideSoon();
+    });
+    document.addEventListener('focusin', (event) => {
+      const icon = event.target.closest && event.target.closest('.delegation-manage-info');
+      if (!icon) return;
+      clearTimeout(App._redelegateTooltipTimer);
+      App.showRedelegateTooltip(icon);
+    });
+    document.addEventListener('focusout', (event) => {
+      if (event.target.closest && event.target.closest('.delegation-manage-info')) {
+        hideSoon();
+      }
+    });
+    document.addEventListener('click', (event) => {
+      const icon = event.target.closest && event.target.closest('.delegation-manage-info');
+      if (icon) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (tooltip.style.display === 'block' && App._redelegateTooltipIcon === icon) {
+          tooltip.style.display = 'none';
+          App._redelegateTooltipIcon = null;
+        } else {
+          App.showRedelegateTooltip(icon);
+        }
+        return;
+      }
+      if (event.target.closest && event.target.closest('.delegation-manage-tooltip')) return;
+      tooltip.style.display = 'none';
+    });
+  },
+
+  showRedelegateTooltip: function(icon) {
+    App.ensureRedelegateTooltip();
+    const tooltip = App._redelegateTooltipEl;
+    if (!tooltip || !icon) return;
+    tooltip.textContent = icon.getAttribute('data-tooltip') || '';
+    tooltip.style.display = 'block';
+    const iconRect = icon.getBoundingClientRect();
+    const tipRect = tooltip.getBoundingClientRect();
+    let left = iconRect.left + (iconRect.width / 2) - (tipRect.width / 2);
+    let top = iconRect.top - tipRect.height - 8;
+    if (top < 8) {
+      top = iconRect.bottom + 8;
+    }
+    if (left + tipRect.width > window.innerWidth - 8) {
+      left = window.innerWidth - tipRect.width - 8;
+    }
+    if (left < 8) left = 8;
+    if (top + tipRect.height > window.innerHeight - 8) {
+      top = Math.max(8, window.innerHeight - tipRect.height - 8);
+    }
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+    App._redelegateTooltipIcon = icon;
+  },
+
+  hideRedelegateTooltip: function() {
+    clearTimeout(App._redelegateTooltipTimer);
+    if (App._redelegateTooltipEl) {
+      App._redelegateTooltipEl.style.display = 'none';
+    }
+    App._redelegateTooltipIcon = null;
+  },
+
+  buildRedelegateDestinationOptionsHtml: function(srcAddress, destinationValidators, pairEntryCounts, maxEntries) {
+    const max = Number.isFinite(maxEntries) && maxEntries > 0 ? maxEntries : 7;
+    let html = '<option value="">Select...</option>';
+    let enabledCount = 0;
+    let otherCount = 0;
+    (destinationValidators || []).forEach((validator) => {
+      const address = validator && validator.address;
+      if (!App.isValidTellorValidatorAddress(address) || address === srcAddress) {
+        return;
+      }
+      const count = (pairEntryCounts && pairEntryCounts[`${srcAddress}|${address}`]) || 0;
+      const full = count >= max;
+      let moniker = validator.moniker || 'Validator';
+      if (moniker.length > 28) {
+        moniker = `${moniker.substring(0, 25)}...`;
+      }
+      const safeMoniker = App.escapeDelegationHtmlText(moniker);
+      const safeAddress = App.escapeDelegationHtmlAttr(address);
+      const title = full
+        ? App.escapeDelegationHtmlAttr(`${validator.moniker || 'Validator'} already has ${count} open redelegations from this validator. Wait for one to finish.`)
+        : App.escapeDelegationHtmlAttr(address);
+      html += `<option value="${safeAddress}" title="${title}"${full ? ' disabled' : ''}>${safeMoniker}${full ? ' (limit reached)' : ''}</option>`;
+      otherCount += 1;
+      if (!full) enabledCount += 1;
+    });
+    return { html, enabledCount, otherCount };
+  },
+
   renderDelegationManageSplitRowHtml: function({
     rowIndex,
     fullAddr,
@@ -7654,7 +8151,12 @@ const App = {
     hasDelegation,
     primaryUnbond,
     headerLabel,
-    isSupplemental
+    isSupplemental,
+    destinationValidators,
+    redelegateLockedUntil,
+    pairEntryCounts,
+    maxEntries,
+    unbondingLabel
   }) {
     const bondedInputId = `delegationManageBondedAmount_${rowIndex}`;
     const unbondingInputId = `delegationManageUnbondingAmount_${rowIndex}`;
@@ -7693,6 +8195,73 @@ const App = {
     const jsUnbondButtonId = App.escapeDelegationJsString(unbondButtonId);
     const jsCancelButtonId = App.escapeDelegationJsString(cancelButtonId);
     const jsCreationHeight = App.escapeDelegationJsString(creationHeight);
+    const redelegateAmountId = `delegationManageRedelegateAmount_${rowIndex}`;
+    const redelegateDestId = `delegationManageRedelegateDest_${rowIndex}`;
+    const redelegateButtonId = `delegationManageRedelegateButton_${rowIndex}`;
+    const jsRedelegateAmountId = App.escapeDelegationJsString(redelegateAmountId);
+    const jsRedelegateDestId = App.escapeDelegationJsString(redelegateDestId);
+    const jsRedelegateButtonId = App.escapeDelegationJsString(redelegateButtonId);
+    const destinationOptions = App.buildRedelegateDestinationOptionsHtml(
+      safeFullAddr,
+      destinationValidators,
+      pairEntryCounts,
+      maxEntries
+    );
+    const redelegateLocked = Boolean(redelegateLockedUntil);
+    const othersAvailable = destinationOptions.otherCount > 0;
+    const redelegateUnavailable = !redelegateLocked && destinationOptions.enabledCount === 0;
+    const redelegateDisabled = redelegateLocked || redelegateUnavailable;
+    const redelegateDisabledAttr = redelegateDisabled ? ' disabled' : '';
+    let redelegateStatus = '';
+    if (redelegateLocked) {
+      const completionLabel = redelegateLockedUntil
+        ? App.formatRedelegateAvailableLabel(redelegateLockedUntil)
+        : '';
+      redelegateStatus = completionLabel
+        ? `Stake was redelegated onto this validator recently, so it cannot be moved again yet. ${completionLabel}`
+        : 'Stake was redelegated onto this validator recently, so it cannot be moved again until that entry finishes.';
+    } else if (redelegateUnavailable && othersAvailable) {
+      redelegateStatus = 'Every other validator already has the maximum number of open redelegations from this one. Wait for an entry to finish before moving more stake.';
+    } else if (redelegateUnavailable) {
+      redelegateStatus = 'No other bonded validator is available to receive this stake right now.';
+    }
+    const disclaimerText = App.buildRedelegateDisclaimerText({
+      unbondingLabel: unbondingLabel || 'about 21 days',
+      maxEntries: maxEntries || 7
+    });
+    const tooltipText = redelegateStatus ? `${disclaimerText}\n\n${redelegateStatus}` : disclaimerText;
+    const safeTooltip = App.escapeDelegationHtmlAttr(tooltipText).replace(/\n/g, '&#10;');
+    const redelegateTitle = App.escapeDelegationHtmlAttr(redelegateStatus || 'Move bonded stake to another validator. Hover the info icon for the limits.');
+    const redelegatePanel = hasDelegation ? `
+          <div class="delegation-manage-split-divider" aria-hidden="true"></div>
+          <div class="delegation-manage-panel delegation-manage-panel-redelegate">
+            <span class="delegation-manage-panel-label">
+              Redelegate
+              <button type="button" class="delegation-manage-info" data-tooltip="${safeTooltip}" aria-label="Redelegate limits">ⓘ</button>
+            </span>
+            <span class="delegation-manage-panel-balance delegation-manage-panel-balance-spacer" aria-hidden="true"></span>
+            <span class="delegation-manage-panel-meta delegation-manage-panel-meta-empty" aria-hidden="true"></span>
+            <div class="delegation-manage-panel-controls delegation-manage-redelegate-controls">
+              <select id="${redelegateDestId}" class="delegation-manage-redelegate-select"${redelegateDisabledAttr} title="Validator that will receive this stake">
+                ${destinationOptions.html}
+              </select>
+              <div class="delegation-manage-redelegate-actions">
+                <input
+                  type="number"
+                  id="${redelegateAmountId}"
+                  class="delegation-unstake-input delegation-manage-redelegate-amount"
+                  min="0"
+                  step="0.000001"
+                  max="${maxBondedTrb}"
+                  placeholder="Amt"
+                  ${redelegateDisabledAttr}
+                />
+                <button type="button" class="delegation-unstake-btn delegation-manage-panel-btn" onclick="App.setUnstakeAmountToMax('${jsRedelegateAmountId}', ${maxBondedTrb})"${redelegateDisabledAttr} title="${redelegateTitle}">Max</button>
+                <button type="button" id="${redelegateButtonId}" class="delegation-unstake-btn delegation-unstake-btn-primary delegation-redelegate-btn delegation-manage-panel-btn"${redelegateDisabledAttr} title="${redelegateTitle}" onclick="App.triggerDelegationRowRedelegate('${jsFullAddr}', '${jsRedelegateAmountId}', '${jsRedelegateDestId}', '${jsRedelegateButtonId}')">Redelegate</button>
+              </div>
+            </div>
+          </div>
+    ` : '';
 
     return `
       <div class="status-item status-delegation delegation-manage-item${supplementalClass}">
@@ -7740,17 +8309,23 @@ const App = {
               <button type="button" id="${cancelButtonId}" class="delegation-unstake-btn delegation-cancel-unbond-btn delegation-manage-panel-btn"${cancelDisabledAttr} title="${cancelTitle}" onclick="App.triggerCancelUnbondRow('${jsFullAddr}', '${jsCreationHeight}', '${jsUnbondingInputId}', '${jsCancelButtonId}')">Cancel</button>
             </div>
           </div>
+          ${redelegatePanel}
         </div>
       </div>
     `;
   },
 
-  renderDelegationManageDropdownHtml: function(manageRows, validatorMonikers) {
+  renderDelegationManageDropdownHtml: function(manageRows, validatorMonikers, options) {
     if (!manageRows.length) {
       return '<div class="status-empty">No delegations to manage</div>';
     }
 
-    let dropdownHtml = '';
+    const settings = options || {};
+    const destinationValidators = settings.destinationValidators || [];
+    const redelegateLocks = settings.redelegateLocks || {};
+    const pairEntryCounts = settings.pairEntryCounts || {};
+    const limits = settings.limits || App.stakingRedelegateLimits(null);
+    let dropdownHtml = '<div class="delegation-manage-list">';
     let rowIndex = 0;
 
     manageRows.forEach((row) => {
@@ -7776,7 +8351,12 @@ const App = {
         unbondTrb,
         hasDelegation,
         primaryUnbond,
-        isSupplemental: false
+        isSupplemental: false,
+        destinationValidators,
+        redelegateLockedUntil: redelegateLocks[fullAddr] || '',
+        pairEntryCounts,
+        maxEntries: limits.maxEntries,
+        unbondingLabel: limits.unbondingLabel
       });
 
       rowIndex += 1;
@@ -7796,13 +8376,17 @@ const App = {
             hasDelegation: false,
             primaryUnbond: unbondEntry,
             headerLabel: `Additional unbonding · ${moniker}`,
-            isSupplemental: true
+            isSupplemental: true,
+            destinationValidators,
+            pairEntryCounts,
+            maxEntries: limits.maxEntries
           });
           rowIndex += 1;
         });
       }
     });
 
+    dropdownHtml += '</div>';
     return dropdownHtml;
   },
 
@@ -7815,20 +8399,37 @@ const App = {
     try {
       statusElement.innerHTML = '<div class="status-loading">Loading...</div>';
 
-      const [delegations, unbondingEntries] = await Promise.all([
+      const [delegations, unbondingEntries, redelegationEntries, stakingParams] = await Promise.all([
         this.fetchCurrentDelegations(delegatorAddress),
-        this.fetchUnbondingDelegations(delegatorAddress)
+        this.fetchUnbondingDelegations(delegatorAddress),
+        this.fetchRedelegations(delegatorAddress).catch((error) => {
+          console.error('Error fetching redelegations:', error);
+          return [];
+        }),
+        this.fetchStakingParams().catch((error) => {
+          console.error('Error fetching staking params:', error);
+          return null;
+        })
       ]);
 
       let validatorMonikers = {};
+      let destinationValidators = [];
       try {
         const validators = await this.fetchValidators();
         validators.forEach((validator) => {
           validatorMonikers[validator.address] = validator.moniker || 'Unknown Validator';
+          if (!validator.jailed && App.isValidTellorValidatorAddress(validator.address)) {
+            destinationValidators.push({
+              address: validator.address,
+              moniker: validator.moniker || 'Unknown Validator'
+            });
+          }
         });
       } catch (e) {
         console.error('Error fetching validators for delegations status:', e);
       }
+
+      const redelegateSummary = App.summarizeRedelegations(redelegationEntries);
 
       const sortedDelegations = (delegations || [])
         .filter((delegation) => delegation.denom === 'loya')
@@ -7879,7 +8480,12 @@ const App = {
       `;
 
       if (dropdownContent) {
-        dropdownContent.innerHTML = App.renderDelegationManageDropdownHtml(manageRows, validatorMonikers);
+        dropdownContent.innerHTML = App.renderDelegationManageDropdownHtml(manageRows, validatorMonikers, {
+          destinationValidators,
+          redelegateLocks: redelegateSummary.locks,
+          pairEntryCounts: redelegateSummary.pairEntryCounts,
+          limits: App.stakingRedelegateLimits(stakingParams)
+        });
       }
     } catch (error) {
       console.error('Error displaying delegations status:', error);
@@ -7935,6 +8541,7 @@ this.displayDelegatorRewardsStatus(App.keplrAddress),
 
   // Initialize delegate section
   initDelegateSection: function() {
+    App.ensureRedelegateTooltip();
     // Set initial state - don't load validators until wallet is connected
     const dropdown = document.getElementById('delegateValidatorDropdown');
     if (dropdown) {

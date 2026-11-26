@@ -183,6 +183,42 @@ export class UnitTests extends TestSuite {
         run: () => this.testRenderDelegationManageDropdownHtml()
       },
       {
+        name: 'Redelegate disclaimer and row controls',
+        run: () => this.testRedelegateDisclaimerAndRowControls()
+      },
+      {
+        name: 'Redelegate row action wiring',
+        run: () => this.testTriggerDelegationRowRedelegate()
+      },
+      {
+        name: 'Redelegate rejects same validator and open incoming entry',
+        run: () => this.testExecuteRedelegationGuards()
+      },
+      {
+        name: 'Redelegate parses open entries and staking limits',
+        run: () => this.testRedelegateParsingAndLimits()
+      },
+      {
+        name: 'Redelegate destination options',
+        run: () => this.testRedelegateDestinationOptions()
+      },
+      {
+        name: 'Redelegate blocks over-amount, pair cap, and power-check failure',
+        run: () => this.testExecuteRedelegationSafetyStops()
+      },
+      {
+        name: 'Validator power check fails closed',
+        run: () => this.testValidatorPowerCheckFailsClosed()
+      },
+      {
+        name: 'Redelegate gas fallback covers measured usage',
+        run: () => this.testRedelegateGasFallback()
+      },
+      {
+        name: 'Redelegate tooltip is plain text',
+        run: () => this.testRedelegateTooltipIsText()
+      },
+      {
         name: 'Build delegation manage rows',
         run: () => this.testBuildDelegationManageRows()
       },
@@ -2553,6 +2589,7 @@ export class UnitTests extends TestSuite {
     }
 
     const validatorAddress = 'tellorvaloper1testvalidator123456789012345678901234567890';
+    const destinationAddress = 'tellorvaloper1destvalidator123456789012345678901234567890';
     const html = window.App.renderDelegationManageSplitRowHtml({
       rowIndex: 0,
       fullAddr: validatorAddress,
@@ -2566,7 +2603,12 @@ export class UnitTests extends TestSuite {
         balanceMicro: '999999',
         completionTime: new Date(Date.now() + 86400000).toISOString()
       },
-      isSupplemental: false
+      isSupplemental: false,
+      destinationValidators: [
+        { address: validatorAddress, moniker: 'Alpha' },
+        { address: destinationAddress, moniker: 'Beta' }
+      ],
+      maxEntries: 7
     });
 
     this.assertContains(html, 'delegation-manage-split', 'Row should use split container');
@@ -2589,6 +2631,11 @@ export class UnitTests extends TestSuite {
     this.assertContains(html, "setCancelUnbondAmountToMax('delegationManageUnbondingAmount_0'", 'Unbonding Max should target unbonding input');
     this.assertContains(html, '>Unbond</button>', 'Bonded panel should render Unbond button');
     this.assertContains(html, '>Cancel</button>', 'Unbonding panel should render Cancel button');
+    this.assertContains(html, 'delegation-manage-panel-redelegate', 'Bonded row should include a redelegate column');
+    this.assertContains(html, '>Redelegate</button>', 'Bonded row should render Redelegate button');
+    this.assertContains(html, 'delegation-manage-info', 'Redelegate limits should sit on a hover icon');
+    this.assertContains(html, 'never return to your wallet', 'Tooltip should explain that stake stays bonded');
+    this.assertFalse(html.includes('delegation-manage-note'), 'Disclaimer should not render as a full-width note');
 
     const disabledBondedHtml = window.App.renderDelegationManageSplitRowHtml({
       rowIndex: 1,
@@ -2639,13 +2686,21 @@ export class UnitTests extends TestSuite {
     const html = window.App.renderDelegationManageDropdownHtml(manageRows, monikers);
 
     this.assertContains(html, 'delegation-manage-validator-header', 'Dropdown row should center validator header');
+    this.assertFalse(html.includes('delegation-manage-note'), 'Disclaimer should not render as a dropdown banner');
+    this.assertContains(html, 'delegation-manage-info', 'Bonded row should expose the redelegate tooltip');
+    this.assertContains(html, 'they never return to your wallet', 'Tooltip should explain stake stays bonded');
+    this.assertContains(html, 'does not change the reporter', 'Tooltip should explain reporter selection is unchanged');
+    this.assertContains(html, '25% or more of total voting power', 'Tooltip should explain the power limit');
     this.assertContains(html, 'delegationManageBondedAmount_0', 'Primary row should use bonded input index 0');
     this.assertContains(html, 'delegationManageUnbondingAmount_0', 'Primary row should use unbonding input index 0');
+    this.assertContains(html, 'delegationManageRedelegateAmount_0', 'Primary row should include a redelegate amount');
     this.assertContains(html, 'Additional unbonding · Test Validator', 'Should render supplemental row for extra unbond');
     this.assertContains(html, 'delegation-manage-item-supplemental', 'Supplemental unbond row should be marked');
     this.assertContains(html, 'delegationManageUnbondingAmount_1', 'Supplemental row should increment unbonding input index');
     this.assertContains(html, `triggerCancelUnbondRow('${validatorAddress}'`, 'Supplemental row should wire cancel');
     this.assertContains(html, "'100'", 'Supplemental row should use older unbond creation height');
+    const redelegateSections = html.split('delegation-manage-panel-redelegate').length - 1;
+    this.assertEqual(redelegateSections, 1, 'Only the bonded row should offer redelegate');
   }
 
   testBuildDelegationManageRows() {
@@ -2704,6 +2759,30 @@ export class UnitTests extends TestSuite {
     this.assertContains(html, '&lt;/span&gt;', 'HTML text content should be escaped');
     this.assertContains(html, 'App.copyToClipboard(', 'Should still render copy handler');
     this.assertContains(html, 'triggerDelegationRowUnstake', 'Should still render unbond handler');
+    this.assertFalse(
+      html.includes('<img'),
+      'Destination moniker markup must not be injected'
+    );
+
+    const xssDestHtml = window.App.renderDelegationManageSplitRowHtml({
+      rowIndex: 100,
+      fullAddr: validatorAddress,
+      moniker: 'Safe',
+      shortAddr: 'tellorvaloper1test...',
+      bondedTrb: 1,
+      unbondTrb: 0,
+      hasDelegation: true,
+      primaryUnbond: null,
+      isSupplemental: false,
+      destinationValidators: [
+        {
+          address: 'tellorvaloper1destvalidator123456789012345678901234567890',
+          moniker: '</option><img src=x onerror=alert(1)>'
+        }
+      ]
+    });
+    this.assertFalse(xssDestHtml.includes('onerror=alert'), 'Destination moniker must be escaped');
+    this.assertContains(xssDestHtml, '&lt;/option&gt;', 'Destination option text should be escaped');
 
     this.assertFalse(
       window.App.isValidUnbondCreationHeight("123');alert(1);//"),
@@ -2864,6 +2943,524 @@ export class UnitTests extends TestSuite {
       window.App.executeUndelegation = originalExecuteUndelegation;
       if (input.parentNode) input.parentNode.removeChild(input);
       if (button.parentNode) button.parentNode.removeChild(button);
+    }
+  }
+
+  testRedelegateDisclaimerAndRowControls() {
+    if (!window.App || !window.App.buildRedelegateDisclaimerText || !window.App.summarizeRedelegations) {
+      return;
+    }
+
+    const text = window.App.buildRedelegateDisclaimerText({
+      unbondingLabel: 'about 21 days',
+      maxEntries: 7
+    });
+    this.assertContains(text, 'about 21 days', 'Disclaimer should name the unbonding window');
+    this.assertContains(text, 'at most 7 redelegations', 'Disclaimer should name the entry cap');
+    this.assertContains(text, 'never return to your wallet', 'Disclaimer should say stake stays out of the wallet');
+
+    const src = 'tellorvaloper1sourcevalidator12345678901234567890123456789';
+    const dst = 'tellorvaloper1destvalidator123456789012345678901234567890';
+    const later = new Date(Date.now() + 2 * 86400000).toISOString();
+    const sooner = new Date(Date.now() + 86400000).toISOString();
+    const summary = window.App.summarizeRedelegations([
+      { validatorSrcAddress: src, validatorDstAddress: dst, completionTime: sooner },
+      { validatorSrcAddress: src, validatorDstAddress: dst, completionTime: later },
+      { validatorSrcAddress: 'tellorvaloper1old', validatorDstAddress: 'tellorvaloper1done', completionTime: new Date(Date.now() - 1000).toISOString() }
+    ]);
+    this.assertEqual(summary.pairEntryCounts[`${src}|${dst}`], 2, 'Pair count should include both open entries');
+    this.assertEqual(summary.locks[dst], later, 'Lock should keep the later completion time');
+
+    const lockedHtml = window.App.renderDelegationManageSplitRowHtml({
+      rowIndex: 3,
+      fullAddr: dst,
+      moniker: 'Dest',
+      shortAddr: 'tellorvaloper1dest...',
+      bondedTrb: 4,
+      unbondTrb: 0,
+      hasDelegation: true,
+      primaryUnbond: null,
+      destinationValidators: [{ address: src, moniker: 'Source' }],
+      redelegateLockedUntil: later,
+      maxEntries: 7
+    });
+    this.assertContains(lockedHtml, 'cannot be moved again yet', 'Locked row should explain the wait');
+    this.assertContains(lockedHtml, 'disabled', 'Locked redelegate controls should be disabled');
+  }
+
+  async testTriggerDelegationRowRedelegate() {
+    if (!window.App || !window.App.triggerDelegationRowRedelegate) {
+      return;
+    }
+
+    const inputId = 'delegationManageRedelegateAmount_wire';
+    const selectId = 'delegationManageRedelegateDest_wire';
+    const buttonId = 'delegationManageRedelegateButton_wire';
+    const src = 'tellorvaloper1sourcevalidator12345678901234567890123456789';
+    const dst = 'tellorvaloper1destvalidator123456789012345678901234567890';
+
+    const input = document.createElement('input');
+    input.id = inputId;
+    input.value = '1.5';
+    document.body.appendChild(input);
+
+    const select = document.createElement('select');
+    select.id = selectId;
+    const option = document.createElement('option');
+    option.value = dst;
+    option.selected = true;
+    select.appendChild(option);
+    document.body.appendChild(select);
+
+    const button = document.createElement('button');
+    button.id = buttonId;
+    button.textContent = 'Redelegate';
+    document.body.appendChild(button);
+
+    const originalExecute = window.App.executeRedelegation;
+    const capturedCalls = [];
+    window.App.executeRedelegation = async (payload) => {
+      capturedCalls.push(payload);
+      return { code: 0, txhash: 'test-redelegate-hash' };
+    };
+
+    try {
+      await window.App.triggerDelegationRowRedelegate(src, inputId, selectId, buttonId);
+      this.assertEqual(capturedCalls.length, 1, 'Row action should call executeRedelegation once');
+      this.assertEqual(capturedCalls[0].validatorSrcAddress, src, 'Should pass the source validator');
+      this.assertEqual(capturedCalls[0].validatorDstAddress, dst, 'Should pass the destination validator');
+      this.assertEqual(capturedCalls[0].amount, '1.5', 'Should pass the amount');
+      this.assertEqual(capturedCalls[0].triggerButton, button, 'Should pass the row button');
+      this.assertEqual(input.value, '', 'Amount should clear after a successful redelegate');
+      this.assertEqual(select.value, '', 'Destination should clear after a successful redelegate');
+    } finally {
+      window.App.executeRedelegation = originalExecute;
+      if (input.parentNode) input.parentNode.removeChild(input);
+      if (select.parentNode) select.parentNode.removeChild(select);
+      if (button.parentNode) button.parentNode.removeChild(button);
+    }
+  }
+
+  async testExecuteRedelegationGuards() {
+    if (!window.App || !window.App.executeRedelegation) {
+      return;
+    }
+
+    const src = 'tellorvaloper1sourcevalidator12345678901234567890123456789';
+    const dst = 'tellorvaloper1destvalidator123456789012345678901234567890';
+    const messages = [];
+    const originalPopup = window.App.showValidationErrorPopup;
+    const originalFetchDelegations = window.App.fetchCurrentDelegations;
+    const originalFetchRedelegations = window.App.fetchRedelegations;
+    const originalFetchParams = window.App.fetchStakingParams;
+    const originalConcentration = window.App.checkValidatorPowerConcentration;
+    const originalConnected = window.App.isKeplrConnected;
+    const originalAdapter = window.cosmosWalletAdapter;
+    const originalBroadcast = window.cosmjs && window.cosmjs.stargate
+      ? window.cosmjs.stargate.redelegateTokens
+      : null;
+
+    let broadcastCalled = false;
+    window.App.showValidationErrorPopup = (message) => {
+      messages.push(message);
+    };
+    window.App.isKeplrConnected = true;
+    window.cosmosWalletAdapter = {
+      isConnected: () => true,
+      enableChain: async () => {},
+      getOfflineSigner: () => ({
+        getAccounts: async () => [{ address: 'tellor1delegator' }]
+      })
+    };
+    window.App.fetchCurrentDelegations = async () => ([
+      { validatorAddress: src, amount: '5000000', denom: 'loya' }
+    ]);
+    window.App.fetchStakingParams = async () => ({ unbonding_time: '1814400s', max_entries: 7 });
+    window.App.checkValidatorPowerConcentration = async () => ({ ok: true });
+    if (window.cosmjs && window.cosmjs.stargate) {
+      window.cosmjs.stargate.redelegateTokens = async () => {
+        broadcastCalled = true;
+        return { code: 0 };
+      };
+    }
+
+    try {
+      window.App.fetchRedelegations = async () => [];
+      await window.App.executeRedelegation({
+        amount: '1',
+        validatorSrcAddress: src,
+        validatorDstAddress: src,
+        buttonLabel: 'Redelegate'
+      });
+      this.assertFalse(broadcastCalled, 'Same-validator redelegate must not broadcast');
+      this.assertTrue(
+        messages.some((message) => message.indexOf('different validator') !== -1),
+        'Same-validator redelegate should explain that the destination must differ'
+      );
+
+      messages.length = 0;
+      const completionTime = new Date(Date.now() + 86400000).toISOString();
+      window.App.fetchRedelegations = async () => ([
+        {
+          validatorSrcAddress: dst,
+          validatorDstAddress: src,
+          completionTime
+        }
+      ]);
+      await window.App.executeRedelegation({
+        amount: '1',
+        validatorSrcAddress: src,
+        validatorDstAddress: dst,
+        buttonLabel: 'Redelegate'
+      });
+      this.assertFalse(broadcastCalled, 'Incoming redelegation should block another move');
+      this.assertTrue(
+        messages.some((message) => message.indexOf('cannot be moved again yet') !== -1),
+        'Incoming redelegation should explain the wait'
+      );
+    } finally {
+      window.App.showValidationErrorPopup = originalPopup;
+      window.App.fetchCurrentDelegations = originalFetchDelegations;
+      window.App.fetchRedelegations = originalFetchRedelegations;
+      window.App.fetchStakingParams = originalFetchParams;
+      window.App.checkValidatorPowerConcentration = originalConcentration;
+      window.App.isKeplrConnected = originalConnected;
+      window.cosmosWalletAdapter = originalAdapter;
+      if (window.cosmjs && window.cosmjs.stargate && originalBroadcast) {
+        window.cosmjs.stargate.redelegateTokens = originalBroadcast;
+      }
+    }
+  }
+
+  async testRedelegateParsingAndLimits() {
+    if (!window.App || !window.App.fetchRedelegations || !window.App.stakingRedelegateLimits) {
+      return;
+    }
+
+    const src = 'tellorvaloper1sourcevalidator12345678901234567890123456789';
+    const dst = 'tellorvaloper1destvalidator123456789012345678901234567890';
+    const future = new Date(Date.now() + 3 * 86400000).toISOString();
+    const past = new Date(Date.now() - 86400000).toISOString();
+    const originalFetch = window.fetch;
+    window.fetch = async (url) => {
+      this.assertContains(String(url), '/redelegations', 'Should query the redelegations endpoint');
+      return {
+        ok: true,
+        json: async () => ({
+          redelegation_responses: [{
+            redelegation: {
+              validator_src_address: src,
+              validator_dst_address: dst
+            },
+            entries: [
+              { redelegation_entry: { completion_time: future } },
+              { redelegation_entry: { completion_time: past } }
+            ]
+          }]
+        })
+      };
+    };
+
+    try {
+      const entries = await window.App.fetchRedelegations('tellor1delegator');
+      this.assertEqual(entries.length, 1, 'Completed redelegation entries should be dropped');
+      this.assertEqual(entries[0].validatorSrcAddress, src, 'Should keep the source validator');
+      this.assertEqual(entries[0].validatorDstAddress, dst, 'Should keep the destination validator');
+      this.assertEqual(entries[0].completionTime, future, 'Should keep the open completion time');
+    } finally {
+      window.fetch = originalFetch;
+    }
+
+    this.assertEqual(window.App.describeUnbondingWindow('1814400s'), 'about 21 days', '21-day duration should be described in days');
+    this.assertEqual(window.App.describeUnbondingWindow('86400s'), 'about 1 day', 'One day should stay singular');
+    this.assertEqual(window.App.describeUnbondingWindow({ seconds: '1814400' }), 'about 21 days', 'Protobuf duration objects should be accepted');
+    this.assertEqual(window.App.describeUnbondingWindow(null), 'about 21 days', 'Missing duration should fall back to about 21 days');
+
+    const limits = window.App.stakingRedelegateLimits({
+      unbonding_time: '1814400s',
+      max_entries: '7'
+    });
+    this.assertEqual(limits.unbondingLabel, 'about 21 days', 'Limits should carry the unbonding label');
+    this.assertEqual(limits.maxEntries, 7, 'Limits should carry the entry cap');
+    this.assertEqual(window.App.stakingRedelegateLimits(null).maxEntries, 7, 'Missing params should default the entry cap to 7');
+  }
+
+  testRedelegateDestinationOptions() {
+    if (!window.App || !window.App.buildRedelegateDestinationOptionsHtml) {
+      return;
+    }
+
+    const src = 'tellorvaloper1sourcevalidator12345678901234567890123456789';
+    const openDest = 'tellorvaloper1destvalidator123456789012345678901234567890';
+    const cappedDest = 'tellorvaloper1capvalidator1234567890123456789012345678901';
+    const options = window.App.buildRedelegateDestinationOptionsHtml(src, [
+      { address: src, moniker: 'Source' },
+      { address: openDest, moniker: 'Beta' },
+      { address: cappedDest, moniker: '</option><img src=x onerror=alert(1)>' }
+    ], {
+      [`${src}|${cappedDest}`]: 7
+    }, 7);
+
+    this.assertEqual(options.enabledCount, 1, 'Only the uncapped other validator should be selectable');
+    this.assertEqual(options.otherCount, 2, 'Source validator should not be offered as a destination');
+    this.assertContains(options.html, `value="${openDest}"`, 'Open destination should be an option');
+    this.assertFalse(options.html.includes(`value="${src}"`), 'Source validator should be omitted');
+    this.assertContains(options.html, 'disabled', 'A pair at the entry cap should be disabled');
+    this.assertContains(options.html, '(limit reached)', 'A capped destination should say the limit is reached');
+    this.assertFalse(options.html.includes('<img'), 'Destination moniker must not inject an image tag');
+    this.assertContains(options.html, '&lt;', 'Destination moniker should escape angle brackets');
+  }
+
+  async testExecuteRedelegationSafetyStops() {
+    if (!window.App || !window.App.executeRedelegation) {
+      return;
+    }
+
+    const src = 'tellorvaloper1sourcevalidator12345678901234567890123456789';
+    const dst = 'tellorvaloper1destvalidator123456789012345678901234567890';
+    const validationMessages = [];
+    const balanceMessages = [];
+    const originalValidation = window.App.showValidationErrorPopup;
+    const originalBalance = window.App.showBalanceErrorPopup;
+    const originalPending = window.App.showPendingPopup;
+    const originalHidePending = window.App.hidePendingPopup;
+    const originalSuccess = window.App.showSuccessPopup;
+    const originalError = window.App.showErrorPopup;
+    const originalRefresh = window.App.refreshCurrentStatus;
+    const originalDelegations = window.App.fetchCurrentDelegations;
+    const originalRedelegations = window.App.fetchRedelegations;
+    const originalParams = window.App.fetchStakingParams;
+    const originalConcentration = window.App.checkValidatorPowerConcentration;
+    const originalConnected = window.App.isKeplrConnected;
+    const originalAdapter = window.cosmosWalletAdapter;
+    const originalBroadcast = window.cosmjs && window.cosmjs.stargate
+      ? window.cosmjs.stargate.redelegateTokens
+      : null;
+
+    const captured = [];
+    window.App.showValidationErrorPopup = (message) => { validationMessages.push(message); };
+    window.App.showBalanceErrorPopup = (message) => { balanceMessages.push(message); };
+    window.App.showPendingPopup = () => {};
+    window.App.hidePendingPopup = () => {};
+    window.App.showSuccessPopup = () => {};
+    window.App.showErrorPopup = () => {};
+    window.App.refreshCurrentStatus = async () => {};
+    window.App.isKeplrConnected = true;
+    window.cosmosWalletAdapter = {
+      isConnected: () => true,
+      enableChain: async () => {},
+      getOfflineSigner: () => ({
+        getAccounts: async () => [{ address: 'tellor1delegator' }]
+      })
+    };
+    window.App.fetchCurrentDelegations = async () => ([
+      { validatorAddress: src, amount: '5000000', denom: 'loya' }
+    ]);
+    window.App.fetchStakingParams = async () => ({ unbonding_time: '1814400s', max_entries: 7 });
+    window.App.fetchRedelegations = async () => [];
+    window.App.checkValidatorPowerConcentration = async () => ({ ok: true });
+    if (!window.cosmjs) window.cosmjs = {};
+    if (!window.cosmjs.stargate) window.cosmjs.stargate = {};
+    window.cosmjs.stargate.redelegateTokens = async (...args) => {
+      captured.push(args);
+      return { code: 0, txhash: 'SAFEHASH' };
+    };
+
+    try {
+      await window.App.executeRedelegation({
+        amount: '6',
+        validatorSrcAddress: src,
+        validatorDstAddress: dst
+      });
+      this.assertEqual(captured.length, 0, 'An amount above bonded stake must not broadcast');
+      this.assertTrue(
+        validationMessages.some((message) => message.indexOf('larger than the bonded stake') !== -1),
+        'Over-amount should name the bonded balance'
+      );
+
+      validationMessages.length = 0;
+      window.App.fetchRedelegations = async () => Array.from({ length: 7 }, () => ({
+        validatorSrcAddress: src,
+        validatorDstAddress: dst,
+        completionTime: new Date(Date.now() + 86400000).toISOString()
+      }));
+      await window.App.executeRedelegation({
+        amount: '1',
+        validatorSrcAddress: src,
+        validatorDstAddress: dst
+      });
+      this.assertEqual(captured.length, 0, 'A pair already at the entry cap must not broadcast');
+      this.assertTrue(
+        validationMessages.some((message) => message.indexOf('already has 7 redelegations') !== -1),
+        'Pair cap should explain how many entries are open'
+      );
+
+      validationMessages.length = 0;
+      window.App.fetchRedelegations = async () => [];
+      window.App.checkValidatorPowerConcentration = async () => ({
+        ok: false,
+        message: 'Voting power could not be checked, so this was not submitted. Refresh the validator list and try again.'
+      });
+      await window.App.executeRedelegation({
+        amount: '1',
+        validatorSrcAddress: src,
+        validatorDstAddress: dst
+      });
+      this.assertEqual(captured.length, 0, 'A failed power check must not broadcast');
+      this.assertTrue(
+        balanceMessages.some((message) => message.indexOf('could not be checked') !== -1),
+        'A failed power check should surface an error'
+      );
+
+      balanceMessages.length = 0;
+      window.App.checkValidatorPowerConcentration = async () => ({ ok: true });
+      const result = await window.App.executeRedelegation({
+        amount: '1',
+        validatorSrcAddress: src,
+        validatorDstAddress: dst
+      });
+      this.assertEqual(captured.length, 1, 'A valid redelegate should broadcast once');
+      this.assertEqual(captured[0][0], 'tellor1delegator', 'Broadcast should use the connected account');
+      this.assertEqual(captured[0][1], src, 'Broadcast should use the source validator');
+      this.assertEqual(captured[0][2], dst, 'Broadcast should use the destination validator');
+      this.assertEqual(captured[0][3], '1', 'Broadcast should use the requested amount');
+      this.assertEqual(result && result.code, 0, 'A signed success should return code 0');
+    } finally {
+      window.App.showValidationErrorPopup = originalValidation;
+      window.App.showBalanceErrorPopup = originalBalance;
+      window.App.showPendingPopup = originalPending;
+      window.App.hidePendingPopup = originalHidePending;
+      window.App.showSuccessPopup = originalSuccess;
+      window.App.showErrorPopup = originalError;
+      window.App.refreshCurrentStatus = originalRefresh;
+      window.App.fetchCurrentDelegations = originalDelegations;
+      window.App.fetchRedelegations = originalRedelegations;
+      window.App.fetchStakingParams = originalParams;
+      window.App.checkValidatorPowerConcentration = originalConcentration;
+      window.App.isKeplrConnected = originalConnected;
+      window.cosmosWalletAdapter = originalAdapter;
+      if (window.cosmjs && window.cosmjs.stargate) {
+        if (originalBroadcast) {
+          window.cosmjs.stargate.redelegateTokens = originalBroadcast;
+        } else {
+          delete window.cosmjs.stargate.redelegateTokens;
+        }
+      }
+    }
+  }
+
+  async testValidatorPowerCheckFailsClosed() {
+    if (!window.App || !window.App.checkValidatorPowerConcentration) {
+      return;
+    }
+
+    const whale = 'tellorvaloper1whalevalidator123456789012345678901234567890';
+    const small = 'tellorvaloper1smallvalidator123456789012345678901234567890';
+    const other = 'tellorvaloper1othervalidator123456789012345678901234567890';
+    const missing = 'tellorvaloper1missingvalidator1234567890123456789012345678';
+    const originalFetchValidators = window.App.fetchValidators;
+
+    try {
+      window.App.fetchValidators = async () => ([
+        { address: whale, votingPower: '250000', jailed: false },
+        { address: small, votingPower: '249000', jailed: false },
+        { address: other, votingPower: '501000', jailed: false }
+      ]);
+      const blocked = await window.App.checkValidatorPowerConcentration(whale);
+      this.assertFalse(blocked.ok, 'A validator at 25% of voting power should be blocked');
+      this.assertContains(blocked.message, '25%', 'The block message should name the 25% limit');
+
+      const allowed = await window.App.checkValidatorPowerConcentration(small);
+      this.assertTrue(allowed.ok, 'A validator under 25% of voting power should be allowed');
+
+      const absent = await window.App.checkValidatorPowerConcentration(missing);
+      this.assertFalse(absent.ok, 'A validator missing from the bonded set should not be submitted');
+      this.assertContains(absent.message, 'could not be checked', 'A missing validator should explain that power was not checked');
+
+      window.App.fetchValidators = async () => {
+        throw new Error('validator list unavailable');
+      };
+      const failed = await window.App.checkValidatorPowerConcentration(whale);
+      this.assertFalse(failed.ok, 'A failed validator query should block the transaction');
+      this.assertContains(failed.message, 'could not be checked', 'A failed query should explain that power was not checked');
+    } finally {
+      window.App.fetchValidators = originalFetchValidators;
+    }
+  }
+
+  async testRedelegateGasFallback() {
+    if (!window.App || !window.App.broadcastCosmosMessages) {
+      return;
+    }
+
+    const originalSigner = window.App.getCosmosSignerAndAddress;
+    const originalAllows = window.App.cosmosRestEndpointAllowsSimulate;
+    const originalEndpoint = window.App.getCosmosApiEndpoint;
+    if (!window.cosmjs) window.cosmjs = {};
+    if (!window.cosmjs.stargate) window.cosmjs.stargate = {};
+    if (!window.cosmjs.stargate.SigningStargateClient) {
+      window.cosmjs.stargate.SigningStargateClient = {};
+    }
+    const originalConnect = window.cosmjs.stargate.SigningStargateClient.connectWithSigner;
+    let capturedFee = null;
+
+    window.App.getCosmosSignerAndAddress = async () => ({
+      offlineSigner: {},
+      signerAddress: 'tellor1delegator'
+    });
+    window.App.cosmosRestEndpointAllowsSimulate = () => true;
+    window.App.getCosmosApiEndpoint = () => 'https://mainnet.tellorlayer.com';
+    window.cosmjs.stargate.SigningStargateClient.connectWithSigner = async () => ({
+      simulateDirect: async () => {
+        throw new Error('simulate unavailable');
+      },
+      signAndBroadcastDirect: async (_address, _messages, fee) => {
+        capturedFee = fee;
+        return { code: 0, txhash: 'FALLBACK' };
+      }
+    });
+
+    try {
+      await window.App.broadcastCosmosMessages([{
+        typeUrl: '/cosmos.staking.v1beta1.MsgBeginRedelegate',
+        value: {}
+      }], 'Redelegate TRB to another validator');
+      this.assertNotNull(capturedFee, 'Fallback broadcast should still sign a fee');
+      const gas = parseInt(capturedFee.gas, 10);
+      const fee = parseInt(capturedFee.amount[0].amount, 10);
+      this.assertTrue(gas >= 800000, 'Fallback gas should cover the measured redelegate usage');
+      this.assertTrue(fee >= Math.ceil(gas * 0.025), 'Fallback fee should meet the minimum gas price');
+    } finally {
+      window.App.getCosmosSignerAndAddress = originalSigner;
+      window.App.cosmosRestEndpointAllowsSimulate = originalAllows;
+      window.App.getCosmosApiEndpoint = originalEndpoint;
+      if (originalConnect) {
+        window.cosmjs.stargate.SigningStargateClient.connectWithSigner = originalConnect;
+      } else {
+        delete window.cosmjs.stargate.SigningStargateClient.connectWithSigner;
+      }
+    }
+  }
+
+  testRedelegateTooltipIsText() {
+    if (!window.App || !window.App.showRedelegateTooltip) {
+      return;
+    }
+
+    const icon = document.createElement('button');
+    icon.className = 'delegation-manage-info';
+    icon.setAttribute('data-tooltip', '<img src=x onerror=alert(1)>');
+    document.body.appendChild(icon);
+
+    try {
+      window.App.showRedelegateTooltip(icon);
+      const tooltip = window.App._redelegateTooltipEl;
+      this.assertNotNull(tooltip, 'Tooltip element should exist');
+      this.assertEqual(tooltip.textContent, '<img src=x onerror=alert(1)>', 'Tooltip should keep markup as text');
+      this.assertEqual(tooltip.querySelectorAll('img').length, 0, 'Tooltip must not parse HTML from validator or status text');
+    } finally {
+      if (window.App.hideRedelegateTooltip) window.App.hideRedelegateTooltip();
+      if (icon.parentNode) icon.parentNode.removeChild(icon);
     }
   }
 

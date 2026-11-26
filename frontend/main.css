@@ -755,6 +755,24 @@ select.input-address option {
     pointer-events: auto;
 }
 
+/* Side strips only. A full-size layer sits above the link and steals the click. */
+.tooltip::before,
+.tooltip::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 14px;
+}
+
+.tooltip::before {
+    left: -14px;
+}
+
+.tooltip::after {
+    right: -14px;
+}
+
 /* Style for links within tooltips */
 .tooltip a {
     color: #165863;
@@ -3052,23 +3070,6 @@ header {
     align-items: center;
 }
 
-#delegateSection .delegate-primary-section .primary-action-button-row {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    justify-content: center;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-#delegateSection .delegate-primary-section .primary-action-button-row .button-style-3 {
-    width: auto;
-    min-width: 150px;
-    margin: 0;
-    padding: 10px 18px;
-    font-size: 16px;
-}
-
 #delegateSection .delegate-primary-section .primary-action-button-row .info-icon {
     position: static;
     right: auto;
@@ -3386,6 +3387,25 @@ header {
     background: #4a3d78;
 }
 
+#delegateSection .delegation-redelegate-btn {
+    flex: 1 1 100%;
+    background: #1f6b4a;
+    color: #f3fff8;
+    padding: 4px 6px;
+}
+
+#delegateSection .delegation-redelegate-btn:hover {
+    background: #18573c;
+}
+
+#delegateSection .delegation-redelegate-btn:disabled,
+#delegateSection .delegation-redelegate-btn:disabled:hover {
+    background: #d7e5df;
+    color: #6d857c;
+    border-color: #b7cdc4;
+    opacity: 1;
+}
+
 #delegateSection .delegation-manage-validator-header {
     display: flex;
     align-items: center;
@@ -3436,11 +3456,45 @@ header {
 }
 
 #delegateSection .delegation-manage-panel-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
     font-size: 0.64rem;
     font-weight: 600;
     color: #3d6459;
     text-transform: uppercase;
     letter-spacing: 0.02em;
+}
+
+#delegateSection .delegation-manage-info {
+    position: static;
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: #e7f3ee;
+    color: #165863;
+    font-size: 0.62rem;
+    line-height: 1;
+    text-transform: none;
+    letter-spacing: 0;
+    cursor: help;
+    flex: 0 0 auto;
+}
+
+#delegateSection .delegation-manage-info:hover,
+#delegateSection .delegation-manage-info:focus-visible {
+    background: #d3ebe3;
+    outline: none;
+}
+
+.delegation-manage-tooltip {
+    max-width: 340px;
+    white-space: pre-line;
+    line-height: 1.45;
+    font-size: 13px;
 }
 
 #delegateSection .delegation-manage-panel-balance {
@@ -3468,7 +3522,7 @@ header {
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 0.2rem;
     width: 100%;
     margin-top: auto;
@@ -3651,8 +3705,73 @@ header {
     border-bottom: none;
 }
 
-#delegateSection #delegationsDropdown .delegation-manage-item:nth-child(even) {
+#delegateSection #delegationsDropdown .delegation-manage-list .delegation-manage-item:nth-child(even) {
     background: #f6faf8;
+}
+
+#delegateSection .delegation-manage-panel-balance-spacer {
+    min-height: 0.85rem;
+}
+
+#delegateSection .delegation-manage-redelegate-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+}
+
+#delegateSection .delegation-manage-redelegate-select {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    border: 1px solid #97b0a5;
+    border-radius: 6px;
+    padding: 3px 4px;
+    font-size: 0.64rem;
+    line-height: 1.2;
+    background: #f7fbf9;
+    color: #123f23;
+}
+
+#delegateSection .delegation-manage-redelegate-select:disabled {
+    background: #eef3f1;
+    color: #7d9088;
+}
+
+#delegateSection .delegation-manage-redelegate-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    width: 100%;
+}
+
+#delegateSection .delegation-manage-redelegate-amount {
+    flex: 1 1 48px;
+    width: 48px;
+    min-width: 0;
+    max-width: 64px;
+}
+
+#delegateSection #delegationsDropdown {
+    width: max(100%, 480px);
+    max-width: min(520px, calc(100vw - 1.5rem));
+    right: auto;
+    max-height: min(70vh, 540px);
+    overflow-y: auto;
+}
+
+#delegateSection .delegation-manage-redelegate-select:disabled {
+    background: #eef3f1;
+    color: #7d9088;
+}
+
+#delegateSection .delegation-manage-redelegate-hint {
+    margin: 0;
+    font-size: 0.66rem;
+    line-height: 1.35;
+    color: #3d6459;
+    text-align: center;
 }
 
 #delegateSection #delegationsDropdown .delegation-manage-item-supplemental {
@@ -3731,6 +3850,10 @@ header {
 
     #delegateSection .trb-input-compact {
         max-width: none;
+    }
+
+    #delegateSection .delegation-manage-redelegate-select {
+        width: 100%;
     }
 }
 
@@ -3843,6 +3966,15 @@ header {
     transition: opacity 0.3s, visibility 0.3s;
 }
 
+.tooltip-text::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 14px;
+}
+
 .tooltip-text::after {
     content: "";
     position: absolute;
@@ -3868,10 +4000,36 @@ header {
     margin-left: 10px;
 }
 
+.tooltip-text-right::before {
+    top: 0;
+    bottom: 0;
+    left: auto;
+    right: 100%;
+    width: 16px;
+    height: auto;
+}
+
 .tooltip-text-right::after {
     top: 50%;
     left: -5px;
     margin-left: 0;
     margin-top: -5px;
     border-color: transparent #333 transparent transparent;
+}
+
+.modal-info-tooltip::before,
+.modal-info-tooltip::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 14px;
+}
+
+.modal-info-tooltip::before {
+    left: -14px;
+}
+
+.modal-info-tooltip::after {
+    right: -14px;
 }
